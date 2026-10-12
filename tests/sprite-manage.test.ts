@@ -202,14 +202,6 @@ test("set_properties records a pixel aspect and refuses one that is not W:H", as
   assert.deepEqual(sprite.pixelRatio, { w: 2, h: 1 });
 });
 
-test("slice ops answer unsupported_command, because slices are not ported", async () => {
-  const studio = createStudio();
-  await manage(studio, { op: "new", width: 2, height: 2 });
-  for (const op of ["slice_create", "slice_update", "slice_delete"]) {
-    await rejectsWith(manage(studio, { op, name: "s", bounds: { x: 0, y: 0, width: 1, height: 1 } }), "unsupported_command", /[Ss]lice/);
-  }
-});
-
 test("a missing op is invalid_args and an unknown one is unsupported_command", async () => {
   const studio = createStudio();
   await manage(studio, { op: "new", width: 2, height: 2 });

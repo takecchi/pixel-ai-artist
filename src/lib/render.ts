@@ -7,7 +7,7 @@ import { TRANSPARENT_GLYPH } from "./grid.js";
  *
  * A 32×32 sprite rendered as a PNG is ~8 screen pixels wide once a vision model
  * downsamples it; the model then guesses. Two representations fix that:
- *   - an upscaled preview PNG (done inside Aseprite, see the `preview` tool);
+ *   - an upscaled preview PNG (`look` op 'preview');
  *   - a text grid, one glyph per pixel, which is exact and works on clients
  *     with no vision at all.
  *

@@ -26,10 +26,11 @@ test("the tool surface stays small enough to be cheap on every turn", async () =
   for (const required of [
     "preflight", "sprite_info", "sprite_manage", "look", "read_pixels",
     "draw", "select", "transform", "layer", "frame", "tag", "cel",
-    "palette", "recolor", "validate", "reference", "export", "tileset",
+    "palette", "recolor", "validate", "reference", "export",
   ]) {
     assert.ok(names.includes(required), `missing tool '${required}'`);
   }
+  assert.equal(tools.length, 17);
 
   await close();
 });
@@ -67,16 +68,12 @@ test("sprite_info's payload stays inside its declared output schema", async () =
         visible: true,
         editable: true,
         opacity: 255,
-        blendMode: "normal",
-        isGroup: false,
-        isTilemap: false,
         cels: [1],
       },
     ],
     frames: [{ number: 1, durationMs: 100 }],
     tags: [],
     palette: ["#000000", "#ffffff"],
-    slices: [],
     selection: { x: 1, y: 2, width: 3, height: 4 },
     activeLayer: "Layer 1",
     activeFrame: 1,
@@ -195,15 +192,15 @@ test("the server instructions carry the rules an agent gets wrong catastrophical
   await close();
 });
 
-test("a tool whose command is not ported returns a structured unsupported_command error", async () => {
+test("a refused call comes back as an error result carrying its code, not a protocol error", async () => {
   const { client, close } = await connected();
   const result = await client.callTool({
-    name: "tileset",
-    arguments: { op: "list" },
+    name: "transform",
+    arguments: { op: "rotate", angle: 45 },
   });
   assert.equal(result.isError, true);
-  const structured = result.structuredContent as { code?: string };
-  assert.equal(structured.code, "unsupported_command");
+  const structured = result.structuredContent as { ok?: boolean; code?: string };
+  assert.deepEqual([structured.ok, structured.code], [false, "refused"]);
   await close();
 });
 

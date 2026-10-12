@@ -31,7 +31,9 @@ under them changes, not ahead of it.
   client and headless `aseprite -b` — is gone. Tools call `Studio.call` with
   the extension's command names.
 - Tilesets, slices, linked cels, blend modes, layer groups and `run_lua` are
-  not ported. Requests for them return `unsupported_command`.
+  not ported and not on the tool surface: no schema field or op names them.
+  A command still being ported answers `unsupported_command`.
+- No undo. A batch (`draw`, `layer`) lands whole or not at all instead.
 
 ## The rules that are not negotiable
 

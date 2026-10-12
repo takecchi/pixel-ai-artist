@@ -16,7 +16,7 @@ import {
 import type { HandlerTable, Studio } from "../studio.js";
 import { spriteSummary } from "./session.js";
 
-/** The extension's flatten_layers, for a model with no groups, blend modes or tilemaps. */
+/** The extension's flatten_layers. */
 export function layerInfo(layer: Layer, index: number) {
   return {
     name: layer.name,
@@ -24,9 +24,6 @@ export function layerInfo(layer: Layer, index: number) {
     visible: layer.visible,
     editable: layer.editable,
     opacity: layer.opacity,
-    blendMode: "normal",
-    isGroup: false,
-    isTilemap: false,
     cels: [...layer.cels.keys()].sort((a, b) => a - b),
   };
 }
@@ -40,9 +37,6 @@ function selectionBounds(sprite: Sprite) {
 
 function spriteInfo(studio: Studio, args: Record<string, unknown>) {
   const sprite = studio.resolveSprite(args.sprite);
-  if (args.includeSlices) {
-    throw new ToolError("unsupported_command", "Slices are not supported.", { command: "sprite.info" });
-  }
   const active = sprite.layers.length > 0 ? studio.resolveLayer(sprite) : undefined;
   return {
     id: sprite.id,
@@ -200,10 +194,6 @@ function spriteManage(studio: Studio, args: Record<string, unknown>) {
   if (op === "open") {
     const s = openSprite(studio, String(need(args.path, "path")));
     return { sprite: displayName(s), id: s.id, width: s.width, height: s.height };
-  }
-
-  if (typeof op === "string" && op.startsWith("slice_")) {
-    throw new ToolError("unsupported_command", "Slices are not supported.", { command: "sprite.manage", op });
   }
 
   const s = studio.resolveSprite(args.sprite);

@@ -25,7 +25,6 @@ names everywhere:
 | `pixel-ai-artist:shade` | Flat art needs volume |
 | `pixel-ai-artist:rig` | A character needs to be animatable |
 | `pixel-ai-artist:animate` | Building a cycle |
-| `pixel-ai-artist:tileset` | Level art and anything that repeats |
 | `pixel-ai-artist:review` | Before saying anything is finished |
 | `pixel-ai-artist:fix` | Editing art that already exists |
 | `pixel-ai-artist:export` | Handing files to a game engine |

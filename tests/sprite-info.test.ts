@@ -60,8 +60,8 @@ test("layers are listed bottom to top with a 1-based index and the frames that h
   studio.ensureCel(sprite, bottom, 1);
   const info = await studio.call<Info>("sprite.info");
   assert.deepEqual(info.layers, [
-    { name: "Layer 1", index: 1, visible: true, editable: true, opacity: 255, blendMode: "normal", isGroup: false, isTilemap: false, cels: [1, 3] },
-    { name: "ink", index: 2, visible: false, editable: false, opacity: 128, blendMode: "normal", isGroup: false, isTilemap: false, cels: [] },
+    { name: "Layer 1", index: 1, visible: true, editable: true, opacity: 255, cels: [1, 3] },
+    { name: "ink", index: 2, visible: false, editable: false, opacity: 128, cels: [] },
   ]);
   assert.deepEqual(info.frames, [
     { number: 1, durationMs: 100 },
@@ -127,12 +127,6 @@ test("sprite.info reads a sprite that is not the active one when named", async (
   studio.addSprite({ width: 9, height: 9 });
   const info = await studio.call<Info>("sprite.info", { sprite: `#${first.id}` });
   assert.deepEqual([info.width, info.height], [3, 5]);
-});
-
-test("asking for slices answers unsupported_command, because slices are not ported", async () => {
-  const studio = createStudio();
-  studio.addSprite({ width: 4, height: 4 });
-  await rejectsWith(studio.call("sprite.info", { includeSlices: true }), "unsupported_command", /[Ss]lices/);
 });
 
 test("with no sprite open, sprite.info answers no_active_sprite", async () => {

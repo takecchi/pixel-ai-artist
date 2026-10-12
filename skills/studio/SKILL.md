@@ -150,7 +150,7 @@ route around. Say which mode you used in the report.
 | Pixel art of a picture the user supplied ("make this character a sprite") | `pixel-ai-artist:brief` if size or palette is open → `pixel-ai-artist:concept` from its reference step → `pixel-ai-artist:new` → `pixel-ai-artist:draw` → `pixel-ai-artist:review` |
 | An animation of a character | the drawing chain above if nothing exists yet, with a storyboard in the concept prompt → `pixel-ai-artist:rig` → `pixel-ai-artist:animate` → `pixel-ai-artist:review` |
 | An animation of a sprite that is already rigged | `pixel-ai-artist:concept` for the storyboard (offer) → `pixel-ai-artist:animate` → `pixel-ai-artist:review` |
-| Tiles, terrain, level art | `pixel-ai-artist:brief` if open-ended → `pixel-ai-artist:concept` (an environment sheet) → `pixel-ai-artist:tileset` → `pixel-ai-artist:review` |
+| Tiles, terrain, level art | `pixel-ai-artist:brief` if open-ended → `pixel-ai-artist:concept` (an environment sheet) → `pixel-ai-artist:draw` → `pixel-ai-artist:review` |
 | Colours changed, a retro look, a cleanup | `pixel-ai-artist:palette` → `pixel-ai-artist:review` |
 | Volume, light, "it looks flat" | `pixel-ai-artist:shade` → `pixel-ai-artist:review` |
 | A change to existing art ("make it more menacing", "fix the hands") | `pixel-ai-artist:fix` → `pixel-ai-artist:review` |

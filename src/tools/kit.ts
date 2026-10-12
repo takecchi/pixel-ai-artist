@@ -22,7 +22,7 @@ export const targetShape = {
     .string()
     .optional()
     .describe(
-      "Which sprite: its id as '#7' (what every result reports back, and the only unambiguous form — two unsaved documents are both called 'Sprite'), its filename, or its display name. Omit to use the sprite Aseprite has focused.",
+      "Which sprite: its id as '#7' (what every result reports back, and the only unambiguous form — two unsaved documents are both called 'Sprite'), its filename, or its display name. Omit to use the active sprite, which preflight reports.",
     ),
   layer: z.string().optional().describe("Layer name. Omit to use the active layer."),
   frame: z

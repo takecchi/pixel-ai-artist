@@ -40,12 +40,6 @@ function opacityArg(value: unknown): number {
   return value;
 }
 
-function refuseBlendMode(value: unknown): void {
-  if (value !== undefined && value !== "normal") {
-    throw new ToolError("unsupported_command", `Blend mode '${String(value)}' is not supported; layers blend normally.`);
-  }
-}
-
 /** Moves `layer` to 1-based stack position `index` (1 = bottom), clamped to the stack. */
 function restack(sprite: Sprite, layer: Layer, index: unknown): void {
   const n = Math.floor(Number(index));
@@ -125,11 +119,6 @@ function mergeDown(studio: Studio, sprite: Sprite, layer: Layer): void {
 
 function applyOp(studio: Studio, sprite: Sprite, op: Op, duplicated: Duplicated[]): void {
   const kind = op.op;
-  if (kind === "group" || kind === "ungroup" || op.parent !== undefined) {
-    throw new ToolError("unsupported_command", "Layer groups are not supported.");
-  }
-  refuseBlendMode(op.blendMode);
-
   if (kind === "create") {
     const layer = studio.addLayer(sprite, typeof op.name === "string" ? op.name : `Layer ${sprite.layers.length + 1}`);
     if (op.opacity !== undefined) layer.opacity = opacityArg(op.opacity);
