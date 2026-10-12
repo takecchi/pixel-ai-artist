@@ -46,6 +46,16 @@ test("every tool declares a description and an output schema", async () => {
   await close();
 });
 
+test("select declares no layer, because a selection belongs to the sprite and op color reads the composite", async () => {
+  const { client, close } = await connected();
+  const { tools } = await client.listTools();
+  const select = tools.find((t) => t.name === "select")!;
+  const props = Object.keys((select.inputSchema as { properties?: Record<string, unknown> }).properties ?? {});
+  assert.ok(props.includes("sprite") && props.includes("frame"));
+  assert.ok(!props.includes("layer"));
+  await close();
+});
+
 test("sprite_info's payload stays inside its declared output schema", async () => {
   // OpenCode validates structuredContent strictly and rejects any property the
   // schema does not declare ("data must NOT have additional properties"), so a

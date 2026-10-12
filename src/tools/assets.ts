@@ -90,7 +90,7 @@ export function registerAssetTools(server: McpServer, studio: Studio): void {
           .describe(
             "Output file path. For 'frames', a pattern containing {frame}, e.g. 'walk_{frame}.png' — one file per frame, numbered from 0.",
           ),
-        frame: targetShape.frame,
+        frame: targetShape.frame.describe("For 'png': the frame written. Omit for the active frame. The other ops write every frame, or the frames `tags` cover."),
         scale: z.number().int().min(1).max(16).default(1).describe("Integer upscale, nearest-neighbour."),
         sheetType: z
           .enum(["horizontal", "vertical", "rows", "columns", "packed"])

@@ -305,7 +305,8 @@ export function registerDrawTools(server: McpServer, studio: Studio): void {
         "Read or change the active selection. Ops: 'get', 'none', 'all', 'rect', 'ellipse', 'color' (a magic wand: select the pixels of the composited frame matching a colour, within `tolerance`, either all of them or only those connected to a start point x,y), 'invert', 'grow', 'shrink'. A selection scopes draw, transform and recolor, which is usually cheaper and safer than masking by hand.",
       inputSchema: {
         op: z.enum(["get", "none", "all", "rect", "ellipse", "color", "invert", "grow", "shrink"]),
-        ...targetShape,
+        sprite: targetShape.sprite,
+        frame: targetShape.frame.describe("For op 'color': the frame whose composite is matched. Omit to use the active frame."),
         rect: rectShape.optional(),
         color: hexColor.optional().describe("For op 'color'."),
         tolerance: z.number().int().min(0).max(255).default(0).describe("For op 'color'. Largest per-channel difference (0–255, alpha included) still counted as `color`, the same comparison as draw's fill. 0 matches the exact RGB, ignoring alpha. RGB sprites only; indexed and grayscale sprites stay exact."),
@@ -316,7 +317,7 @@ export function registerDrawTools(server: McpServer, studio: Studio): void {
         mode: z
           .enum(["replace", "add", "subtract", "intersect"])
           .default("replace")
-          .describe("How this selection combines with the existing one."),
+          .describe("How this selection combines with the existing one, for rect, ellipse, color, grow and shrink. 'none', 'all' and 'invert' always replace."),
       },
       outputSchema: {
         sprite: z.string(),
@@ -343,7 +344,7 @@ export function registerDrawTools(server: McpServer, studio: Studio): void {
     {
       title: "Transform",
       description:
-        "Move, flip, rotate or scale pixels on ONE cel — the target layer's image on the target frame. Ops: 'translate', 'flip', 'rotate', 'scale', 'outline', 'crop_to_content'. " +
+        "Move, flip, rotate or scale pixels on ONE cel — the target layer's image on the target frame. Ops: 'translate', 'flip', 'rotate', 'scale', 'outline', 'crop_to_content' (the exception: it trims the whole canvas to the content of every visible layer on every frame). " +
         "To transform part of a cel, crop the region out with `draw` op 'blit' first; there is no selection-scoped transform. " +
         "Rotation is only clean at 90° multiples — arbitrary angles destroy pixel art, so anything else needs `allowLossy`. " +
         "Scaling is nearest-neighbour and integer-only for the same reason.",

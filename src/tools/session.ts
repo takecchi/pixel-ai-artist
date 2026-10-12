@@ -142,7 +142,7 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
           ),
         width: z.number().int().positive().optional(),
         height: z.number().int().positive().optional(),
-        colorMode: z.enum(["rgb", "grayscale", "indexed"]).optional().describe("For 'new'. Indexed keeps a sprite honest about its palette."),
+        colorMode: z.enum(["rgb", "grayscale", "indexed"]).optional().describe("For 'new', or 'set_properties' to convert an existing sprite. Indexed keeps a sprite honest about its palette."),
         anchor: z
           .enum(["top_left", "top", "top_right", "left", "center", "right", "bottom_left", "bottom", "bottom_right"])
           .default("center")

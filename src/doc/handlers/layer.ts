@@ -123,6 +123,7 @@ function applyOp(studio: Studio, sprite: Sprite, op: Op, duplicated: Duplicated[
     const layer = studio.addLayer(sprite, typeof op.name === "string" ? op.name : `Layer ${sprite.layers.length + 1}`);
     if (op.opacity !== undefined) layer.opacity = opacityArg(op.opacity);
     if (op.visible !== undefined) layer.visible = Boolean(op.visible);
+    if (op.editable !== undefined) layer.editable = Boolean(op.editable);
     if (op.index !== undefined) restack(sprite, layer, op.index);
     return;
   }

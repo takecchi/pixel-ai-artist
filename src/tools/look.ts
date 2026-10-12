@@ -63,7 +63,7 @@ export function registerLookTools(server: McpServer, studio: Studio): void {
             height: z.number().int().positive(),
           })
           .optional()
-          .describe("Crop. Omit to read the whole canvas."),
+          .describe("Crop. Omit to read the whole canvas. 'filmstrip' always shows whole frames."),
         layer: z
           .string()
           .optional()
@@ -313,7 +313,9 @@ export function registerLookTools(server: McpServer, studio: Studio): void {
       description:
         "Read a rectangular region as structured data: a list of distinct colours plus a row-major index grid. Use this when you need to compute over pixels (sample a palette from art, find a silhouette edge, copy a region) rather than just look at them. For eyeballing, 'look' is cheaper.",
       inputSchema: {
-        ...targetShape,
+        sprite: targetShape.sprite,
+        layer: targetShape.layer.describe("With composite false: the layer whose cel is read. Omit for the active layer. Ignored when composite is true."),
+        frame: targetShape.frame,
         region: z
           .object({
             x: z.number().int(),
