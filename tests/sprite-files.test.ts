@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 import { Image, ToolError, createStudio, rgba } from "../dist/doc/index.js";
 import { encodeGif, decodeGif } from "../dist/lib/gif.js";
 import { decodePng, encodePng } from "../dist/lib/png.js";
@@ -131,7 +132,7 @@ test("open reads a JPEG as an RGB sprite", async () => {
 });
 
 function fileURLPath(rel: string): string {
-  return new URL(rel, import.meta.url).pathname;
+  return fileURLToPath(new URL(rel, import.meta.url));
 }
 
 test("open tells the format by content, not by extension", async () => {
