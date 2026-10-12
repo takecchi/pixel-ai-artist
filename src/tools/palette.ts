@@ -3,9 +3,10 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { AsepriteLink } from "../bridge/link.js";
+import type { Studio } from "../doc/index.js";
 import { buildRamp, contrastRatio, parseHex, snapToPalette, toHex } from "../lib/color.js";
 import { fail, hexColor, ok, targetShape } from "./kit.js";
+import { ToolError } from "../doc/errors.js";
 
 export interface Preset {
   name: string;
@@ -51,7 +52,7 @@ export function searchPresets(query: string, limit = 20): { key: string; preset:
     .map(({ key, preset }) => ({ key, preset }));
 }
 
-export function registerPaletteTools(server: McpServer, live: AsepriteLink): void {
+export function registerPaletteTools(server: McpServer, studio: Studio): void {
   server.registerTool(
     "palette",
     {
@@ -151,9 +152,9 @@ export function registerPaletteTools(server: McpServer, live: AsepriteLink): voi
       try {
         switch (args.op) {
           case "ramp": {
-            if (!args.base) return fail(new Error("op 'ramp' needs a `base` colour."));
+            if (!args.base) return fail(new ToolError("invalid_args", "op 'ramp' needs a `base` colour."));
             const ramp = buildRamp(parseHex(args.base), args.steps, args.spread);
-            const data = await live.call<Record<string, unknown>>("palette.set", {
+            const data = await studio.call<Record<string, unknown>>("palette.set", {
               sprite: args.sprite,
               colors: ramp,
               append: true,
@@ -192,7 +193,7 @@ export function registerPaletteTools(server: McpServer, live: AsepriteLink): voi
                   : `No preset matches '${query}' among ${Object.keys(table).length}. Search by a word of the name or author (e.g. 'endesga', 'gameboy', 'nes'), or load a palette file with op 'load'.`,
               );
             }
-            const data = await live.call<Record<string, unknown>>("palette.set", {
+            const data = await studio.call<Record<string, unknown>>("palette.set", {
               sprite: args.sprite,
               colors: chosen.colors,
               replace: args.replace !== false,
@@ -205,8 +206,8 @@ export function registerPaletteTools(server: McpServer, live: AsepriteLink): voi
           }
 
           case "load": {
-            if (!args.path) return fail(new Error("op 'load' needs a `path`."));
-            const data = await live.call<Record<string, unknown>>("palette.load", {
+            if (!args.path) return fail(new ToolError("invalid_args", "op 'load' needs a `path`."));
+            const data = await studio.call<Record<string, unknown>>("palette.load", {
               sprite: args.sprite,
               path: args.path,
               replace: args.replace,
@@ -217,9 +218,9 @@ export function registerPaletteTools(server: McpServer, live: AsepriteLink): voi
 
           case "set": {
             if (!args.colors || args.colors.length === 0) {
-              return fail(new Error("op 'set' needs at least one colour."));
+              return fail(new ToolError("invalid_args", "op 'set' needs at least one colour."));
             }
-            const data = await live.call<Record<string, unknown>>("palette.set", {
+            const data = await studio.call<Record<string, unknown>>("palette.set", {
               sprite: args.sprite,
               colors: args.colors,
               startIndex: args.startIndex,
@@ -230,7 +231,7 @@ export function registerPaletteTools(server: McpServer, live: AsepriteLink): voi
           }
 
           case "analyze": {
-            const state = await live.call<{
+            const state = await studio.call<{
               sprite: string;
               colors: string[];
               usage: { index: number; hex: string; pixels: number }[];
@@ -243,7 +244,7 @@ export function registerPaletteTools(server: McpServer, live: AsepriteLink): voi
           }
 
           case "extract": {
-            const data = await live.call<{ sprite: string; colors: string[] }>("palette.extract", {
+            const data = await studio.call<{ sprite: string; colors: string[] }>("palette.extract", {
               sprite: args.sprite,
               maxColors: args.maxColors,
             });
@@ -254,7 +255,7 @@ export function registerPaletteTools(server: McpServer, live: AsepriteLink): voi
           }
 
           default: {
-            const data = await live.call<Record<string, unknown>>("palette.get", {
+            const data = await studio.call<Record<string, unknown>>("palette.get", {
               sprite: args.sprite,
             });
             const colors = (data.colors as string[]) ?? [];

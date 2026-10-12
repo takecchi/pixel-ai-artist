@@ -1,4 +1,4 @@
-import { LiveError } from "./protocol.js";
+import { ToolError } from "../doc/errors.js";
 // Shared with the grid compiler: `look ascii` output must draw back unchanged.
 import { TRANSPARENT_GLYPH } from "./grid.js";
 
@@ -83,7 +83,7 @@ class GlyphTable {
     } else {
       glyph = GLYPHS[this.nextFree++];
       if (glyph === undefined) {
-        throw new LiveError(
+        throw new ToolError(
           "too_large",
           `Colour ${color} has no glyph: the palette and the off-palette colours together need more than ${GLYPHS.length}. ` +
             `Sharing a glyph would make the grid lie about which colour is where. Snap the art to the palette ` +
@@ -193,7 +193,7 @@ export interface DiffView {
  */
 export function renderDiff(before: PixelRegion, after: PixelRegion, palette: readonly string[] = []): DiffView {
   if (before.width !== after.width || before.height !== after.height) {
-    throw new LiveError(
+    throw new ToolError(
       "invalid_args",
       `Cannot diff regions of different sizes (${before.width}×${before.height} vs ${after.width}×${after.height}).`,
     );

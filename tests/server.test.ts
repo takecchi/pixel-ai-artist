@@ -7,19 +7,11 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createServer } from "../dist/server.js";
 
 async function connected(opts: { prompts?: boolean } = {}) {
-  const { server, live } = createServer({
-    // Ports nothing listens on, and no bridge spawn: these tests are about the
-    // MCP surface, not the Aseprite link.
-    pluginPort: 19941,
-    controlPort: 19942,
-    autoSpawnBridge: false,
-    allowLua: false,
-    ...opts,
-  });
+  const { server } = createServer(opts);
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: "test", version: "0" });
   await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
-  return { client, close: async () => { live.close(); await server.close(); } };
+  return { client, close: async () => { await server.close(); } };
 }
 
 test("the tool surface stays small enough to be cheap on every turn", async () => {
@@ -38,10 +30,6 @@ test("the tool surface stays small enough to be cheap on every turn", async () =
   ]) {
     assert.ok(names.includes(required), `missing tool '${required}'`);
   }
-
-  // run_lua is arbitrary code execution in the app holding the user's unsaved
-  // work; it must stay off until the operator opts in.
-  assert.ok(!names.includes("run_lua"), "run_lua exposed without opt-in");
 
   await close();
 });
@@ -207,20 +195,19 @@ test("the server instructions carry the rules an agent gets wrong catastrophical
   await close();
 });
 
-test("a mutating tool returns a structured not_connected error, not a hang", async () => {
+test("a tool whose command is not ported yet returns a structured unsupported_command error", async () => {
   const { client, close } = await connected();
   const result = await client.callTool({
     name: "draw",
     arguments: { ops: [{ kind: "pixels", color: "#ffffff", points: [{ x: 0, y: 0 }] }] },
   });
   assert.equal(result.isError, true);
-  const structured = result.structuredContent as { code?: string; details?: Record<string, unknown> };
-  assert.equal(structured.code, "not_connected");
-  assert.equal(structured.details?.doNotFallBackToDisk, true);
+  const structured = result.structuredContent as { code?: string };
+  assert.equal(structured.code, "unsupported_command");
   await close();
 });
 
-test("draw measureOnly with a text op returns textBounds and never calls the (absent) bridge", async () => {
+test("draw measureOnly with a text op returns textBounds and never calls the studio", async () => {
   const { client, close } = await connected();
   const result = await client.callTool({
     name: "draw",
@@ -229,10 +216,9 @@ test("draw measureOnly with a text op returns textBounds and never calls the (ab
       ops: [{ kind: "text", text: "Hi", x: 10, y: 10, color: "#ffffff" }],
     },
   });
-  // No bridge is running (autoSpawnBridge: false); if measureOnly reached
-  // live.call anyway this would fail with a structured not_connected error
-  // instead of answering, since nothing is listening on the plugin port.
-  assert.notEqual(result.isError, true, "measureOnly must not touch the live bridge");
+  // draw.batch has no handler yet: if measureOnly reached studio.call anyway
+  // this would fail with unsupported_command instead of answering.
+  assert.notEqual(result.isError, true, "measureOnly must not touch the studio");
   const structured = result.structuredContent as {
     measureOnly: boolean;
     textBounds: { index: number; bounds: { x: number; y: number; width: number; height: number } | null }[];
@@ -263,30 +249,21 @@ test("draw measureOnly rejects a batch that mixes a non-text op", async () => {
   await close();
 });
 
-test("preflight answers instead of failing when Aseprite is absent", async () => {
+test("preflight reports ready with this server's version and asks for a sprite when none is open", async () => {
   const { client, close } = await connected();
   const result = await client.callTool({ name: "preflight", arguments: {} });
   assert.notEqual(result.isError, true, "preflight must always answer");
-  const structured = result.structuredContent as { ready: boolean; directive: string };
-  assert.equal(structured.ready, false);
-  assert.ok(structured.directive.length > 20);
+  const structured = result.structuredContent as {
+    ready: boolean;
+    version: string;
+    activeSprite?: unknown;
+    directive: string;
+  };
+  const pkg = JSON.parse(readFileSync(path.resolve(import.meta.dirname, "..", "package.json"), "utf8"));
+  assert.equal(structured.ready, true);
+  assert.equal(structured.version, pkg.version);
+  assert.equal(structured.activeSprite ?? null, null);
+  assert.match(structured.directive, /no sprite open/);
+  assert.match(structured.directive, /sprite_manage op 'new'/);
   await close();
-});
-
-test("run_lua appears only when the operator enables it", async () => {
-  const { server, live } = createServer({
-    pluginPort: 19943,
-    controlPort: 19944,
-    autoSpawnBridge: false,
-    allowLua: true,
-  });
-  const [ct, st] = InMemoryTransport.createLinkedPair();
-  const client = new Client({ name: "test", version: "0" });
-  await Promise.all([client.connect(ct), server.connect(st)]);
-
-  const { tools } = await client.listTools();
-  assert.ok(tools.some((t) => t.name === "run_lua"));
-
-  live.close();
-  await server.close();
 });

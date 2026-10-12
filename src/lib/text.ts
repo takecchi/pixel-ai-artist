@@ -16,7 +16,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { LiveError } from "./protocol.js";
+import { ToolError } from "../doc/errors.js";
 
 export interface Font {
   name: string;
@@ -97,7 +97,7 @@ export function loadFont(name: string): Font {
   try {
     font = JSON.parse(readFileSync(file, "utf8")) as Font;
   } catch {
-    throw new LiveError(
+    throw new ToolError(
       "invalid_args",
       `Unknown font '${name}'. No file at knowledge/fonts/${name}.json.`,
       { font: name },

@@ -2,47 +2,30 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { LiveClient } from "./bridge/client.js";
-import { HeadlessClient, editorGuard } from "./bridge/headless.js";
-import { LinkSelector } from "./bridge/selector.js";
-import { findAsepriteBinary } from "./extension.js";
+import { createStudio, type Studio } from "./doc/index.js";
 import { loadRules, loadSkills, serverInstructions, type RuleDoc } from "./lib/skills.js";
 import { packageRoot, packageVersion } from "./lib/version.js";
 import { registerAssetTools } from "./tools/assets.js";
 import { registerCraftTools } from "./tools/craft.js";
 import { registerDrawTools } from "./tools/draw.js";
-import { registerEscapeTools } from "./tools/escape.js";
 import { registerLookTools } from "./tools/look.js";
 import { registerPaletteTools } from "./tools/palette.js";
 import { registerSessionTools } from "./tools/session.js";
 import { registerStructureTools } from "./tools/structure.js";
 
 export interface CreateServerOptions {
-  controlPort?: number;
-  pluginPort?: number;
-  /** Enables the run_lua escape hatch. Off unless the operator opts in. */
-  allowLua?: boolean;
   /**
    * Register every workflow as an MCP prompt. Plugin installs (Claude Code,
    * omp) turn this off: they already list the skills as `/pixel-ai-artist:<name>`, and
    * the harness would add the prompts again as `/pixel-ai-artist:pixel-ai-artist:pixel-ai-artist:<name>`.
    */
   prompts?: boolean;
-  autoSpawnBridge?: boolean;
   root?: string;
-  /**
-   * Start against a batch Aseprite this server owns instead of the user's
-   * window. The session can still switch explicitly with `preflight mode=…`;
-   * nothing switches on its own (ADR-0008).
-   */
-  headless?: boolean;
-  /** Headless: the Aseprite executable. Default: ASEPRITE_PATH, then the usual install locations. */
-  asepritePath?: string;
 }
 
 export interface RunningServer {
   server: McpServer;
-  live: LinkSelector;
+  studio: Studio;
 }
 
 export function createServer(opts: CreateServerOptions = {}): RunningServer {
@@ -50,32 +33,7 @@ export function createServer(opts: CreateServerOptions = {}): RunningServer {
   const skills = loadSkills(root);
   const rules = loadRules(root);
 
-  // stderr is the only channel that will not corrupt a stdio MCP session.
-  const log = (msg: string) => process.stderr.write(`[pixel-ai-artist] ${msg}\n`);
-  const live = new LinkSelector(
-    {
-      live: () =>
-        new LiveClient({
-          controlPort: opts.controlPort,
-          pluginPort: opts.pluginPort,
-          autoSpawnBridge: opts.autoSpawnBridge ?? true,
-          log,
-        }),
-      headless: () =>
-        new HeadlessClient({
-          asepritePath: opts.asepritePath ?? findAsepriteBinary(),
-          root,
-          allowLua: opts.allowLua ?? false,
-          // Watches the user's window without ever starting a bridge: its only
-          // job is to refuse a headless write to a file that window has open.
-          guard: editorGuard(
-            new LiveClient({ controlPort: opts.controlPort, pluginPort: opts.pluginPort, autoSpawnBridge: false }),
-          ),
-          log,
-        }),
-    },
-    opts.headless ? "headless" : "live",
-  );
+  const studio = createStudio();
 
   const server = new McpServer(
     {
@@ -87,22 +45,21 @@ export function createServer(opts: CreateServerOptions = {}): RunningServer {
       // Capabilities are left to the SDK to infer from what actually gets
       // registered. Declaring `prompts` by hand while no prompt exists
       // advertises a method that then answers -32601 Method not found.
-      instructions: serverInstructions(skills, live.mode),
+      instructions: serverInstructions(skills),
     },
   );
 
-  registerSessionTools(server, live);
-  registerLookTools(server, live);
-  registerDrawTools(server, live);
-  registerStructureTools(server, live);
-  registerPaletteTools(server, live);
-  registerCraftTools(server, live);
-  registerAssetTools(server, live);
-  registerEscapeTools(server, live, opts.allowLua ?? false);
+  registerSessionTools(server, studio);
+  registerLookTools(server, studio);
+  registerDrawTools(server, studio);
+  registerStructureTools(server, studio);
+  registerPaletteTools(server, studio);
+  registerCraftTools(server, studio);
+  registerAssetTools(server, studio);
 
   registerSkillSurface(server, root, skills, rules, opts.prompts ?? true);
 
-  return { server, live };
+  return { server, studio };
 }
 
 function registerSkillSurface(

@@ -3,11 +3,9 @@
  *
  * omp installs this repository as a marketplace plugin and picks up the
  * skills, agents and MCP server from the same tree Claude Code uses — but it
- * does not run Claude's `hooks.json`. This module restores the two hooks there
+ * does not run Claude's `hooks.json`. This module restores the hook there
  * with omp's event API, so neither harness gets less discipline than the other:
  *
- * - SessionStart → a hidden note on the first prompt saying whether the bridge
- *   is reachable.
  * - PostToolUse on draw/recolor/transform → the "look at it" nudge, appended to
  *   the first successful mutating result of the session.
  *
@@ -15,7 +13,7 @@
  * step and no dev dependencies, and the handlers only use the event payloads.
  */
 
-import { bridgeStatusMessage, LOOK_NUDGE, loadSkillCommands, skillPrompt } from "../hooks/shared.mjs";
+import { LOOK_NUDGE, loadSkillCommands, skillPrompt } from "../hooks/shared.mjs";
 
 // Claude names plugin MCP tools `mcp__plugin_pixel-ai-artist_pixel-ai-artist__draw`; omp
 // names the same tool `mcp__pixel-ai-artist_pixel-ai-artist_draw`, and a server wired by hand
@@ -27,14 +25,9 @@ export function isPixelMutation(toolName) {
 }
 
 export default function pixelAiArtist(pi) {
-  let status = null;
-  let statusSent = false;
   let nudged = false;
 
   const reset = () => {
-    // Probe at session start so the first prompt never waits on it.
-    status = bridgeStatusMessage();
-    statusSent = false;
     nudged = false;
   };
   pi.on("session_start", reset);
@@ -50,19 +43,6 @@ export default function pixelAiArtist(pi) {
       },
     });
   }
-
-  pi.on("before_agent_start", async () => {
-    if (statusSent) return;
-    statusSent = true;
-    return {
-      message: {
-        customType: "pixel-ai-artist/status",
-        content: await (status ?? bridgeStatusMessage()),
-        display: false,
-        attribution: "agent",
-      },
-    };
-  });
 
   // Once per session: a reminder the model sees on every draw becomes noise it
   // learns to skip.

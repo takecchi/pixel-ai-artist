@@ -13,7 +13,7 @@ under them changes, not ahead of it.
 
 | Path | What |
 |------|------|
-| `src/` | The MCP server, bridge, control client and CLI (TypeScript) |
+| `src/` | The MCP server and CLI (TypeScript) |
 | `src/doc/` | The in-process documents: model, `Studio`, and one handler module per area under `handlers/` |
 | `rules/` | Pixel-art craft, served as `rules://` resources |
 | `skills/` | Workflows, served as `skill://` resources and MCP prompts |
@@ -28,8 +28,8 @@ under them changes, not ahead of it.
   tools draw into them; results leave as files (PNG, GIF, sprite sheets, and
   later `.ase` so Aseprite can open them).
 - The Aseprite link — the Lua extension, the WebSocket bridge, the control
-  client and headless `aseprite -b` — is being removed; code still under
-  `src/bridge/` is on its way out.
+  client and headless `aseprite -b` — is gone. Tools call `Studio.call` with
+  the extension's command names.
 - Tilesets, slices, linked cels, blend modes, layer groups and `run_lua` are
   not ported. Requests for them return `unsupported_command`.
 
@@ -72,7 +72,7 @@ Copy both blocks into any new workflow.
 ## Testing
 
 ```bash
-npm test   # colour, rendering, bridge transport, MCP surface
+npm test   # colour, rendering, documents, MCP surface
 ```
 
 `package-lock.json` is the only lockfile; `bin/pixel-ai-artist.mjs`

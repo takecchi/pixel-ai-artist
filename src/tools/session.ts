@@ -1,9 +1,9 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { LinkSelector } from "../bridge/selector.js";
+import type { Studio } from "../doc/index.js";
 import { fail, ok, targetShape } from "./kit.js";
-import { LiveError } from "../lib/protocol.js";
 import { packageVersion } from "../lib/version.js";
+import { ToolError } from "../doc/errors.js";
 
 const boundsShape = z.object({
   x: z.number().int(),
@@ -20,31 +20,17 @@ const sliceInfoShape = z.object({
   pivot: z.object({ x: z.number().int(), y: z.number().int() }).optional(),
 });
 
-export function registerSessionTools(server: McpServer, live: LinkSelector): void {
+export function registerSessionTools(server: McpServer, studio: Studio): void {
   server.registerTool(
     "preflight",
     {
       title: "Preflight",
       description:
-        "Check that Aseprite is connected and report what this session can do. Call this FIRST in any pixel-art task and stop if `ready` is false — every editing tool writes into the user's open Aseprite window ('live') or into a batch Aseprite this server owns ('headless'), and there is no useful fallback when that Aseprite is not there. " +
-        "Pass `mode` to choose which one the session works with from now on — only because the user asked (e.g. --headless) or the request plainly needs no window (files for CI, a batch of assets). Never switch to get around a live session that is not ready: ask the user instead. Switching loses nothing; each side keeps its documents.",
-      inputSchema: {
-        mode: z
-          .enum(["live", "headless"])
-          .optional()
-          .describe("Switch the session to this Aseprite before checking. Omit to keep the current one."),
-      },
+        "Report what this session holds and what to do next. Call this FIRST in any pixel-art task. Documents live in this server's memory, with no editor and no window: the user sees only what `look` shows and the files you write, and nothing is on disk until you save or export.",
+      inputSchema: {},
       outputSchema: {
-        ready: z.boolean().describe("True only when Aseprite is attached and accepting commands."),
-        switched: z.boolean().describe("True when this call changed the session's mode."),
-        mode: z
-          .enum(["live", "headless"])
-          .describe("'live' = the user's open window. 'headless' = a batch Aseprite with no window; nothing is on disk until you save or export."),
-        bridgeConnected: z.boolean(),
-        pluginConnected: z.boolean(),
-        asepriteVersion: z.string().nullish(),
-        extensionVersion: z.string().nullish(),
-        features: z.array(z.string()).describe("Optional capabilities this extension build supports."),
+        ready: z.boolean().describe("Always true: the documents live in this process."),
+        version: z.string().describe("This server's version."),
         activeSprite: z
           .object({
             name: z.string(),
@@ -59,112 +45,23 @@ export function registerSessionTools(server: McpServer, live: LinkSelector): voi
       },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    async (args) => {
-      const switched = args.mode ? live.use(args.mode) : false;
-      if (live.mode === "headless") {
-        // Starting the batch process is part of the answer: a missing or
-        // broken executable is reported here, in its own words, rather than
-        // on the first draw call.
-        try {
-          const site = await live.call<Record<string, unknown>>("session.site", {}, { expect: ["openSprites"] });
-          const sprite = activeSpriteOf(site);
-          const version = String(live.hello?.asepriteVersion);
-          return ok(
-            {
-              ready: true,
-              mode: "headless",
-              switched,
-              bridgeConnected: live.bridgeConnected,
-              pluginConnected: live.pluginConnected,
-              asepriteVersion: live.hello?.asepriteVersion ?? null,
-              extensionVersion: live.hello?.extensionVersion ?? null,
-              features: live.features,
-              activeSprite: sprite,
-              directive:
-                "Ready, headless: there is no window, so the user sees only what `look` shows and the files you write. " +
-                "Open or create a sprite with sprite_manage, and save it (op 'save'/'save_as') before you finish — unsaved work is lost when this server stops.",
-            },
-            sprite
-              ? `READY (headless) — Aseprite ${version}, active sprite ${sprite.name} (${sprite.width}×${sprite.height}). Nothing is on disk until you save.`
-              : `READY (headless) — Aseprite ${version}, no sprite open. Nothing is on disk until you save.`,
-          );
-        } catch (err) {
-          const remediation = err instanceof LiveError ? err.details.remediation : undefined;
-          const message = err instanceof Error ? err.message : String(err);
-          return ok(
-            {
-              ready: false,
-              mode: "headless",
-              switched,
-              bridgeConnected: live.bridgeConnected,
-              pluginConnected: false,
-              asepriteVersion: null,
-              extensionVersion: null,
-              features: [],
-              activeSprite: null,
-              directive: `${message}${remediation ? ` ${String(remediation)}` : ""} Tell the user; do not write the files by another route.`,
-            },
-            "NOT READY — the headless Aseprite could not start. Do not attempt to write sprite files yourself instead.",
-          );
-        }
-      }
-
-      await live.waitForBridge(2_000);
-      if (!live.pluginConnected) await live.waitForPlugin(1_500);
-
-      const base = {
-        mode: "live" as const,
-        switched,
-        bridgeConnected: live.bridgeConnected,
-        pluginConnected: live.pluginConnected,
-        asepriteVersion: live.hello?.asepriteVersion ?? null,
-        extensionVersion: live.hello?.extensionVersion ?? null,
-        features: live.features,
-      };
-
-      if (!live.pluginConnected) {
-        return ok(
-          {
-            ...base,
-            ready: false,
-            activeSprite: null,
-            directive:
-              (live.bridgeConnected
-                ? "The bridge is running but Aseprite is not attached. Ask the user to open Aseprite with the pixel-ai-artist extension installed, then call preflight again."
-                : "The bridge is not running. Ask the user to run `npx pixel-ai-artist doctor`.") +
-              " If the work does not need their window, you may offer headless mode — ask; do not switch on your own.",
-          },
-          "NOT READY — Aseprite is not connected. Do not attempt to edit files on disk instead.",
-        );
-      }
-
-      // Aseprite loads the extension once, at startup, so an editor left open
-      // across an upgrade keeps answering with the old build — and the agent
-      // spends the session working around bugs that were fixed weeks ago. Say
-      // so up front; it is the first thing preflight is asked.
-      const stale =
-        base.extensionVersion !== null && base.extensionVersion !== packageVersion()
-          ? `The attached extension is ${String(base.extensionVersion)} but this server is ${packageVersion()}. ` +
-            "Tell the user to run `install-extension` and restart Aseprite before trusting a command that misbehaves. "
-          : "";
-
+    async () => {
       try {
-        const site = await live.call<Record<string, unknown>>("session.site", {}, { expect: ["openSprites"] });
+        const site = await studio.call<Record<string, unknown>>("session.site", {}, { expect: ["openSprites"] });
         const sprite = activeSpriteOf(site);
+        const version = packageVersion();
         return ok(
           {
-            ...base,
             ready: true,
+            version,
             activeSprite: sprite,
-            directive:
-              stale +
-              (sprite
-                ? "Ready. Call sprite_info before your first edit so you are working from the real layer, frame and palette state."
-                : "Ready, but no sprite is open. Use sprite_manage with op 'new' or 'open' first."),
+            directive: sprite
+              ? "Ready. Call sprite_info before your first edit so you are working from the real layer, frame and palette state. Nothing is on disk until you save or export."
+              : "Ready, no sprite open. Create one with sprite_manage op 'new', or 'open' a file. Nothing is on disk until you save or export.",
           },
           sprite
-            ? `READY — Aseprite ${base.asepriteVersion}, active sprite ${sprite.name} (${sprite.width}×${sprite.height}).`
-            : "READY — Aseprite is connected but no sprite is open.",
+            ? `READY — pixel-ai-artist ${version}, active sprite ${sprite.name} (${sprite.width}×${sprite.height}).`
+            : `READY — pixel-ai-artist ${version}, no sprite open.`,
         );
       } catch (err) {
         return fail(err);
@@ -229,7 +126,7 @@ export function registerSessionTools(server: McpServer, live: LinkSelector): voi
     },
     async (args) => {
       try {
-        const data = await live.call<Record<string, unknown>>("sprite.info", args, {
+        const data = await studio.call<Record<string, unknown>>("sprite.info", args, {
           expect: ["name", "width", "height", "colorMode", "frameCount", "layers"],
         });
         return ok(data, describeSprite(data));
@@ -320,19 +217,20 @@ export function registerSessionTools(server: McpServer, live: LinkSelector): voi
       try {
         if (args.op === "close" && !args.force) {
           // A close that discards work is not recoverable through undo.
-          const info = await live.call<{ modified?: boolean; name?: string }>("sprite.info", {
+          const info = await studio.call<{ modified?: boolean; name?: string }>("sprite.info", {
             sprite: args.sprite,
             includePalette: false,
           });
           if (info.modified) {
             return fail(
-              new Error(
+              new ToolError(
+                "refused",
                 `'${info.name ?? "This sprite"}' has unsaved changes. Save it first, or ask the user to confirm and call again with force: true.`,
               ),
             );
           }
         }
-        const data = await live.call<Record<string, unknown>>("sprite.manage", args);
+        const data = await studio.call<Record<string, unknown>>("sprite.manage", args);
         const merged = { op: args.op, ...data };
         // Hand back the unambiguous form: the display name of a fresh document
         // is "Sprite" for every unsaved sprite at once, so an agent that feeds

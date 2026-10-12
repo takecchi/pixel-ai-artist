@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { bridgeStatusMessage, LOOK_NUDGE, loadSkillCommands, skillPrompt } from "../hooks/shared.mjs";
+import { LOOK_NUDGE, loadSkillCommands, skillPrompt } from "../hooks/shared.mjs";
 
 const OWN_DIR = path.dirname(fileURLToPath(import.meta.url));
 
@@ -34,7 +34,6 @@ export default {
       return;
     }
     const commands = loadSkillCommands(skillsDir);
-    const statusSent = new Set();
     // The one look-nudge per session, split across two hooks: `execute.after`
     // detects the pixel mutation, and `context` delivers the reminder into the
     // next model call's system prompt. See the note on the `context` hook below
@@ -67,10 +66,6 @@ export default {
     });
 
     await ctx.session.hook("context", async (event) => {
-      if (!statusSent.has(event.sessionID)) {
-        statusSent.add(event.sessionID);
-        event.system.push({ type: "text", text: await bridgeStatusMessage() });
-      }
       if (pendingNudge.has(event.sessionID)) {
         pendingNudge.delete(event.sessionID);
         nudged.add(event.sessionID);

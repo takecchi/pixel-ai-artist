@@ -6,10 +6,6 @@ import extension, { isPixelMutation } from "../omp/pixel-ai-artist.mjs";
 // @ts-ignore
 import { LOOK_NUDGE, loadSkillCommands, skillPrompt } from "../hooks/shared.mjs";
 
-// Nothing listens here, so the status probe answers fast and never touches a
-// real Aseprite session.
-process.env.PIXEL_AI_CONTROL_PORT = "19961";
-
 type Handler = (event?: unknown) => unknown;
 
 function load() {
@@ -92,19 +88,4 @@ test("look nudge is appended once per session, only after a successful mutation"
 
   emit("session_start", { type: "session_start" });
   assert.ok(await emit("tool_result", result("mcp__pixel-ai-artist_pixel-ai-artist_transform")));
-});
-
-test("bridge status reaches the model once per session, hidden from the transcript", async () => {
-  const { emit } = load();
-  emit("session_start", { type: "session_start" });
-
-  const first = (await emit("before_agent_start", { prompt: "draw a knight" })) as {
-    message: { content: string; display: boolean };
-  };
-  assert.match(first.message.content, /no bridge on :19961/);
-  assert.equal(first.message.display, false);
-  assert.equal(await emit("before_agent_start", { prompt: "now shade it" }), undefined);
-
-  emit("session_switch", { type: "session_switch" });
-  assert.ok(await emit("before_agent_start", { prompt: "resumed" }));
 });

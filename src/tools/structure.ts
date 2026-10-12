@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { AsepriteLink } from "../bridge/link.js";
+import type { Studio } from "../doc/index.js";
 import { fail, ok, targetShape } from "./kit.js";
 
 /**
@@ -40,7 +40,7 @@ const layerOp = z.object({
     .describe("For 'duplicate': copy the layer into another OPEN sprite instead of this one."),
 });
 
-export function registerStructureTools(server: McpServer, live: AsepriteLink): void {
+export function registerStructureTools(server: McpServer, studio: Studio): void {
   server.registerTool(
     "layer",
     {
@@ -108,7 +108,7 @@ export function registerStructureTools(server: McpServer, live: AsepriteLink): v
     },
     async (args) => {
       try {
-        const data = await live.call<Record<string, unknown>>("layer.apply", args);
+        const data = await studio.call<Record<string, unknown>>("layer.apply", args);
         return ok(data, describeLayers(data));
       } catch (err) {
         return fail(err);
@@ -159,7 +159,7 @@ export function registerStructureTools(server: McpServer, live: AsepriteLink): v
     },
     async (args) => {
       try {
-        const data = await live.call<Record<string, unknown>>("frame.apply", args);
+        const data = await studio.call<Record<string, unknown>>("frame.apply", args);
         const total = data.totalDurationMs;
         const summary =
           typeof total === "number"
@@ -206,7 +206,7 @@ export function registerStructureTools(server: McpServer, live: AsepriteLink): v
     },
     async (args) => {
       try {
-        const data = await live.call<Record<string, unknown>>("tag.apply", args);
+        const data = await studio.call<Record<string, unknown>>("tag.apply", args);
         return ok(data);
       } catch (err) {
         return fail(err);
@@ -288,7 +288,7 @@ export function registerStructureTools(server: McpServer, live: AsepriteLink): v
     },
     async (args) => {
       try {
-        const data = await live.call<Record<string, unknown>>("cel.apply", args);
+        const data = await studio.call<Record<string, unknown>>("cel.apply", args);
         return ok(data);
       } catch (err) {
         return fail(err);

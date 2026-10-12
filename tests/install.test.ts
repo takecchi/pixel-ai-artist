@@ -37,13 +37,13 @@ test("opencode is a client, with an XDG-aware user path", () => {
 
 test("project scope writes the mcp.servers entry the plugin expects", () => {
   const dir = scratch();
-  const result = install("opencode", base(dir, { env: { PIXEL_AI_HEADLESS: "1" } }));
+  const result = install("opencode", base(dir, { env: { PIXEL_AI_EXTRA: "1" } }));
   assert.equal(result.written, true);
   const doc = JSON.parse(readFileSync(path.join(dir, ".opencode", "opencode.json"), "utf8"));
   assert.deepEqual(doc.mcp.servers["pixel-ai-artist"], {
     type: "local",
     command: ["npx", "-y", "pixel-ai-artist@latest", "serve"],
-    environment: { PIXEL_AI_HEADLESS: "1", PIXEL_AI_PROMPTS: "0" },
+    environment: { PIXEL_AI_EXTRA: "1", PIXEL_AI_PROMPTS: "0" },
   });
 });
 

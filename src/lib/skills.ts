@@ -126,20 +126,15 @@ function splitFrontmatter(raw: string): { frontmatter: Frontmatter; body: string
  * it is paid for on every session, so it carries only the rules an agent gets
  * wrong catastrophically, and points at the skills for everything else.
  */
-export function serverInstructions(skills: SkillDoc[], mode: "live" | "headless" = "live"): string {
+export function serverInstructions(skills: SkillDoc[]): string {
   const catalogue = skills.map((s) => `  - pixel-ai-artist:${s.name} (skill://${s.name}): ${s.description}`).join("\n");
 
-  const where =
-    mode === "headless"
-      ? "Pixel AI Artist — draw pixel art. This session starts HEADLESS: a batch Aseprite this server runs, with no window."
-      : "Pixel AI Artist — draw pixel art in the user's OPEN Aseprite window.";
-
-  return `${where} \`preflight\` with mode='live' or mode='headless' switches between the user's window and a headless batch Aseprite — only when the user asked (e.g. --headless) or the request plainly needs no window; never to get around a window that is not ready.
+  return `Pixel AI Artist — draw pixel art. Documents live in this server's memory, with no editor and no window: the user sees only what \`look\` shows and the files you write.
 
 Non-negotiables:
-1. Call \`preflight\` before anything else. If ready is false, stop and tell the user. Live: never fall back to editing .aseprite/.png files on disk — the user would not see those changes and a later save would overwrite them. Headless: documents live in memory and nothing reaches disk until \`sprite_manage\` op 'save'/'save_as' or \`export\` — save before you finish, and never write sprite files by any other route.
+1. Call \`preflight\` before anything else. Nothing reaches disk until \`sprite_manage\` op 'save'/'save_as' or \`export\` — save before you finish, and never write sprite files by any other route.
 2. Call \`sprite_info\` before your first edit. Layer names, frame count and palette must come from the document, never from assumption.
-3. Batch. One \`draw\` call carrying every op is right; forty calls carrying one op each is wrong. Each call is one undo step for the user.
+3. Batch. One \`draw\` call carrying every op is right; forty calls carrying one op each is wrong.
 4. Look at your work. After drawing, call \`look\` (op 'preview' to judge the read, op 'ascii' to verify exact pixels). Do not report a sprite finished without looking at it.
 5. Keep the palette. \`draw\` and \`recolor\` snap to the sprite's palette by default. If a colour you want is far from every palette entry, say so and ask before widening the palette.
 6. Run \`validate\` before declaring done.

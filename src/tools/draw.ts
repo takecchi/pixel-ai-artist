@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { AsepriteLink } from "../bridge/link.js";
-import { LiveError } from "../lib/protocol.js";
+import type { Studio } from "../doc/index.js";
+import { ToolError } from "../doc/errors.js";
 import { compileGrid, type CanvasSize } from "../lib/grid.js";
 import { layoutText, loadFont, type TextAnchor } from "../lib/text.js";
 import { fail, hexColor, ok, targetShape } from "./kit.js";
@@ -161,7 +161,7 @@ const drawOp = z.discriminatedUnion("kind", [
   }),
 ]);
 
-export function registerDrawTools(server: McpServer, live: AsepriteLink): void {
+export function registerDrawTools(server: McpServer, studio: Studio): void {
   server.registerTool(
     "draw",
     {
@@ -242,7 +242,7 @@ export function registerDrawTools(server: McpServer, live: AsepriteLink): void {
         if (args.measureOnly) {
           if (args.ops.some((op) => op.kind !== "text")) {
             return fail(
-              new LiveError(
+              new ToolError(
                 "invalid_args",
                 "measureOnly only accepts 'text' ops — nothing else has ink bounds to measure without drawing.",
               ),
@@ -261,7 +261,7 @@ export function registerDrawTools(server: McpServer, live: AsepriteLink): void {
 
         // A grid is bounded by the canvas, which only Aseprite knows.
         const canvas: CanvasSize | undefined = args.ops.some((op) => op.kind === "grid")
-          ? await live.call<CanvasSize>("sprite.info", { sprite: args.sprite, includePalette: false }, { expect: ["width", "height"] })
+          ? await studio.call<CanvasSize>("sprite.info", { sprite: args.sprite, includePalette: false }, { expect: ["width", "height"] })
           : undefined;
         const expandedOps: Record<string, unknown>[] = [];
         for (const op of args.ops) {
@@ -275,7 +275,7 @@ export function registerDrawTools(server: McpServer, live: AsepriteLink): void {
           }
         }
 
-        const data = await live.call<Record<string, unknown>>(
+        const data = await studio.call<Record<string, unknown>>(
           "draw.batch",
           { ...args, ops: expandedOps, measureOnly: undefined },
           { expect: ["opsApplied", "pixelsChanged", "layer", "frame"] },
@@ -334,7 +334,7 @@ export function registerDrawTools(server: McpServer, live: AsepriteLink): void {
     },
     async (args) => {
       try {
-        const data = await live.call<Record<string, unknown>>("select.apply", args);
+        const data = await studio.call<Record<string, unknown>>("select.apply", args);
         return ok(data);
       } catch (err) {
         return fail(err);
@@ -390,12 +390,13 @@ export function registerDrawTools(server: McpServer, live: AsepriteLink): void {
       try {
         if (args.op === "rotate" && args.angle % 90 !== 0 && !args.allowLossy) {
           return fail(
-            new Error(
+            new ToolError(
+              "refused",
               `A ${args.angle}° rotation resamples every pixel and will destroy the sprite's crispness. Use a multiple of 90, or confirm with the user and pass allowLossy: true.`,
             ),
           );
         }
-        const data = await live.call<Record<string, unknown>>("transform.apply", args);
+        const data = await studio.call<Record<string, unknown>>("transform.apply", args);
         return ok(data);
       } catch (err) {
         return fail(err);

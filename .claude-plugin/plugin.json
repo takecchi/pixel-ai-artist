@@ -26,8 +26,6 @@
         "serve"
       ],
       "env": {
-        "PIXEL_AI_PLUGIN_PORT": "9941",
-        "PIXEL_AI_CONTROL_PORT": "9942",
         "PIXEL_AI_PROMPTS": "0"
       }
     }
