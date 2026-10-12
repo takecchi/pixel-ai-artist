@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { crc32, deflateSync } from "node:zlib";
 import { Image, ToolError, createStudio, rgba } from "../dist/doc/index.js";
 import { encodeGif, decodeGif } from "../dist/lib/gif.js";
 import { decodePng, encodePng } from "../dist/lib/png.js";
@@ -229,6 +230,103 @@ test("open names an opened image's layer Background when it has no transparency,
     assert.equal(studio.activeSprite()!.layers[0]!.name, "Background");
     await manage(studio, { op: "open", path: clear });
     assert.equal(studio.activeSprite()!.layers[0]!.name, "Layer");
+  });
+});
+
+/** A palette PNG of 8-bit indices; `trns` adds a tRNS chunk. */
+function indexedPng(width: number, height: number, plte: number[][], indices: number[], trns?: number[]): Uint8Array {
+  const chunk = (type: string, body: number[] | Uint8Array): Uint8Array => {
+    const out = new Uint8Array(12 + body.length);
+    const view = new DataView(out.buffer);
+    view.setUint32(0, body.length);
+    for (let i = 0; i < 4; i++) out[4 + i] = type.charCodeAt(i);
+    out.set(body, 8);
+    view.setUint32(8 + body.length, crc32(out.subarray(4, 8 + body.length)));
+    return out;
+  };
+  const ihdr = new Uint8Array(13);
+  const view = new DataView(ihdr.buffer);
+  view.setUint32(0, width);
+  view.setUint32(4, height);
+  ihdr[8] = 8;
+  ihdr[9] = 3;
+  const rows = Array.from({ length: height }, (_, y) => [0, ...indices.slice(y * width, (y + 1) * width)]);
+  const parts = [
+    Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a),
+    chunk("IHDR", ihdr),
+    chunk("PLTE", plte.flat()),
+    ...(trns ? [chunk("tRNS", trns)] : []),
+    chunk("IDAT", deflateSync(Uint8Array.from(rows.flat()))),
+    chunk("IEND", []),
+  ];
+  return Uint8Array.from(parts.flatMap((p) => [...p]));
+}
+
+const BLACK = rgba(0, 0, 0);
+
+test("open of an indexed PNG with no transparency makes a Background layer, and index 0 shows as an opaque colour", async () => {
+  await inTempDir(async (dir) => {
+    const file = path.join(dir, "opaque.png");
+    writeFileSync(file, indexedPng(2, 1, [[0, 0, 0], [255, 0, 0]], [0, 1]));
+    const studio = createStudio();
+    await manage(studio, { op: "open", path: file });
+    const sprite = studio.activeSprite()!;
+    assert.deepEqual([sprite.colorMode, sprite.layers[0]!.background], ["indexed", true]);
+    assert.deepEqual([...studio.composite(sprite, 1).pixels], [BLACK, RED]);
+    const read = await studio.call<Reply>("pixels.read", {});
+    assert.deepEqual([read.colors, read.grid], [["#00000000", "#000000", "#ff0000"], [1, 2]]);
+  });
+});
+
+test("export png of an indexed PNG opened with no transparency writes its index-0 pixels as opaque", async () => {
+  await inTempDir(async (dir) => {
+    const file = path.join(dir, "opaque.png");
+    writeFileSync(file, indexedPng(2, 1, [[0, 0, 0], [255, 0, 0]], [0, 1]));
+    const studio = createStudio();
+    await manage(studio, { op: "open", path: file });
+    const out = path.join(dir, "out.png");
+    await studio.call("export.run", { op: "png", path: out });
+    assert.deepEqual([...readPng(out).pixels], [BLACK, RED]);
+  });
+});
+
+test("open of an indexed PNG with a fully transparent tRNS entry makes no Background, and that index is clear", async () => {
+  await inTempDir(async (dir) => {
+    const file = path.join(dir, "clear.png");
+    writeFileSync(file, indexedPng(2, 1, [[0, 0, 0], [255, 0, 0]], [0, 1], [0]));
+    const studio = createStudio();
+    await manage(studio, { op: "open", path: file });
+    const sprite = studio.activeSprite()!;
+    assert.equal(sprite.layers[0]!.background, undefined);
+    assert.equal(sprite.transparentIndex, 0);
+    assert.deepEqual([...studio.composite(sprite, 1).pixels], [0, RED]);
+  });
+});
+
+test("open of a GIF with only a global colour table and no transparent index makes a Background, and the background colour index shows as a colour", async () => {
+  await inTempDir(async (dir) => {
+    const file = path.join(dir, "opaque.gif");
+    // The encoder's table starts with the first colour used and the logical screen's background index is 0, so RED is index 0.
+    writeFileSync(file, encodeGif([{ image: img(2, 1, [RED, BLUE]), durationMs: 100 }]));
+    const studio = createStudio();
+    await manage(studio, { op: "open", path: file });
+    const sprite = studio.activeSprite()!;
+    assert.deepEqual([sprite.colorMode, sprite.transparentIndex, sprite.layers[0]!.background], ["indexed", 0, true]);
+    assert.deepEqual([...studio.composite(sprite, 1).pixels], [RED, BLUE]);
+    const read = await studio.call<Reply>("pixels.read", {});
+    assert.deepEqual(read.grid, [1, 2]);
+  });
+});
+
+test("open of a GIF with a transparent index makes no Background, and that index is clear", async () => {
+  await inTempDir(async (dir) => {
+    const file = path.join(dir, "clear.gif");
+    writeFileSync(file, encodeGif([{ image: img(2, 1, [RED, 0]), durationMs: 100 }]));
+    const studio = createStudio();
+    await manage(studio, { op: "open", path: file });
+    const sprite = studio.activeSprite()!;
+    assert.equal(sprite.layers[0]!.background, undefined);
+    assert.deepEqual([...studio.composite(sprite, 1).pixels], [RED, 0]);
   });
 });
 

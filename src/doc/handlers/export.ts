@@ -5,7 +5,7 @@ import { encodePng } from "../../lib/png.js";
 import { buildSpriteSheet, type SheetTag, type SheetType } from "../../lib/spritesheet.js";
 import { packageVersion } from "../../lib/version.js";
 import { ToolError, need } from "../errors.js";
-import { isAsepritePath, writeAseprite, writeBytes, writeFrames } from "../files.js";
+import { isAsepritePath, opaqueFrames, writeAseprite, writeBytes, writeFrames, type Written } from "../files.js";
 import { Image, channels, displayName, type Layer, type Rgba, type Sprite } from "../model.js";
 import type { HandlerTable, Studio } from "../studio.js";
 
@@ -134,6 +134,15 @@ function writeSheet(view: ExportView, s: Sprite, file: string, args: Record<stri
   return files;
 }
 
+/**
+ * gif and frames were saved from the sprite, or a copy of it, which keeps a
+ * Background; Aseprite writes those with no transparency. png flattened into
+ * a fresh sprite first and spritesheet built a new texture, so they keep it.
+ */
+function savedFrames(view: ExportView): AnimationFrame[] {
+  return view.layers.some((l) => l.background) ? opaqueFrames(view.frames) : view.frames;
+}
+
 /** png and frames were saveCopyAs in the Lua handler: a GIF there keeps an RGB sprite's colours. */
 function ownPalette(s: Sprite): readonly Rgba[] {
   return s.colorMode === "indexed" ? s.palette : [];
@@ -148,6 +157,7 @@ function exportRun(studio: Studio, args: Record<string, unknown>) {
   let files: string[];
   let frame: number | undefined;
   let atlas: string | undefined;
+  let adjustedDurations: Written["adjustedDurations"] = [];
 
   if (op === "png") {
     if (names(args.tags, "tags")) {
@@ -163,13 +173,15 @@ function exportRun(studio: Studio, args: Record<string, unknown>) {
     if (!isAsepritePath(file)) {
       throw new ToolError("invalid_args", "'aseprite' writes an .aseprite or .ase file; give the path one of those extensions.");
     }
-    files = writeAseprite(s, file);
+    const written: Written = writeAseprite(s, file);
+    files = written.files;
+    adjustedDurations = written.adjustedDurations;
   } else if (op === "gif") {
-    const frames = exportView(studio, s, args, scale).frames;
+    const frames = savedFrames(exportView(studio, s, args, scale));
     const opaque = s.palette.map((c) => (c | 255) >>> 0);
     files = writeFrames(s.palette.length > 0 ? inPalette(frames, s.palette) : frames, opaque, file);
   } else if (op === "frames") {
-    files = writeFrames(exportView(studio, s, args, scale).frames, ownPalette(s), file);
+    files = writeFrames(savedFrames(exportView(studio, s, args, scale)), ownPalette(s), file);
   } else if (op === "spritesheet") {
     files = writeSheet(exportView(studio, s, args, scale), s, file, args);
     if (args.includeJson !== false) atlas = files[0];
@@ -186,6 +198,7 @@ function exportRun(studio: Studio, args: Record<string, unknown>) {
     frameCount: s.frames.length,
     frame,
     atlas,
+    ...(adjustedDurations.length > 0 ? { adjustedDurations } : {}),
   };
 }
 

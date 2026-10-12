@@ -20,6 +20,7 @@ function layer(name: string, extra: Partial<AseLayer> = {}): AseLayer {
     reference: false,
     blendMode: 0,
     opacity: 255,
+    otherFlags: 0,
     ...extra,
   };
 }
@@ -68,7 +69,17 @@ function sample(mode: "rgba" | "grayscale" | "indexed"): AseFile {
   };
 }
 
-const NO_FEATURES = { slices: 0, tilesets: 0, tilemapCels: 0, zIndexCels: 0, paletteChanges: 0 };
+const NO_FEATURES = {
+  slices: 0,
+  tilesets: 0,
+  tilemapCels: 0,
+  zIndexCels: 0,
+  paletteChanges: 0,
+  layerUuids: 0,
+  unknownChunks: 0,
+  droppedCels: 0,
+  unreadFrameBytes: 0,
+};
 
 /** The decoded file without what decoding adds: features, and the 1:1 pixel ratio every sample has. */
 function stripFeatures(f: ReturnType<typeof decodeAse>): AseFile {
@@ -132,6 +143,31 @@ function mkLayerChunk(name: string, type = 0, withTileset = false, withUuid = fa
   if (withTileset) b.u32(7);
   if (withUuid) b.zeros(16);
   return mkChunk(0x2004, b);
+}
+
+function rawCel(layer: number, w: number, h: number, data: number[], z = 0): number[] {
+  return mkChunk(0x2005, new B().u16(layer).u16(0).u16(0).u8(255).u16(0).u16(z).zeros(5).u16(w).u16(h).raw(data));
+}
+
+function linkCel(layer: number, frame: number): number[] {
+  return mkChunk(0x2005, new B().u16(layer).u16(0).u16(0).u8(255).u16(1).u16(0).zeros(5).u16(frame));
+}
+
+/** A palette chunk of n opaque colors. */
+function palette(n: number): number[] {
+  const b = new B().u32(n).u32(0).u32(n - 1).zeros(8);
+  for (let i = 0; i < n; i++) b.u16(0).raw([i, i, i, 255]);
+  return mkChunk(0x2019, b);
+}
+
+function udText(text: string): number[] {
+  return mkChunk(0x2020, new B().u32(1).str(text));
+}
+
+/** A properties block with one map holding one uint32, size DWORD included. */
+function propertiesBlock(value: number): number[] {
+  const body = new B().u32(1).u32(0).u32(1).str("k").u16(7).u32(value).bytes;
+  return new B().u32(body.length + 4).raw(body).bytes;
 }
 
 function chunkTypes(bytes: Uint8Array): number[] {
@@ -198,11 +234,11 @@ test("writes frame headers with the real chunk count in both count fields", () =
   assert.equal(dv.getUint16(second + 8, true), 250);
 });
 
-test("writes chunks of the first frame in palette, layer, tag, cel order", () => {
+test("writes chunks of the first frame in palette, tag, layer, cel order", () => {
   const file = sample("rgba");
   file.tags = [{ name: "t", from: 0, to: 1, direction: "forward", repeat: 0, color: [1, 2, 3, 4] }];
   const types = chunkTypes(encodeAse(file));
-  assert.deepEqual(types, [0x0004, 0x2019, 0x2004, 0x2004, 0x2004, 0x2018, 0x2020, 0x2005, 0x2005]);
+  assert.deepEqual(types, [0x0004, 0x2019, 0x2018, 0x2020, 0x2004, 0x2004, 0x2004, 0x2005, 0x2005]);
 });
 
 test("round trips tags with direction, repeat, name and color", () => {
@@ -240,7 +276,7 @@ test("decoder takes the tag color from the old RGB bytes when no user data follo
   assert.deepEqual(decodeAse(file).tags[0]!.color, [11, 22, 33, 255]);
 });
 
-test("decoder assigns user data colors to tags in order and ignores text and properties", () => {
+test("decoder assigns the user data after a tags chunk to the tags in order, keeping text and properties", () => {
   const tag = (name: string) => new B().u16(0).u16(0).u8(0).u16(0).zeros(6).zeros(3).u8(0).str(name).bytes;
   const tags = new B().u16(2).zeros(8).raw(tag("a")).raw(tag("b")).bytes;
   const ud1 = new B().u32(1 | 2 | 4).str("note").u8(1).u8(2).u8(3).u8(4).u32(12).u32(1).u32(0).u32(0).bytes;
@@ -250,6 +286,8 @@ test("decoder assigns user data colors to tags in order and ignores text and pro
   ]);
   const d = decodeAse(file);
   assert.deepEqual(d.tags.map((t) => t.color), [[1, 2, 3, 4], [5, 6, 7, 8]]);
+  assert.deepEqual(d.tags[0]!.userData, { text: "note", properties: Uint8Array.from([12, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]) });
+  assert.equal(d.tags[1]!.userData, undefined);
 });
 
 test("a user data chunk that does not follow the tags chunk does not change tag colors", () => {
@@ -263,22 +301,26 @@ test("a user data chunk that does not follow the tags chunk does not change tag 
 
 test("round trips the user data text of a layer, written right after its layer chunk", () => {
   const file = sample("rgba");
-  file.layers[0]!.text = "pixel-ai-artist:reference";
+  file.layers[0]!.userData = { text: "pixel-ai-artist:reference" };
   const bytes = encodeAse(file);
   const types = chunkTypes(bytes);
   assert.equal(types[types.indexOf(0x2004) + 1], 0x2020);
   const d = decodeAse(bytes);
-  assert.equal(d.layers[0]!.text, "pixel-ai-artist:reference");
-  assert.equal(d.layers[1]!.text, undefined);
+  assert.deepEqual(d.layers[0]!.userData, { text: "pixel-ai-artist:reference" });
+  assert.equal(d.layers[1]!.userData, undefined);
 });
 
-test("decoder takes a layer's text only from a user data chunk right after it, and one with just a colour gives none", () => {
+test("decoder gives a layer the user data chunk right after it, with the fields its flags name", () => {
   const withText = new B().u32(1 | 2).str("note").u8(1).u8(2).u8(3).u8(4).bytes;
   const colourOnly = new B().u32(2).u8(9).u8(9).u8(9).u8(9).bytes;
   const file = mkFile([
     mkFrame([mkLayerChunk("A"), mkChunk(0x2020, withText), mkLayerChunk("B"), mkChunk(0x2020, colourOnly), mkLayerChunk("C")], 10),
   ]);
-  assert.deepEqual(decodeAse(file).layers.map((l) => l.text), ["note", undefined, undefined]);
+  assert.deepEqual(decodeAse(file).layers.map((l) => l.userData), [
+    { text: "note", color: [1, 2, 3, 4] },
+    { color: [9, 9, 9, 9] },
+    undefined,
+  ]);
 });
 
 test("a layer's user data does not take a tag's colour, and tag user data still goes to the tags", () => {
@@ -289,7 +331,7 @@ test("a layer's user data does not take a tag's colour, and tag user data still 
     mkFrame([mkLayerChunk("L"), mkChunk(0x2020, layerText), mkChunk(0x2018, tags), mkChunk(0x2020, tagColour)], 10),
   ]);
   const d = decodeAse(file);
-  assert.equal(d.layers[0]!.text, "mine");
+  assert.equal(d.layers[0]!.userData?.text, "mine");
   assert.deepEqual(d.tags[0]!.color, [5, 6, 7, 8]);
 });
 
@@ -353,6 +395,7 @@ test("decoder skips the tileset index of tilemap layers and the UUID when the he
     10,
   );
   const d = decodeAse(mkFile([frame], { flags: 1 | 4 }));
+  assert.equal(d.features.layerUuids, 2);
   assert.deepEqual(d.layers.map((l) => [l.name, l.type]), [["tiles", "tilemap"], ["after", "image"]]);
 });
 
@@ -423,8 +466,7 @@ test("a file without slices, tilesets, tilemap cels or z-index has all features 
 });
 
 test("cels with a nonzero z-index are counted and keep their z-index", () => {
-  const cel = (z: number) =>
-    mkChunk(0x2005, new B().u16(0).u16(0).u16(0).u8(255).u16(1).u16(z).zeros(5).u16(0));
+  const cel = (z: number) => rawCel(0, 1, 1, [1, 2, 3, 4], z);
   const d = decodeAse(mkFile([mkFrame([mkLayerChunk("a"), cel(0)], 10), mkFrame([cel(-2)], 10), mkFrame([cel(5)], 10)]));
   assert.equal(d.features.zIndexCels, 2);
   assert.deepEqual(d.frames.map((f) => f.cels[0]!.zIndex), [0, -2, 5]);
@@ -523,7 +565,7 @@ test("grayscale pixels are read as value then alpha, indexed pixels as one index
   const gray = decodeAse(mkFile([mkFrame([mkLayerChunk("a"), raw([200, 7, 9, 255])], 10)], { depth: 16 }));
   assert.equal(gray.colorMode, "grayscale");
   assert.deepEqual([...gray.frames[0]!.cels[0]!.image!.pixels], [200, 7, 9, 255]);
-  const indexed = decodeAse(mkFile([mkFrame([mkLayerChunk("a"), raw([3, 0])], 10)], { depth: 8 }));
+  const indexed = decodeAse(mkFile([mkFrame([palette(2), mkLayerChunk("a"), raw([3, 0])], 10)], { depth: 8 }));
   assert.deepEqual([...indexed.frames[0]!.cels[0]!.image!.pixels], [3, 0]);
 });
 
@@ -536,7 +578,7 @@ test("the header transparent index is returned for indexed sprites without chang
 });
 
 test("decoder reads the transparent index from header byte 28", () => {
-  const bytes = mkFile([mkFrame([], 10)], { depth: 8 });
+  const bytes = mkFile([mkFrame([palette(10)], 10)], { depth: 8 });
   bytes[28] = 9;
   assert.equal(decodeAse(bytes).transparentIndex, 9);
 });
@@ -546,8 +588,8 @@ test("a tag with an unknown direction is rejected", () => {
   assert.throws(() => decodeAse(mkFile([mkFrame([mkChunk(0x2018, tags)], 10)])), /direction/);
 });
 
-test("known but unsupported chunks and unknown chunks are skipped", () => {
-  const types = [0x2006, 0x2007, 0x2008, 0x2016, 0x2017, 0x7777];
+test("chunks Aseprite reads and this reader has no model for are skipped without counting as unknown", () => {
+  const types = [0x2016, 0x2017, 0x2021];
   const d = decodeAse(mkFile([mkFrame([mkLayerChunk("a"), ...types.map((t) => mkChunk(t, [1, 2, 3]))], 10)]));
   assert.deepEqual(d.features, NO_FEATURES);
   assert.equal(d.layers.length, 1);
@@ -565,11 +607,17 @@ test("frame duration of 0 falls back to the header speed", () => {
   assert.deepEqual(d.frames.map((f) => f.durationMs), [77, 40]);
 });
 
-test("chunk count uses the old field only when the new field is 0", () => {
-  const frame = mkFrame([mkLayerChunk("a"), mkLayerChunk("b")], 10, 2, 0);
-  assert.equal(decodeAse(mkFile([frame])).layers.length, 2);
-  const preferNew = mkFrame([mkLayerChunk("a"), mkLayerChunk("b")], 10, 2, 1);
-  assert.equal(decodeAse(mkFile([preferNew])).layers.length, 1);
+test("chunk count is the old field, and the new field only when the old one is 0xFFFF and the new one is larger", () => {
+  const two = () => [mkLayerChunk("a"), mkLayerChunk("b")];
+  assert.equal(decodeAse(mkFile([mkFrame(two(), 10, 2, 0)])).layers.length, 2);
+  assert.equal(decodeAse(mkFile([mkFrame(two(), 10, 2, 1)])).layers.length, 2);
+  assert.throws(() => decodeAse(mkFile([mkFrame(two(), 10, 0xffff, 2)])), Error);
+  const many = Array.from({ length: 0x10000 }, () => mkChunk(0x7777, []));
+  const d = decodeAse(mkFile([mkFrame(many, 10, 0xffff, 0x10000)]));
+  assert.equal(d.features.unknownChunks, 0x10000);
+  assert.equal(d.features.unreadFrameBytes, 0);
+  assert.equal(decodeAse(mkFile([mkFrame(two(), 10, 1, 2)])).layers.length, 1);
+  assert.equal(decodeAse(mkFile([mkFrame(two(), 10, 0, 2)])).layers.length, 0);
 });
 
 test("decoder throws on a bad file magic", () => {
@@ -690,15 +738,14 @@ test("encoder rejects tags outside the frame range or with from after to", () =>
   }
 });
 
-test("encoder rejects an indexed transparentIndex outside the palette but not other modes", () => {
+test("encoder checks the transparentIndex is a byte, not that it is inside the palette", () => {
   const file = sample("indexed");
   file.transparentIndex = 4;
+  assert.doesNotThrow(() => encodeAse(file));
+  file.transparentIndex = 256;
   assert.throws(() => encodeAse(file), RangeError);
-  file.transparentIndex = 3;
-  assert.equal(decodeAse(encodeAse(file)).transparentIndex, 3);
-  const rgba = sample("rgba");
-  rgba.transparentIndex = 4;
-  assert.doesNotThrow(() => encodeAse(rgba));
+  file.transparentIndex = -1;
+  assert.throws(() => encodeAse(file), RangeError);
 });
 
 test("encoder rejects two cels on the same layer in one frame", () => {
@@ -754,4 +801,297 @@ test("round trips a pixel ratio through the header, and reads a zero field as 1:
 test("encoder rejects a pixel ratio outside 1..255", () => {
   assert.throws(() => encodeAse({ ...sample("rgba"), pixelRatio: { w: 0, h: 1 } }), RangeError);
   assert.throws(() => encodeAse({ ...sample("rgba"), pixelRatio: { w: 1, h: 256 } }), RangeError);
+});
+
+function chunksOfFirstFrame(bytes: Uint8Array): { type: number; body: Uint8Array }[] {
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const out: { type: number; body: Uint8Array }[] = [];
+  const count = dv.getUint32(128 + 12, true);
+  let pos = 128 + 16;
+  for (let i = 0; i < count; i++) {
+    const size = dv.getUint32(pos, true);
+    out.push({ type: dv.getUint16(pos + 4, true), body: bytes.subarray(pos + 6, pos + size) });
+    pos += size;
+  }
+  return out;
+}
+
+function decorated(): AseFile {
+  const file = sample("rgba");
+  file.userData = { text: "sprite", color: [1, 2, 3, 4], properties: Uint8Array.from(propertiesBlock(1)) };
+  file.layers[0]!.userData = { text: "layer", properties: Uint8Array.from(propertiesBlock(2)) };
+  file.layers[1]!.userData = { color: [9, 8, 7, 6] };
+  file.frames[0]!.cels[0]!.userData = { text: "cel", color: [5, 5, 5, 255], properties: Uint8Array.from(propertiesBlock(3)) };
+  file.frames[0]!.cels[0]!.extra = Uint8Array.from([1, 0, 0, 0, 9, 9, 9, 9, 8, 8, 8, 8, 7, 7, 7, 7, 6, 6, 6, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+  file.frames[1]!.cels[1]!.userData = { text: "日本語" };
+  file.tags = [
+    { name: "a", from: 0, to: 1, direction: "forward", repeat: 0, color: [1, 2, 3, 4], userData: { text: "tag", properties: Uint8Array.from(propertiesBlock(4)) } },
+    { name: "b", from: 1, to: 1, direction: "reverse", repeat: 2, color: [10, 20, 30, 255] },
+  ];
+  file.externalFiles = Uint8Array.from(new B().u32(1).zeros(8).u32(1).u8(2).zeros(7).str("acme/Ext").bytes);
+  file.colorProfile = Uint8Array.from(new B().u16(2).u16(0).u32(0).zeros(8).u32(5).raw([1, 2, 3, 4, 5]).bytes);
+  return file;
+}
+
+test("round trips user data text, color and properties bytes of the sprite, layers, cels and tags", () => {
+  const file = decorated();
+  assert.deepEqual(stripFeatures(decodeAse(encodeAse(file))), file);
+});
+
+test("round trips an embedded ICC color profile and the external files list byte for byte", () => {
+  const file = decorated();
+  const d = decodeAse(encodeAse(file));
+  assert.deepEqual(d.colorProfile, file.colorProfile);
+  assert.deepEqual(d.externalFiles, file.externalFiles);
+  const bare = decodeAse(encodeAse(sample("rgba")));
+  assert.equal("colorProfile" in bare, false);
+  assert.equal("externalFiles" in bare, false);
+  assert.equal("userData" in bare, false);
+});
+
+test("round trips layer flag bits above the named ones and writes them into the layer flags", () => {
+  const file = sample("rgba");
+  file.layers[0]!.otherFlags = 0x8100;
+  file.layers[1]!.otherFlags = 128;
+  const bytes = encodeAse(file);
+  const layerBodies = chunksOfFirstFrame(bytes).filter((c) => c.type === 0x2004);
+  const flags = layerBodies.map((c) => new DataView(c.body.buffer, c.body.byteOffset).getUint16(0, true));
+  assert.deepEqual(flags, [0x8100 | 8 | 1, 128 | 2 | 1, 2]);
+  assert.deepEqual(decodeAse(bytes).layers.map((l) => l.otherFlags), [0x8100, 128, 0]);
+});
+
+test("the encoder rejects otherFlags that overlap the named layer flags", () => {
+  const file = sample("rgba");
+  file.layers[0]!.otherFlags = 64;
+  assert.throws(() => encodeAse(file), RangeError);
+  file.layers[0]!.otherFlags = 0x10000;
+  assert.throws(() => encodeAse(file), RangeError);
+});
+
+test("round trips a cel extra body and writes it right after its cel, before the cel's user data", () => {
+  const file = decorated();
+  const types = chunksOfFirstFrame(encodeAse(file)).map((c) => c.type);
+  const firstCel = types.indexOf(0x2005);
+  assert.deepEqual(types.slice(firstCel, firstCel + 3), [0x2005, 0x2006, 0x2020]);
+  const d = decodeAse(encodeAse(file));
+  assert.deepEqual(d.frames[0]!.cels[0]!.extra, file.frames[0]!.cels[0]!.extra);
+  assert.equal(d.frames[0]!.cels[1]!.extra, undefined);
+});
+
+test("writes frame 0 as external files, color profile, palette, sprite user data, tags with user data, layers with user data, then cels", () => {
+  const types = chunksOfFirstFrame(encodeAse(decorated())).map((c) => c.type);
+  assert.deepEqual(types, [
+    0x2008, 0x2007, 0x0004, 0x2019, 0x2020,
+    0x2018, 0x2020, 0x2020,
+    0x2004, 0x2020, 0x2004, 0x2020, 0x2004,
+    0x2005, 0x2006, 0x2020, 0x2005,
+  ]);
+});
+
+test("user data with nothing in it is not written, but every tag gets a user data chunk", () => {
+  const file = sample("rgba");
+  file.userData = { text: "", color: [1, 1, 1, 0] };
+  file.layers[0]!.userData = {};
+  file.tags = [{ name: "t", from: 0, to: 0, direction: "forward", repeat: 0, color: [0, 0, 0, 0] }];
+  const chunks = chunksOfFirstFrame(encodeAse(file));
+  assert.deepEqual(chunks.map((c) => c.type), [0x0004, 0x2019, 0x2018, 0x2020, 0x2004, 0x2004, 0x2004, 0x2005, 0x2005]);
+  assert.deepEqual([...chunks[3]!.body], [0, 0, 0, 0]);
+});
+
+test("a tag's user data color is written from the tag color, and its text and properties from userData", () => {
+  const file = sample("rgba");
+  file.tags = [
+    { name: "t", from: 0, to: 0, direction: "forward", repeat: 0, color: [1, 2, 3, 200], userData: { text: "x", color: [9, 9, 9, 9], properties: Uint8Array.from(propertiesBlock(7)) } },
+    { name: "u", from: 0, to: 0, direction: "forward", repeat: 0, color: [5, 6, 7, 0], userData: { text: "y" } },
+  ];
+  const chunks = chunksOfFirstFrame(encodeAse(file)).filter((c) => c.type === 0x2020);
+  assert.deepEqual([...chunks[0]!.body], [7, 0, 0, 0, 1, 0, 120, 1, 2, 3, 200, ...propertiesBlock(7)]);
+  assert.deepEqual([...chunks[1]!.body], [1, 0, 0, 0, 1, 0, 121]);
+});
+
+test("the encoder rejects a properties block whose size field does not match its length", () => {
+  const file = sample("rgba");
+  const block = Uint8Array.from(propertiesBlock(1));
+  file.layers[0]!.userData = { properties: block.subarray(0, block.length - 1) };
+  assert.throws(() => encodeAse(file), RangeError);
+  file.layers[0]!.userData = { properties: new Uint8Array(4) };
+  assert.throws(() => encodeAse(file), RangeError);
+});
+
+test("the encoder rejects an empty cel image and one over 4096 x 4096 pixels", () => {
+  const empty = sample("indexed");
+  empty.frames[0]!.cels[0]!.image = { width: 0, height: 3, pixels: new Uint8Array(0) };
+  assert.throws(() => encodeAse(empty), RangeError);
+  const big = sample("indexed");
+  big.frames[0]!.cels[0]!.image = { width: 4097, height: 4096, pixels: new Uint8Array(4097 * 4096) };
+  assert.throws(() => encodeAse(big), RangeError);
+});
+
+test("user data after a layer, a cel, the sprite and a tags chunk goes to that object", () => {
+  const tags = new B().u16(1).zeros(8).u16(0).u16(0).u8(0).u16(0).zeros(6).u8(1).u8(1).u8(1).u8(0).str("a").bytes;
+  const file = mkFile([
+    mkFrame([udText("sprite"), mkLayerChunk("L"), udText("layer"), rawCel(0, 1, 1, [1, 2, 3, 4]), udText("cel"), mkChunk(0x2018, tags), udText("tag")], 10),
+  ]);
+  const d = decodeAse(file);
+  assert.equal(d.userData?.text, "sprite");
+  assert.equal(d.layers[0]!.userData?.text, "layer");
+  assert.equal(d.frames[0]!.cels[0]!.userData?.text, "cel");
+  assert.equal(d.tags[0]!.userData?.text, "tag");
+});
+
+test("a second user data chunk after the same object replaces the first", () => {
+  const d = decodeAse(mkFile([mkFrame([mkLayerChunk("L"), udText("one"), udText("two")], 10)]));
+  assert.equal(d.layers[0]!.userData?.text, "two");
+});
+
+test("palette, cel extra, color profile, external files, mask, path and unknown chunks leave the user data target alone", () => {
+  const between = [palette(1), mkChunk(0x2006, new B().u32(0)), mkChunk(0x2007, new B().u16(1).u16(0).u32(0).zeros(8)), mkChunk(0x2008, new B().u32(0).zeros(8)), mkChunk(0x2016, [1]), mkChunk(0x2017, [1]), mkChunk(0x7777, [1])];
+  const d = decodeAse(mkFile([mkFrame([mkLayerChunk("L"), rawCel(0, 1, 1, [1, 2, 3, 4]), ...between, udText("cel")], 10)]));
+  assert.equal(d.frames[0]!.cels[0]!.userData?.text, "cel");
+  assert.equal(d.layers[0]!.userData, undefined);
+});
+
+test("user data after a slice or a tileset is dropped and does not reach the object before it", () => {
+  const slice = mkChunk(0x2022, new B().u32(0).u32(0).u32(0).str("s"));
+  const tileset = mkChunk(0x2023, new B().u32(0).u32(0).u32(0).u16(8).u16(8).u16(1).zeros(14).str("ts"));
+  for (const between of [slice, tileset]) {
+    const d = decodeAse(mkFile([mkFrame([mkLayerChunk("L"), between, udText("lost")], 10)]));
+    assert.equal(d.layers[0]!.userData, undefined);
+    assert.equal(d.userData, undefined);
+  }
+});
+
+test("user data after the last tag is dropped, and a new frame does not move the target back to the sprite", () => {
+  const tags = new B().u16(1).zeros(8).u16(0).u16(0).u8(0).u16(0).zeros(6).u8(1).u8(1).u8(1).u8(0).str("a").bytes;
+  const afterTags = decodeAse(mkFile([mkFrame([mkLayerChunk("L"), udText("layer"), mkChunk(0x2018, tags), udText("tag"), udText("stray")], 10)]));
+  assert.equal(afterTags.layers[0]!.userData?.text, "layer");
+  assert.equal(afterTags.userData, undefined);
+  const later = decodeAse(mkFile([mkFrame([mkLayerChunk("L"), rawCel(0, 1, 1, [1, 2, 3, 4])], 10), mkFrame([udText("late")], 10)]));
+  assert.equal(later.frames[0]!.cels[0]!.userData?.text, "late");
+  assert.equal(later.userData, undefined);
+});
+
+test("a tag whose user data has no color gets the color 0,0,0,0, and a tag without user data keeps the RGB of its chunk with alpha 255", () => {
+  const tag = (name: string) => new B().u16(0).u16(0).u8(0).u16(0).zeros(6).u8(4).u8(5).u8(6).u8(0).str(name).bytes;
+  const tags = new B().u16(2).zeros(8).raw(tag("a")).raw(tag("b")).bytes;
+  const d = decodeAse(mkFile([mkFrame([mkChunk(0x2018, tags), udText("only text")], 10)]));
+  assert.deepEqual(d.tags.map((t) => t.color), [[0, 0, 0, 0], [4, 5, 6, 255]]);
+  assert.deepEqual(d.tags[0]!.userData, { text: "only text" });
+});
+
+test("a user data chunk whose properties block is smaller than 8 bytes or runs past the chunk is rejected", () => {
+  const small = mkChunk(0x2020, new B().u32(4).u32(4));
+  assert.throws(() => decodeAse(mkFile([mkFrame([mkLayerChunk("L"), small], 10)])), Error);
+  const long = mkChunk(0x2020, new B().u32(4).u32(64).u32(0));
+  assert.throws(() => decodeAse(mkFile([mkFrame([mkLayerChunk("L"), long], 10)])), Error);
+});
+
+test("a cel on a layer index at or past the layer count is rejected", () => {
+  assert.throws(() => decodeAse(mkFile([mkFrame([mkLayerChunk("L"), rawCel(1, 1, 1, [1, 2, 3, 4])], 10)])), Error);
+  assert.throws(() => decodeAse(mkFile([mkFrame([rawCel(0, 1, 1, [1, 2, 3, 4])], 10)])), Error);
+});
+
+test("a cel image with a zero width or height is rejected", () => {
+  assert.throws(() => decodeAse(mkFile([mkFrame([mkLayerChunk("L"), rawCel(0, 0, 3, [])], 10)])), Error);
+  assert.throws(() => decodeAse(mkFile([mkFrame([mkLayerChunk("L"), rawCel(0, 3, 0, [])], 10)])), Error);
+});
+
+test("a cel image of more than 4096 x 4096 pixels is rejected with a RangeError before its data is read", () => {
+  const z = deflateSync(new Uint8Array(4));
+  const cel = mkChunk(0x2005, new B().u16(0).u16(0).u16(0).u8(255).u16(2).u16(0).zeros(5).u16(4097).u16(4096).raw(z));
+  assert.throws(() => decodeAse(mkFile([mkFrame([mkLayerChunk("L"), cel], 10)])), RangeError);
+});
+
+test("a file with no frames is rejected", () => {
+  assert.throws(() => decodeAse(mkFile([])), Error);
+});
+
+test("a tag with from after to, or to at or past the frame count, is rejected", () => {
+  const tag = (from: number, to: number) => mkChunk(0x2018, new B().u16(1).zeros(8).u16(from).u16(to).u8(0).u16(0).zeros(6).zeros(4).str("a"));
+  for (const [from, to] of [[1, 0], [0, 2], [2, 3]] as const) {
+    assert.throws(() => decodeAse(mkFile([mkFrame([tag(from, to)], 10), mkFrame([], 10)])), Error, `${from}..${to}`);
+  }
+  assert.equal(decodeAse(mkFile([mkFrame([tag(0, 1)], 10), mkFrame([], 10)])).tags.length, 1);
+});
+
+test("an indexed file whose transparent index is at or past the palette size is rejected", () => {
+  const make = (colors: number) => {
+    const bytes = mkFile([mkFrame([palette(colors)], 10)], { depth: 8 });
+    bytes[28] = 3;
+    return bytes;
+  };
+  assert.throws(() => decodeAse(make(3)), Error);
+  assert.equal(decodeAse(make(4)).transparentIndex, 3);
+});
+
+test("the transparent index is 0 for a file that is not indexed", () => {
+  for (const depth of [32, 16]) {
+    const bytes = mkFile([mkFrame([], 10)], { depth });
+    bytes[28] = 9;
+    assert.equal(decodeAse(bytes).transparentIndex, 0);
+  }
+});
+
+test("a linked cel with no cel on the same layer in an earlier frame is dropped and counted", () => {
+  const pixels = [1, 2, 3, 4];
+  const d = decodeAse(
+    mkFile([
+      mkFrame([mkLayerChunk("a"), mkLayerChunk("b"), rawCel(0, 1, 1, pixels), linkCel(1, 0)], 10),
+      mkFrame([linkCel(0, 0), linkCel(1, 1), linkCel(1, 5), linkCel(0, 2)], 10),
+      mkFrame([linkCel(0, 1)], 10),
+    ]),
+  );
+  assert.deepEqual(d.frames.map((f) => f.cels.map((c) => [c.layer, c.linkedFrame ?? null])), [[[0, null]], [[0, 0]], [[0, 1]]]);
+  assert.equal(d.features.droppedCels, 4);
+});
+
+test("a second cel on the same layer and frame is dropped and counted, the first one stays", () => {
+  const d = decodeAse(mkFile([mkFrame([mkLayerChunk("a"), rawCel(0, 1, 1, [1, 1, 1, 1]), udText("first"), rawCel(0, 1, 1, [2, 2, 2, 2]), udText("second")], 10)]));
+  assert.deepEqual([...d.frames[0]!.cels[0]!.image!.pixels], [1, 1, 1, 1]);
+  assert.equal(d.frames[0]!.cels.length, 1);
+  assert.equal(d.frames[0]!.cels[0]!.userData?.text, "first");
+  assert.equal(d.features.droppedCels, 1);
+});
+
+test("a cel extra after a dropped cel lands on the last cel that was kept", () => {
+  const extra = mkChunk(0x2006, new B().u32(1).zeros(32));
+  const d = decodeAse(mkFile([mkFrame([mkLayerChunk("a"), rawCel(0, 1, 1, [1, 1, 1, 1]), rawCel(0, 1, 1, [2, 2, 2, 2]), extra], 10)]));
+  assert.equal(d.frames[0]!.cels[0]!.extra?.length, 36);
+});
+
+test("only chunk types Aseprite does not know are counted as unknown", () => {
+  const known = [0x2006, 0x2007, 0x2008, 0x2016, 0x2017, 0x2021];
+  const body = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  const d = decodeAse(mkFile([mkFrame([...known.map((t) => mkChunk(t, body)), mkChunk(0x7777, [1]), mkChunk(0x0012, [1]), mkChunk(0x2024, [1])], 10)]));
+  assert.equal(d.features.unknownChunks, 3);
+});
+
+test("bytes left in a frame after its counted chunks are summed over frames in unreadFrameBytes", () => {
+  const a = mkLayerChunk("a");
+  const b = mkLayerChunk("b");
+  const d = decodeAse(mkFile([mkFrame([a, b], 10, 1, 1), mkFrame([a, b, a], 10, 1, 0)]));
+  assert.equal(d.layers.length, 2);
+  assert.equal(d.features.unreadFrameBytes, b.length + b.length + a.length);
+});
+
+test("a background layer's blend mode and opacity are read as normal and 255", () => {
+  const lay = (flags: number) =>
+    mkChunk(0x2004, new B().u16(flags).u16(0).u16(0).u16(0).u16(0).u16(4).u8(90).zeros(3).str("l"));
+  const d = decodeAse(mkFile([mkFrame([lay(3 | 8), lay(3)], 10)], { flags: 3 }));
+  assert.deepEqual(d.layers.map((l) => [l.background, l.blendMode, l.opacity]), [[true, 0, 255], [false, 4, 90]]);
+});
+
+test("decoder keeps layer flag bits above 64 in otherFlags", () => {
+  const lay = mkChunk(0x2004, new B().u16(0x0100 | 1).u16(0).u16(0).u16(0).u16(0).u16(0).u8(255).zeros(3).str("l"));
+  const d = decodeAse(mkFile([mkFrame([lay], 10)]));
+  assert.deepEqual([d.layers[0]!.visible, d.layers[0]!.otherFlags], [true, 0x100]);
+});
+
+test("a frame duration of 0 falls back to the header speed, and to 1 when that is 0 too", () => {
+  assert.deepEqual(decodeAse(mkFile([mkFrame([], 0)], { speed: 0 })).frames.map((f) => f.durationMs), [1]);
+});
+
+test("a file written by encodeAse decodes with no dropped, unknown or unread parts", () => {
+  const d = decodeAse(encodeAse(decorated()));
+  assert.deepEqual(d.features, { ...NO_FEATURES, zIndexCels: 2 });
 });

@@ -189,6 +189,18 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
           .array(z.object({ from: z.string(), to: z.string() }))
           .optional()
           .describe("Op 'open': layers that shared a name in the file and were renamed so each can be addressed."),
+        lostOnSave: z
+          .record(z.number().int())
+          .optional()
+          .describe("Op 'open': what the file holds that saving will not write back the same way, counted by kind (linkedCels are saved as separate images; layerUuids and unknownChunks are dropped)."),
+        skippedOnOpen: z
+          .record(z.number().int())
+          .optional()
+          .describe("Op 'open': what the file holds that was not read, as Aseprite does not read it either (cels linked to nothing or duplicated on one layer and frame; bytes after a frame's last chunk)."),
+        adjustedDurations: z
+          .array(z.object({ frame: z.number().int(), from: z.number(), to: z.number().int() }))
+          .optional()
+          .describe("Ops 'save'/'save_as' to .aseprite: frame durations brought into the format's 1..65535 ms."),
       },
       annotations: {
         readOnlyHint: false,
@@ -222,7 +234,11 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
         const hint = data.id === undefined ? "" : ` Refer to it as '#${String(data.id)}'.`;
         const renamed = (data.renamedLayers as { from: string; to: string }[] | undefined) ?? [];
         const renames = renamed.length === 0 ? "" : ` Renamed layers that shared a name: ${renamed.map((r) => `'${r.from}' → '${r.to}'`).join(", ")}.`;
-        return ok(merged, `${args.op}: ${String(data.sprite ?? "ok")}.${hint}${renames}`);
+        const kinds = (key: string) => Object.entries((data[key] as Record<string, number> | undefined) ?? {}).map(([k, n]) => `${k} ${n}`).join(", ");
+        const lost = kinds("lostOnSave") ? ` Saving will not keep: ${kinds("lostOnSave")}.` : "";
+        const skipped = kinds("skippedOnOpen") ? ` Not read from the file: ${kinds("skippedOnOpen")}.` : "";
+        const adjusted = ((data.adjustedDurations as unknown[] | undefined) ?? []).length > 0 ? " Some frame durations were brought into 1..65535 ms (adjustedDurations)." : "";
+        return ok(merged, `${args.op}: ${String(data.sprite ?? "ok")}.${hint}${renames}${lost}${skipped}${adjusted}`);
       } catch (err) {
         return fail(err);
       }

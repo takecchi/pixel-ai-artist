@@ -193,13 +193,15 @@ function spriteManage(studio: Studio, args: Record<string, unknown>) {
   }
 
   if (op === "open") {
-    const { sprite: s, renamedLayers } = openSprite(studio, String(need(args.path, "path")));
+    const { sprite: s, renamedLayers, lostOnSave, skippedOnOpen } = openSprite(studio, String(need(args.path, "path")));
     return {
       sprite: displayName(s),
       id: s.id,
       width: s.width,
       height: s.height,
       ...(renamedLayers.length > 0 ? { renamedLayers } : {}),
+      ...(Object.keys(lostOnSave).length > 0 ? { lostOnSave } : {}),
+      ...(Object.keys(skippedOnOpen).length > 0 ? { skippedOnOpen } : {}),
     };
   }
 
@@ -214,13 +216,13 @@ function spriteManage(studio: Studio, args: Record<string, unknown>) {
     if (!s.filename) {
       throw new ToolError("invalid_args", "This sprite has never been saved. Use op 'save_as' with a path.");
     }
-    const files = saveSprite(studio, s, s.filename);
-    return { sprite: displayName(s), id: s.id, path: s.filename, files };
+    const { files, adjustedDurations } = saveSprite(studio, s, s.filename);
+    return { sprite: displayName(s), id: s.id, path: s.filename, files, ...(adjustedDurations.length > 0 ? { adjustedDurations } : {}) };
   }
 
   if (op === "save_as") {
-    const files = saveSprite(studio, s, String(need(args.path, "path")));
-    return { sprite: displayName(s), id: s.id, path: s.filename, files };
+    const { files, adjustedDurations } = saveSprite(studio, s, String(need(args.path, "path")));
+    return { sprite: displayName(s), id: s.id, path: s.filename, files, ...(adjustedDurations.length > 0 ? { adjustedDurations } : {}) };
   }
 
   if (op === "close") {

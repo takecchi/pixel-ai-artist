@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { deflateSync } from "node:zlib";
 import { Image, ToolError, createStudio, rgba } from "../dist/doc/index.js";
 import { decodeAse, encodeAse } from "../dist/lib/ase.js";
 import type { AseFile, AseLayer } from "../dist/lib/ase.js";
@@ -107,14 +108,39 @@ const mkFrame = (chunks: number[][]): number[] => {
   return new B().u32(16 + body.length).u16(0xf1fa).u16(chunks.length).u16(100).zeros(2).u32(chunks.length).raw(body).bytes;
 };
 
-function mkFile(frames: number[][]): Uint8Array {
+/** `headerFlags` 4 makes every layer chunk carry a UUID. */
+function mkFile(frames: number[][], headerFlags = 3): Uint8Array {
   const body = frames.flat();
-  const head = new B().u32(128 + body.length).u16(0xa5e0).u16(frames.length).u16(2).u16(2).u16(32).u32(3).u16(100).zeros(128 - 20);
+  const head = new B().u32(128 + body.length).u16(0xa5e0).u16(frames.length).u16(2).u16(2).u16(32).u32(headerFlags).u16(100).zeros(128 - 20);
   return Uint8Array.from([...head.bytes, ...body]);
 }
 
-const mkLayer = (name: string, type = 0) =>
-  mkChunk(0x2004, new B().u16(3).u16(type).u16(0).u16(0).u16(0).u16(0).u8(255).zeros(3).str(name).raw(type === 2 ? [0, 0, 0, 0] : []));
+const mkLayer = (name: string, type = 0, uuid = false) =>
+  mkChunk(
+    0x2004,
+    new B().u16(3).u16(type).u16(0).u16(0).u16(0).u16(0).u8(255).zeros(3).str(name).raw(type === 2 ? [0, 0, 0, 0] : []).raw(uuid ? new Array(16).fill(7) : []),
+  );
+
+/** A zlib-compressed RGBA cel, all zero unless `pixels` is given; the size is written as asked, whatever the pixels. */
+const mkCel = (layer: number, width: number, height: number, pixels?: Uint8Array) =>
+  mkChunk(
+    0x2005,
+    new B().u16(layer).u16(0).u16(0).u8(255).u16(2).u16(0).zeros(5).u16(width).u16(height).raw(deflateSync(pixels ?? new Uint8Array(width * height * 4))),
+  );
+
+const mkLinkedCel = (layer: number, frame: number) => mkChunk(0x2005, new B().u16(layer).u16(0).u16(0).u8(255).u16(1).u16(0).zeros(5).u16(frame));
+
+const mkTags = (tags: [from: number, to: number, name: string][]) => {
+  const b = new B().u16(tags.length).zeros(8);
+  for (const [from, to, name] of tags) b.u16(from).u16(to).u8(0).u16(0).zeros(6).raw([1, 2, 3, 0]).str(name);
+  return mkChunk(0x2018, b);
+};
+
+/** A frame that declares `declared` chunks, however many it holds. */
+const mkFrameDeclaring = (chunks: number[][], declared: number): number[] => {
+  const body = chunks.flat();
+  return new B().u32(16 + body.length).u16(0xf1fa).u16(declared).u16(100).zeros(2).u32(declared).raw(body).bytes;
+};
 const mkPalette = (colors: number[][]) => {
   const b = new B().u32(colors.length).u32(0).u32(colors.length - 1).zeros(8);
   for (const c of colors) b.u16(0).raw(c);
@@ -125,6 +151,15 @@ function write(dir: string, name: string, bytes: Uint8Array): string {
   const file = path.join(dir, name);
   writeFileSync(file, bytes);
   return file;
+}
+
+const MARK = "pixel-ai-artist:reference";
+
+/** Saves the studio's active sprite as `name` in `dir` and decodes what was written. */
+async function savedAse(studio: Studio, dir: string, name = "saved.aseprite") {
+  const file = path.join(dir, name);
+  await manage(studio, { op: "save_as", path: file });
+  return decodeAse(new Uint8Array(readFileSync(file)));
 }
 
 async function opened(file: string) {
@@ -225,7 +260,7 @@ test("save_as .aseprite writes the whole document, hidden layers included, and t
     sprite.modified = true;
     const file = path.join(dir, "all.aseprite");
     const reply = await manage(studio, { op: "save_as", path: file });
-    assert.deepEqual(reply, { sprite: "all.aseprite", id: sprite.id, path: file });
+    assert.deepEqual(reply, { sprite: "all.aseprite", id: sprite.id, path: file, files: [file] });
     assert.deepEqual(decodeAse(new Uint8Array(readFileSync(file))).layers.map((l) => [l.name, l.visible]), [["Bottom", true], ["Mid", false], ["Top", true]]);
     assert.equal(sprite.filename, file);
     assert.equal(sprite.modified, false);
@@ -397,55 +432,107 @@ test("a reference layer saves with its mark in the layer's user data, not as an 
     const file = path.join(dir, "ref.aseprite");
     await manage(studio, { op: "save_as", path: file });
     const layers = decodeAse(new Uint8Array(readFileSync(file))).layers;
-    assert.deepEqual(layers.map((l) => [l.reference, l.text]), [[false, undefined], [false, "pixel-ai-artist:reference"], [false, undefined]]);
+    assert.deepEqual(layers.map((l) => [l.reference, l.userData?.text]), [[false, undefined], [false, MARK], [false, undefined]]);
     const back = await opened(file);
     assert.deepEqual(back.sprite.layers.map((l) => l.reference === true), [false, true, false]);
+    assert.equal(back.sprite.layers[1]!.aseprite, undefined);
   });
 });
 
-test("open marks a layer whose user data contains the mark among other notes, and saving keeps the notes", async () => {
+const NOTED = "traced from photo\npixel-ai-artist:reference\nkeep at 50%";
+
+test("open marks a layer whose user data has the mark as one of its lines, and keeps the other lines as the layer's user data", async () => {
   await inTempDir(async (dir) => {
-    const noted = "traced from photo\npixel-ai-artist:reference\nkeep at 50%";
-    const file = write(dir, "noted.aseprite", encodeAse(aseFile([aseLayer("art"), aseLayer("ref", { text: noted })])));
-    const { studio, sprite } = await opened(file);
+    const file = write(dir, "noted.aseprite", encodeAse(aseFile([aseLayer("art"), aseLayer("ref", { userData: { text: NOTED } })])));
+    const { sprite } = await opened(file);
     assert.deepEqual(sprite.layers.map((l) => l.reference === true), [false, true]);
-    const again = path.join(dir, "again.aseprite");
-    await manage(studio, { op: "save_as", path: again });
-    assert.equal(decodeAse(new Uint8Array(readFileSync(again))).layers[1]!.text, noted);
+    assert.equal(sprite.layers[1]!.aseprite?.userData?.text, "traced from photo\nkeep at 50%");
+  });
+});
+
+test("saving a marked layer keeps its other lines and writes the mark as one last line", async () => {
+  await inTempDir(async (dir) => {
+    const file = write(dir, "noted.aseprite", encodeAse(aseFile([aseLayer("art"), aseLayer("ref", { userData: { text: NOTED } })])));
+    const { studio } = await opened(file);
+    assert.equal((await savedAse(studio, dir)).layers[1]!.userData?.text, `traced from photo\nkeep at 50%\n${MARK}`);
+  });
+});
+
+test("a mark repeated in a layer's user data is written once", async () => {
+  await inTempDir(async (dir) => {
+    const text = `first\n${MARK}\nsecond\n${MARK}`;
+    const file = write(dir, "twice.aseprite", encodeAse(aseFile([aseLayer("ref", { userData: { text } })])));
+    const { studio } = await opened(file);
+    assert.equal((await savedAse(studio, dir)).layers[0]!.userData?.text, `first\nsecond\n${MARK}`);
   });
 });
 
 test("saving a reference layer that already has a note appends the mark and keeps the note", async () => {
   await inTempDir(async (dir) => {
-    const file = write(dir, "note.aseprite", encodeAse(aseFile([aseLayer("art", { text: "my note" })])));
+    const file = write(dir, "note.aseprite", encodeAse(aseFile([aseLayer("art", { userData: { text: "my note" } })])));
     const { studio, sprite } = await opened(file);
     assert.equal(sprite.layers[0]!.reference, undefined);
     sprite.layers[0]!.reference = true;
-    const again = path.join(dir, "again.aseprite");
-    await manage(studio, { op: "save_as", path: again });
-    assert.equal(decodeAse(new Uint8Array(readFileSync(again))).layers[0]!.text, "my note\npixel-ai-artist:reference");
+    assert.equal((await savedAse(studio, dir)).layers[0]!.userData?.text, `my note\n${MARK}`);
   });
 });
 
-test("an Aseprite reference layer opens as a marked ordinary layer and is written back without the flag", async () => {
+test("user data that only mentions the mark does not make a reference layer, and is written back as it was", async () => {
   await inTempDir(async (dir) => {
-    const file = write(dir, "aseref.aseprite", encodeAse(aseFile([aseLayer("art"), aseLayer("ref", { reference: true })])));
+    const texts = [
+      "pixel-ai-artist:references",
+      "this is NOT pixel-ai-artist:reference here",
+      "xpixel-ai-artist:reference",
+      "pixel-ai-artist:reference ",
+      "PIXEL-AI-ARTIST:REFERENCE",
+    ];
+    const file = write(dir, "mentions.aseprite", encodeAse(aseFile(texts.map((text, i) => aseLayer(`note ${i}`, { userData: { text } })))));
     const { studio, sprite } = await opened(file);
-    assert.deepEqual(sprite.layers.map((l) => l.reference === true), [false, true]);
-    const again = path.join(dir, "again.aseprite");
-    await manage(studio, { op: "save_as", path: again });
-    const ref = decodeAse(new Uint8Array(readFileSync(again))).layers[1]!;
-    assert.deepEqual([ref.reference, ref.text], [false, "pixel-ai-artist:reference"]);
+    assert.deepEqual(sprite.layers.map((l) => l.reference), texts.map(() => undefined));
+    assert.deepEqual(sprite.layers.map((l) => l.aseprite?.userData?.text), texts);
+    assert.deepEqual((await savedAse(studio, dir)).layers.map((l) => l.userData?.text), texts);
+  });
+});
+
+test("clearing the reference of an opened layer removes only the mark line, and it does not come back on reopening", async () => {
+  await inTempDir(async (dir) => {
+    const only = write(dir, "only.aseprite", encodeAse(aseFile([aseLayer("a", { userData: { text: NOTED } }), aseLayer("b", { userData: { text: MARK } })])));
+    const { studio, sprite } = await opened(only);
+    for (const layer of sprite.layers) delete layer.reference;
+    const saved = await savedAse(studio, dir, "cleared.aseprite");
+    assert.deepEqual(saved.layers.map((l) => l.userData?.text), ["traced from photo\nkeep at 50%", undefined]);
+    const back = (await opened(path.join(dir, "cleared.aseprite"))).sprite;
+    assert.deepEqual(back.layers.map((l) => l.reference), [undefined, undefined]);
+  });
+});
+
+test("an Aseprite reference layer opens as a marked layer and is written back with the flag and no mark line", async () => {
+  await inTempDir(async (dir) => {
+    const flagged = aseLayer("ref", { reference: true, userData: { text: `note\n${MARK}` } });
+    const file = write(dir, "aseref.aseprite", encodeAse(aseFile([aseLayer("art"), flagged, aseLayer("bare", { reference: true })])));
+    const { studio, sprite } = await opened(file);
+    assert.deepEqual(sprite.layers.map((l) => l.reference === true), [false, true, true]);
+    assert.deepEqual(sprite.layers.map((l) => l.aseprite?.referenceFlag), [undefined, true, true]);
+    const layers = (await savedAse(studio, dir)).layers;
+    assert.deepEqual(layers.map((l) => [l.reference, l.userData?.text]), [[false, undefined], [true, "note"], [true, undefined]]);
+  });
+});
+
+test("clearing the reference of an Aseprite reference layer clears its flag too and keeps its notes", async () => {
+  await inTempDir(async (dir) => {
+    const file = write(dir, "aseref.aseprite", encodeAse(aseFile([aseLayer("ref", { reference: true, userData: { text: "note" } })])));
+    const { studio, sprite } = await opened(file);
+    delete sprite.layers[0]!.reference;
+    const layer = (await savedAse(studio, dir)).layers[0]!;
+    assert.deepEqual([layer.reference, layer.userData?.text], [false, "note"]);
   });
 });
 
 test("an unmarked layer's user data text survives a save", async () => {
   await inTempDir(async (dir) => {
-    const file = write(dir, "plain.aseprite", encodeAse(aseFile([aseLayer("art", { text: "just a note" })])));
+    const file = write(dir, "plain.aseprite", encodeAse(aseFile([aseLayer("art", { userData: { text: "just a note" } })])));
     const { studio } = await opened(file);
-    const again = path.join(dir, "again.aseprite");
-    await manage(studio, { op: "save_as", path: again });
-    assert.equal(decodeAse(new Uint8Array(readFileSync(again))).layers[0]!.text, "just a note");
+    assert.equal((await savedAse(studio, dir)).layers[0]!.userData?.text, "just a note");
   });
 });
 
@@ -485,5 +572,257 @@ test("open of a file whose layer names are all different reports no renames", as
     const file = write(dir, "fine.aseprite", encodeAse(aseFile([aseLayer("A"), aseLayer("B")])));
     const reply = await manage(createStudio(), { op: "open", path: file });
     assert.equal(reply.renamedLayers, undefined);
+  });
+});
+
+test("open names the second and later empty layer names as Aseprite does, one more than the highest 'Layer N' in the file", async () => {
+  await inTempDir(async (dir) => {
+    const file = write(dir, "empty.aseprite", encodeAse(aseFile([aseLayer("Layer 4"), aseLayer(""), aseLayer(""), aseLayer("")])));
+    const studio = createStudio();
+    const reply = await manage(studio, { op: "open", path: file });
+    assert.deepEqual(studio.activeSprite()!.layers.map((l) => l.name), ["Layer 4", "", "Layer 5", "Layer 6"]);
+    assert.deepEqual(reply.renamedLayers, [{ from: "", to: "Layer 5" }, { from: "", to: "Layer 6" }]);
+  });
+});
+
+test("open numbers empty layer names from Layer 1 when the file has no 'Layer N'", async () => {
+  await inTempDir(async (dir) => {
+    const file = write(dir, "empty.aseprite", encodeAse(aseFile([aseLayer(""), aseLayer("Ink"), aseLayer("")])));
+    const studio = createStudio();
+    await manage(studio, { op: "open", path: file });
+    assert.deepEqual(studio.activeSprite()!.layers.map((l) => l.name), ["", "Ink", "Layer 1"]);
+  });
+});
+
+test("open leaves a single empty layer name empty and reports no rename", async () => {
+  await inTempDir(async (dir) => {
+    const file = write(dir, "one.aseprite", encodeAse(aseFile([aseLayer(""), aseLayer("Ink")])));
+    const studio = createStudio();
+    const reply = await manage(studio, { op: "open", path: file });
+    assert.deepEqual(studio.activeSprite()!.layers.map((l) => l.name), ["", "Ink"]);
+    assert.equal(reply.renamedLayers, undefined);
+  });
+});
+
+// ── what open refuses because a save could not write it back ────────────
+
+async function refusesAsIoError(bytes: Uint8Array, message: RegExp) {
+  await inTempDir(async (dir) => {
+    const studio = createStudio();
+    await rejectsWith(manage(studio, { op: "open", path: write(dir, "bad.aseprite", bytes) }), "io_error", (err) => {
+      assert.match(err.message, message);
+    });
+    assert.equal(studio.sprites().length, 0);
+  });
+}
+
+test("open answers io_error, not internal_error, for a cel on a layer number the file does not have", async () => {
+  await refusesAsIoError(mkFile([mkFrame([mkLayer("only"), mkCel(1, 1, 1)])]), /layer/);
+  await refusesAsIoError(mkFile([mkFrame([mkCel(0, 1, 1)])]), /layer/);
+});
+
+test("open answers io_error for a file with no frames", async () => {
+  await refusesAsIoError(mkFile([]), /no frames/);
+});
+
+test("open answers io_error for a tag that covers frames the file does not have", async () => {
+  await refusesAsIoError(mkFile([mkFrame([mkLayer("a"), mkTags([[0, 3, "late"]])])]), /late/);
+  await refusesAsIoError(mkFile([mkFrame([mkLayer("a"), mkTags([[1, 0, "backwards"]])])]), /backwards/);
+});
+
+test("open answers io_error for an indexed file whose transparent index is outside its palette", async () => {
+  const file = aseFile([aseLayer("a")], { colorMode: "indexed", transparentIndex: 5 });
+  file.frames[0]!.cels[0]!.image!.pixels = new Uint8Array(4);
+  await refusesAsIoError(encodeAse(file), /transparent index/);
+});
+
+test("open answers io_error when the cel images together hold more than 4096 * 4096 pixels, though each is small", async () => {
+  await refusesAsIoError(mkFile([mkFrame([mkLayer("a"), mkLayer("b"), mkCel(0, 4096, 2049), mkCel(1, 4096, 2049)])]), /pixels/);
+});
+
+test("open answers io_error for a cel image with no pixels", async () => {
+  await refusesAsIoError(mkFile([mkFrame([mkLayer("a"), mkCel(0, 0, 0)])]), /empty/);
+  await refusesAsIoError(mkFile([mkFrame([mkLayer("a"), mkCel(0, 3, 0)])]), /empty/);
+});
+
+// ── what open leaves out, and says so ───────────────────────────────────
+
+test("open counts a linked cel whose frame has no cel to link to as skipped and still opens the file", async () => {
+  await inTempDir(async (dir) => {
+    const file = aseFile([aseLayer("img")]);
+    file.frames[0]!.cels = [];
+    file.frames.push({ durationMs: 50, cels: [{ layer: 0, x: 0, y: 0, opacity: 255, zIndex: 0, linkedFrame: 0 }] });
+    const studio = createStudio();
+    const reply = await manage(studio, { op: "open", path: write(dir, "dangling.aseprite", encodeAse(file)) });
+    assert.deepEqual(reply.skippedOnOpen, { cels: 1 });
+    assert.equal(reply.lostOnSave, undefined);
+    assert.deepEqual([...studio.activeSprite()!.layers[0]!.cels.keys()], []);
+  });
+});
+
+test("open keeps the first of two cels on one layer and frame and counts the second as skipped", async () => {
+  await inTempDir(async (dir) => {
+    const first = Uint8Array.from([9, 9, 9, 255]);
+    const bytes = mkFile([mkFrame([mkLayer("a"), mkCel(0, 1, 1, first), mkCel(0, 1, 1, Uint8Array.from([1, 2, 3, 255]))])]);
+    const studio = createStudio();
+    const reply = await manage(studio, { op: "open", path: write(dir, "twice.aseprite", bytes) });
+    assert.deepEqual(reply.skippedOnOpen, { cels: 1 });
+    assert.deepEqual([...studio.activeSprite()!.layers[0]!.cels.get(1)!.image.pixels], [rgba(9, 9, 9)]);
+  });
+});
+
+test("open counts the bytes left in a frame after its declared chunks as skipped", async () => {
+  await inTempDir(async (dir) => {
+    const extra = mkLayer("never read");
+    const bytes = mkFile([mkFrameDeclaring([mkLayer("a"), extra], 1)]);
+    const studio = createStudio();
+    const reply = await manage(studio, { op: "open", path: write(dir, "tail.aseprite", bytes) });
+    assert.deepEqual(reply.skippedOnOpen, { frameBytes: extra.length });
+    assert.deepEqual(studio.activeSprite()!.layers.map((l) => l.name), ["a"]);
+  });
+});
+
+test("open of a file with nothing to leave out reports no skippedOnOpen and no lostOnSave", async () => {
+  await inTempDir(async (dir) => {
+    const reply = await manage(createStudio(), { op: "open", path: write(dir, "clean.aseprite", encodeAse(aseFile([aseLayer("a")]))) });
+    assert.equal(reply.skippedOnOpen, undefined);
+    assert.equal(reply.lostOnSave, undefined);
+  });
+});
+
+// ── what a save will not write back ─────────────────────────────────────
+
+test("open reports how many linked cels a save will write as copies", async () => {
+  await inTempDir(async (dir) => {
+    const file = aseFile([aseLayer("img")]);
+    file.frames.push({ durationMs: 50, cels: [{ layer: 0, x: 0, y: 0, opacity: 255, zIndex: 0, linkedFrame: 0 }] });
+    file.frames.push({ durationMs: 50, cels: [{ layer: 0, x: 0, y: 0, opacity: 255, zIndex: 0, linkedFrame: 0 }] });
+    const reply = await manage(createStudio(), { op: "open", path: write(dir, "linked.aseprite", encodeAse(file)) });
+    assert.deepEqual(reply.lostOnSave, { linkedCels: 2 });
+  });
+});
+
+test("open reports layer UUIDs and chunks of an unknown type as lost on save, counting each", async () => {
+  await inTempDir(async (dir) => {
+    const unknown = mkChunk(0x7777, [1, 2, 3]);
+    const bytes = mkFile([mkFrame([mkLayer("a", 0, true), mkLayer("b", 0, true), unknown, unknown])], 7);
+    const reply = await manage(createStudio(), { op: "open", path: write(dir, "uuid.aseprite", bytes) });
+    assert.deepEqual(reply.lostOnSave, { layerUuids: 2, unknownChunks: 2 });
+  });
+});
+
+// ── what a save writes back ─────────────────────────────────────────────
+
+const PROPS = Uint8Array.from([12, 0, 0, 0, 0, 0, 0, 0, 9, 8, 7, 6]);
+const PROFILE = Uint8Array.from([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5]);
+const EXTERNAL = Uint8Array.from([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+const CEL_EXTRA = Uint8Array.from([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+
+function carryingFile(): AseFile {
+  const file = aseFile([aseLayer("art", { userData: { text: "layer note", color: [1, 2, 3, 4], properties: PROPS } })], {
+    userData: { text: "sprite note", color: [5, 6, 7, 255], properties: PROPS },
+    colorProfile: PROFILE,
+    externalFiles: EXTERNAL,
+    tags: [{ name: "walk", from: 0, to: 0, direction: "forward", repeat: 0, color: [10, 20, 30, 255], userData: { text: "tag note", properties: PROPS } }],
+  });
+  Object.assign(file.frames[0]!.cels[0]!, { userData: { text: "cel note", color: [8, 9, 10, 11], properties: PROPS }, extra: CEL_EXTRA });
+  return file;
+}
+
+test("save_as writes back the user data of the sprite, a layer, a cel and a tag, with its text, color and properties bytes", async () => {
+  await inTempDir(async (dir) => {
+    const { studio } = await opened(write(dir, "carry.aseprite", encodeAse(carryingFile())));
+    const saved = await savedAse(studio, dir);
+    assert.deepEqual(saved.userData, { text: "sprite note", color: [5, 6, 7, 255], properties: PROPS });
+    assert.deepEqual(saved.layers[0]!.userData, { text: "layer note", color: [1, 2, 3, 4], properties: PROPS });
+    assert.deepEqual(saved.frames[0]!.cels[0]!.userData, { text: "cel note", color: [8, 9, 10, 11], properties: PROPS });
+    assert.deepEqual(saved.tags[0]!.userData, { text: "tag note", properties: PROPS });
+    assert.deepEqual(saved.frames[0]!.cels[0]!.extra, CEL_EXTRA);
+  });
+});
+
+test("save_as writes back the color profile and external files chunks byte for byte", async () => {
+  await inTempDir(async (dir) => {
+    const { studio } = await opened(write(dir, "carry.aseprite", encodeAse(carryingFile())));
+    const saved = await savedAse(studio, dir);
+    assert.deepEqual(saved.colorProfile, PROFILE);
+    assert.deepEqual(saved.externalFiles, EXTERNAL);
+  });
+});
+
+test("an opened tag's color is the document tag's color, and a changed color is what save_as writes", async () => {
+  await inTempDir(async (dir) => {
+    const { studio, sprite } = await opened(write(dir, "carry.aseprite", encodeAse(carryingFile())));
+    assert.equal(sprite.tags[0]!.color, rgba(10, 20, 30, 255));
+    assert.deepEqual((await savedAse(studio, dir, "same.aseprite")).tags[0]!.color, [10, 20, 30, 255]);
+    sprite.tags[0]!.color = rgba(200, 100, 50, 255);
+    assert.deepEqual((await savedAse(studio, dir, "changed.aseprite")).tags[0]!.color, [200, 100, 50, 255]);
+  });
+});
+
+test("an opened layer keeps its user data in layer.aseprite.userData, apart from the reference mark", async () => {
+  await inTempDir(async (dir) => {
+    const { sprite } = await opened(write(dir, "carry.aseprite", encodeAse(carryingFile())));
+    assert.deepEqual(sprite.layers[0]!.aseprite, { userData: { text: "layer note", color: [1, 2, 3, 4], properties: PROPS } });
+  });
+});
+
+// ── what a save has to bring into range ─────────────────────────────────
+
+test("save_as brings a frame duration outside 1..65535 into range and answers what it changed", async () => {
+  await inTempDir(async (dir) => {
+    const { studio, sprite } = await drawn("rgb");
+    sprite.frames = [{ durationMs: 0 }, { durationMs: 250 }, { durationMs: 70000 }];
+    const file = path.join(dir, "range.aseprite");
+    const reply = await manage(studio, { op: "save_as", path: file });
+    assert.deepEqual(reply.adjustedDurations, [{ frame: 1, from: 0, to: 1 }, { frame: 3, from: 70000, to: 65535 }]);
+    assert.deepEqual(decodeAse(new Uint8Array(readFileSync(file))).frames.map((f) => f.durationMs), [1, 250, 65535]);
+    assert.equal(sprite.filename, file);
+  });
+});
+
+test("save of an opened .aseprite brings durations into range the same way", async () => {
+  await inTempDir(async (dir) => {
+    const { studio, sprite } = await drawn("rgb");
+    const file = path.join(dir, "again.aseprite");
+    await manage(studio, { op: "save_as", path: file });
+    sprite.frames[1]!.durationMs = 99999;
+    const reply = await manage(studio, { op: "save" });
+    assert.deepEqual(reply.adjustedDurations, [{ frame: 2, from: 99999, to: 65535 }]);
+  });
+});
+
+test("export.run aseprite brings durations into range and answers what it changed", async () => {
+  await inTempDir(async (dir) => {
+    const { studio, sprite } = await drawn("rgb");
+    sprite.frames[2]!.durationMs = 0;
+    const file = path.join(dir, "copy.aseprite");
+    const reply = await studio.call<Record<string, any>>("export.run", { op: "aseprite", path: file });
+    assert.deepEqual(reply.adjustedDurations, [{ frame: 3, from: 0, to: 1 }]);
+    assert.deepEqual(decodeAse(new Uint8Array(readFileSync(file))).frames.map((f) => f.durationMs), [100, 250, 1]);
+  });
+});
+
+test("save_as .aseprite with a cel outside -32768..32767 is invalid_args and writes nothing", async () => {
+  await inTempDir(async (dir) => {
+    for (const [x, y] of [[40000, 0], [0, -32769]] as const) {
+      const { studio, sprite } = await drawn("rgb");
+      const cel = sprite.layers[1]!.cels.get(1)!;
+      [cel.x, cel.y] = [x, y];
+      const file = path.join(dir, `far${x}.aseprite`);
+      await rejectsWith(manage(studio, { op: "save_as", path: file }), "invalid_args");
+      assert.equal(existsSync(file), false);
+      assert.equal(sprite.filename, null);
+    }
+  });
+});
+
+test("save_as .aseprite writes cels at -32768 and 32767", async () => {
+  await inTempDir(async (dir) => {
+    const { studio, sprite } = await drawn("rgb");
+    const cel = sprite.layers[1]!.cels.get(1)!;
+    [cel.x, cel.y] = [-32768, 32767];
+    const cels = (await savedAse(studio, dir)).frames[0]!.cels;
+    assert.deepEqual(cels.filter((c) => c.layer === 1).map((c) => [c.x, c.y]), [[-32768, 32767]]);
   });
 });

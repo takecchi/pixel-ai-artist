@@ -13,6 +13,7 @@
  */
 
 import { deltaE, rgbToLab } from "../lib/color.js";
+import type { AseUserData } from "../lib/ase.js";
 import { presets } from "../lib/palettes.js";
 import { ToolError } from "./errors.js";
 
@@ -107,6 +108,8 @@ export interface Cel {
   image: Image;
   /** 0–255. */
   opacity: number;
+  /** What an opened .aseprite carried for this cel and the model does not use, written back on save. */
+  aseprite?: { userData?: AseUserData; extra?: Uint8Array };
 }
 
 export interface Layer {
@@ -119,8 +122,25 @@ export interface Layer {
   opacity: number;
   /** Set on layers made by reference op 'import'; the name says nothing, since import takes any. */
   reference?: true;
-  /** The layer's user data text from an .aseprite file, written back on save. */
-  text?: string;
+  /**
+   * Aseprite's Background layer: composited before the other layers, an
+   * indexed sprite's transparent index shows as its palette colour on it, and
+   * while it is visible a saved PNG or GIF has no transparency.
+   */
+  background?: true;
+  /**
+   * What an opened .aseprite carried for this layer and the model does not
+   * use, written back on save. `referenceFlag` is Aseprite's own reference
+   * layer flag; the user data text here never holds the reference mark.
+   */
+  aseprite?: {
+    lockMovement?: boolean;
+    preferLinkedCels?: boolean;
+    collapsed?: boolean;
+    referenceFlag?: boolean;
+    otherFlags?: number;
+    userData?: AseUserData;
+  };
   /** Keyed by 1-based frame number. */
   cels: Map<number, Cel>;
 }
@@ -140,6 +160,8 @@ export interface Tag {
   /** 0 = forever. */
   repeats: number;
   color: Rgba;
+  /** An opened .aseprite tag's user data text and properties, written back on save. */
+  aseprite?: { userData?: AseUserData };
 }
 
 /** One byte per canvas pixel, non-zero = selected. */
@@ -173,6 +195,8 @@ export interface Sprite {
   activeFrame: number;
   /** Next value for `Layer.id`. */
   nextLayerId: number;
+  /** What an opened .aseprite carried for the whole sprite and the model does not use, written back on save. */
+  aseprite?: { userData?: AseUserData; colorProfile?: Uint8Array; externalFiles?: Uint8Array };
 }
 
 /** What results call a sprite: its file's base name, "Sprite" until it has one. */
@@ -195,6 +219,17 @@ export function pixelToRgba(s: Sprite, value: number): Rgba {
   if (s.colorMode !== "indexed") return value >>> 0;
   if (value === s.transparentIndex || value >= s.palette.length) return TRANSPARENT;
   return ((s.palette[value]! & 0xffffff00) | 255) >>> 0;
+}
+
+/**
+ * `pixelToRgba` for a pixel of `layer`: on an indexed Background layer the
+ * transparent index is paint, its palette colour, as Aseprite renders it.
+ */
+export function layerPixelToRgba(s: Sprite, layer: Layer, value: number): Rgba {
+  if (layer.background && s.colorMode === "indexed" && value === s.transparentIndex && value < s.palette.length) {
+    return ((s.palette[value]! & 0xffffff00) | 255) >>> 0;
+  }
+  return pixelToRgba(s, value);
 }
 
 /** `pixelToRgba` as hex; null where there is no paint. Grayscale never shows its alpha. */

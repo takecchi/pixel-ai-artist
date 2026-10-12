@@ -11,9 +11,9 @@ import type { AnimationFrame } from "../lib/image.js";
 import { readImageDocument, type ImageDocument } from "../lib/image-document.js";
 import { encodePng } from "../lib/png.js";
 import { frameFileNames } from "../lib/spritesheet.js";
-import { aseFromSprite, spriteFromAse, type RenamedLayer } from "./aseprite.js";
+import { aseFromSprite, spriteFromAse, type AdjustedDuration, type AseOpenNotes } from "./aseprite.js";
 import { ToolError } from "./errors.js";
-import { defaultPalette, rgbaToHex, type Rgba, type Sprite } from "./model.js";
+import { Image, defaultPalette, rgbaToHex, type Layer, type Rgba, type Sprite } from "./model.js";
 import type { Studio } from "./studio.js";
 
 const ASE_MAGIC = 0xa5e0;
@@ -23,7 +23,7 @@ function isAseprite(bytes: Uint8Array): boolean {
 }
 
 /** Opens an .aseprite, PNG, GIF or JPEG file as a sprite and makes it active. */
-export function openSprite(studio: Studio, file: string): { sprite: Sprite; renamedLayers: RenamedLayer[] } {
+export function openSprite(studio: Studio, file: string): { sprite: Sprite } & AseOpenNotes {
   const full = path.resolve(file);
   let bytes: Uint8Array;
   try {
@@ -51,23 +51,50 @@ export function openSprite(studio: Studio, file: string): { sprite: Sprite; rena
   const sprite = studio.addSprite({ width, height, colorMode: doc.colorMode, filename: full, palette });
   sprite.transparentIndex = doc.transparentIndex;
   const layer = sprite.layers[0]!;
-  // Aseprite names an opened image's layer after whether it became a Background.
+  // An image with no transparency opens as Aseprite's Background, which also locks its position.
   layer.name = doc.background ? "Background" : "Layer";
+  if (doc.background) {
+    layer.background = true;
+    layer.aseprite = { lockMovement: true };
+  }
   sprite.frames = doc.frames.map((f) => ({ durationMs: f.durationMs }));
   doc.frames.forEach((f, i) => layer.cels.set(i + 1, { x: 0, y: 0, image: f.image, opacity: 255 }));
   sprite.modified = false;
-  return { sprite, renamedLayers: [] };
+  return { sprite, renamedLayers: [], lostOnSave: {}, skippedOnOpen: {} };
 }
 
 export function isAsepritePath(file: string): boolean {
   return [".ase", ".aseprite"].includes(path.extname(file).toLowerCase());
 }
 
+export interface Written {
+  files: string[];
+  /** Frame durations brought into a format's range on the way out. */
+  adjustedDurations: AdjustedDuration[];
+}
+
 /** The whole document, layers and all, as an .aseprite file. */
-export function writeAseprite(sprite: Sprite, file: string): string[] {
+export function writeAseprite(sprite: Sprite, file: string): Written {
   const full = path.resolve(file);
-  writeBytes(full, encodeAse(aseFromSprite(sprite)));
-  return [full];
+  const { file: ase, adjustedDurations } = aseFromSprite(sprite);
+  writeBytes(full, encodeAse(ase));
+  return { files: [full], adjustedDurations };
+}
+
+/** Whether a visible Background is among `layers`, which makes Aseprite write PNG and GIF with no transparency. */
+export function drawsBackground(layers: readonly Layer[]): boolean {
+  return layers.some((l) => l.background && l.visible);
+}
+
+/** Frames with every pixel opaque and its colour kept, as Aseprite writes a sprite that has a visible Background. */
+export function opaqueFrames(frames: AnimationFrame[]): AnimationFrame[] {
+  return frames.map((f) => {
+    const image = new Image(f.image.width, f.image.height);
+    f.image.pixels.forEach((v, i) => {
+      image.pixels[i] = (v | 255) >>> 0;
+    });
+    return { image, durationMs: f.durationMs };
+  });
 }
 
 function rendered(studio: Studio, sprite: Sprite): AnimationFrame[] {
@@ -117,9 +144,9 @@ export function writeFrames(frames: AnimationFrame[], palette: readonly Rgba[], 
  * Writes the sprite as its visible layers look, and the sprite then belongs to
  * that file. Aseprite's GIF saver keeps an RGB or grayscale sprite's colours,
  * building the colour table from the frames, and only an indexed sprite is
- * written in its palette.
+ * written in its palette. A visible Background leaves PNG and GIF opaque.
  */
-export function saveSprite(studio: Studio, sprite: Sprite, file: string): string[] {
+export function saveSprite(studio: Studio, sprite: Sprite, file: string): Written {
   const ext = path.extname(file).toLowerCase();
   if (![".png", ".gif", ".ase", ".aseprite"].includes(ext)) {
     throw new ToolError("unsupported_command", `Saving '${ext || file}' files is not supported yet; save as .aseprite, .png or .gif.`, {
@@ -127,10 +154,15 @@ export function saveSprite(studio: Studio, sprite: Sprite, file: string): string
       supported: [".aseprite", ".ase", ".png", ".gif"],
     });
   }
-  const files = isAsepritePath(file)
-    ? writeAseprite(sprite, file)
-    : writeFrames(rendered(studio, sprite), sprite.colorMode === "indexed" ? sprite.palette : [], file);
+  let written: Written;
+  if (isAsepritePath(file)) {
+    written = writeAseprite(sprite, file);
+  } else {
+    const frames = rendered(studio, sprite);
+    const out = drawsBackground(sprite.layers) ? opaqueFrames(frames) : frames;
+    written = { files: writeFrames(out, sprite.colorMode === "indexed" ? sprite.palette : [], file), adjustedDurations: [] };
+  }
   sprite.filename = path.resolve(file);
   sprite.modified = false;
-  return files;
+  return written;
 }

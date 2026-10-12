@@ -130,6 +130,10 @@ export function registerAssetTools(server: McpServer, studio: Studio): void {
         frameCount: z.number().int().optional(),
         frame: z.number().int().optional().describe("Which frame a single-frame export wrote. Defaults to the active frame, which is not always the one you drew on."),
         atlas: z.string().nullish().optional(),
+        adjustedDurations: z
+          .array(z.object({ frame: z.number().int(), from: z.number(), to: z.number().int() }))
+          .optional()
+          .describe("Op 'aseprite': frame durations brought into the format's 1..65535 ms."),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
     },

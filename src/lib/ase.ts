@@ -2,6 +2,12 @@ import { deflateSync, inflateSync } from "node:zlib";
 
 export type AseColorMode = "rgba" | "grayscale" | "indexed";
 export type AseTagDirection = "forward" | "reverse" | "pingpong" | "pingpong_reverse";
+/** The user data chunk that follows an object. `properties` is the whole properties block, size DWORD included, as stored. */
+export interface AseUserData {
+  text?: string;
+  color?: [number, number, number, number];
+  properties?: Uint8Array;
+}
 export interface AseLayer {
   name: string;
   type: "image" | "group" | "tilemap";
@@ -15,8 +21,10 @@ export interface AseLayer {
   reference: boolean;
   blendMode: number;
   opacity: number;
-  /** The text of the user data chunk that follows the layer chunk, when there is one. */
-  text?: string;
+  /** Layer flag bits other than the seven named above (128 and up), kept so they are written back. */
+  /** Flag bits above the seven named ones, kept to write back; 0 when absent. */
+  otherFlags?: number;
+  userData?: AseUserData;
 }
 export interface AseCelImage {
   width: number;
@@ -31,6 +39,9 @@ export interface AseCel {
   zIndex: number;
   image?: AseCelImage;
   linkedFrame?: number;
+  userData?: AseUserData;
+  /** The body of the cel extra chunk (0x2006) that follows the cel, written back as is. */
+  extra?: Uint8Array;
   /** Decoded only: a tilemap cel, whose tiles are not read. */
   tilemap?: true;
 }
@@ -44,7 +55,9 @@ export interface AseTag {
   to: number;
   direction: AseTagDirection;
   repeat: number;
+  /** The tag's color; it is written as the color of the tag's user data, so userData.color is not used. */
   color: [number, number, number, number];
+  userData?: AseUserData;
 }
 export interface AseFile {
   width: number;
@@ -57,6 +70,12 @@ export interface AseFile {
   tags: AseTag[];
   /** Pixel width:height; 1:1 when absent. */
   pixelRatio?: { w: number; h: number };
+  /** The sprite's user data. */
+  userData?: AseUserData;
+  /** The body of the color profile chunk (0x2007). */
+  colorProfile?: Uint8Array;
+  /** The body of the external files chunk (0x2008); properties keys refer to its entries. */
+  externalFiles?: Uint8Array;
 }
 /** What the file holds that AseFile cannot represent; all zero means nothing was dropped. */
 export interface AseFeatures {
@@ -66,6 +85,14 @@ export interface AseFeatures {
   zIndexCels: number;
   /** Palette chunks after the first frame; the decoded palette is the first frame's. */
   paletteChanges: number;
+  /** Layers whose UUID was skipped. */
+  layerUuids: number;
+  /** Chunks of a type this reader does not know, skipped. */
+  unknownChunks: number;
+  /** Cels left out: a link to a cel that is not in an earlier frame, or a second cel on the same layer and frame. */
+  droppedCels: number;
+  /** Bytes left in frames after the counted chunks. */
+  unreadFrameBytes: number;
 }
 export type AseDecoded = AseFile & { pixelRatio: { w: number; h: number }; features: AseFeatures };
 
@@ -83,6 +110,9 @@ const FRAME_MAGIC = 0xf1fa;
 const HEADER_FLAGS = 1 | 2;
 const MAX_ENCODE_SIZE = 65535;
 const MAX_DECODE_SIZE = 16384;
+/** Pixels in all cel images together, so a small file cannot claim gigabytes once inflated. */
+const MAX_CEL_PIXELS = 4096 * 4096;
+const NAMED_LAYER_FLAGS = 1 | 2 | 4 | 8 | 16 | 32 | 64;
 const MAX_PALETTE = 65535;
 
 const textEncoder = new TextEncoder();
@@ -213,7 +243,24 @@ function checkString(name: string, s: string): void {
   if (textEncoder.encode(s).length > 0xffff) throw new RangeError(`${name} is longer than 65535 bytes`);
 }
 
+function checkUserData(name: string, u: AseUserData | undefined): void {
+  if (u === undefined) return;
+  if (u.text !== undefined) checkString(`${name} text`, u.text);
+  if (u.color !== undefined) {
+    if (u.color.length !== 4) throw new RangeError(`${name} color must have 4 components`);
+    for (const c of u.color) checkInt(`${name} color`, c, 0, 255);
+  }
+  if (u.properties !== undefined) {
+    const p = u.properties;
+    const size = p.length >= 4 ? new DataView(p.buffer, p.byteOffset, p.byteLength).getUint32(0, true) : -1;
+    if (p.length < 8 || size !== p.length) {
+      throw new RangeError(`${name} properties must be at least 8 bytes and start with their own size`);
+    }
+  }
+}
+
 function validate(file: AseFile): void {
+  let celPixels = 0;
   checkInt("width", file.width, 1, MAX_ENCODE_SIZE);
   if (file.pixelRatio) {
     checkInt("pixelRatio.w", file.pixelRatio.w, 1, 255);
@@ -226,17 +273,16 @@ function validate(file: AseFile): void {
   const colors = file.palette.length / 4;
   if (colors > MAX_PALETTE) throw new RangeError(`palette has more than ${MAX_PALETTE} colors`);
   checkInt("transparentIndex", file.transparentIndex, 0, 255);
-  if (file.colorMode === "indexed" && file.transparentIndex >= colors) {
-    throw new RangeError("transparentIndex is outside the palette");
-  }
-  checkInt("layer count", file.layers.length, 0, 0xffff);
+  checkUserData("sprite user data", file.userData);  checkInt("layer count", file.layers.length, 0, 0xffff);
   checkInt("frame count", file.frames.length, 1, 0xffff);
   file.layers.forEach((l, i) => {
     if (!LAYER_TYPES.includes(l.type)) throw new RangeError(`layer ${i}: unknown type`);
     // A tilemap layer needs a tileset chunk and tilemap cels, which this writer has no way to give it.
     if (l.type === "tilemap") throw new RangeError(`layer ${i}: tilemap layers cannot be written`);
     checkString(`layer ${i} name`, l.name);
-    if (l.text !== undefined) checkString(`layer ${i} text`, l.text);
+    checkUserData(`layer ${i} user data`, l.userData);
+    checkInt(`layer ${i} otherFlags`, l.otherFlags ?? 0, 0, 0xffff);
+    if (((l.otherFlags ?? 0) & NAMED_LAYER_FLAGS) !== 0) throw new RangeError(`layer ${i} otherFlags must not use the named flag bits`);
     checkInt(`layer ${i} childLevel`, l.childLevel, 0, 0xffff);
     checkInt(`layer ${i} blendMode`, l.blendMode, 0, 0xffff);
     checkInt(`layer ${i} opacity`, l.opacity, 0, 255);
@@ -259,9 +305,15 @@ function validate(file: AseFile): void {
       if (cel.linkedFrame !== undefined) {
         checkInt(`frame ${fi} cel linkedFrame`, cel.linkedFrame, 0, fi - 1);
       }
+      checkUserData(`frame ${fi} cel on layer ${cel.layer} user data`, cel.userData);
       if (cel.image !== undefined) {
-        checkInt(`frame ${fi} cel image width`, cel.image.width, 0, 0xffff);
-        checkInt(`frame ${fi} cel image height`, cel.image.height, 0, 0xffff);
+        // The decoder refuses an empty image or more than MAX_CEL_PIXELS in all, so such a file would not read back.
+        checkInt(`frame ${fi} cel image width`, cel.image.width, 1, 0xffff);
+        checkInt(`frame ${fi} cel image height`, cel.image.height, 1, 0xffff);
+        celPixels += cel.image.width * cel.image.height;
+        if (celPixels > MAX_CEL_PIXELS) {
+          throw new RangeError(`cel images hold more than ${MAX_CEL_PIXELS} pixels in all`);
+        }
         if (cel.image.pixels.length !== cel.image.width * cel.image.height * bpp) {
           throw new RangeError(`frame ${fi} cel image pixels length does not match its size and color mode`);
         }
@@ -276,6 +328,7 @@ function validate(file: AseFile): void {
     checkInt(`tag ${i} repeat`, t.repeat, 0, 0xffff);
     if (t.color.length !== 4) throw new RangeError(`tag ${i}: color must have 4 components`);
     for (const c of t.color) checkInt(`tag ${i} color`, c, 0, 255);
+    checkUserData(`tag ${i} user data`, t.userData);
   });
   checkInt("tag count", file.tags.length, 0, 0xffff);
 }
@@ -313,7 +366,8 @@ function layerChunk(l: AseLayer): Uint8Array {
     (l.background ? 8 : 0) |
     (l.preferLinkedCels ? 16 : 0) |
     (l.collapsed ? 32 : 0) |
-    (l.reference ? 64 : 0);
+    (l.reference ? 64 : 0) |
+    (l.otherFlags ?? 0);
   const w = new Writer()
     .u16(flags)
     .u16(LAYER_TYPES.indexOf(l.type))
@@ -345,6 +399,19 @@ function celChunk(cel: AseCel): Uint8Array {
   return chunk(0x2005, w);
 }
 
+/** A user data chunk; undefined for one with nothing in it, which Aseprite does not write. */
+function userDataChunk(u: AseUserData | undefined, always = false): Uint8Array | undefined {
+  const hasText = u?.text !== undefined && u.text !== "";
+  const hasColor = u?.color !== undefined && u.color[3] !== 0;
+  const hasProps = u?.properties !== undefined;
+  if (!always && !hasText && !hasColor && !hasProps) return undefined;
+  const w = new Writer().u32((hasText ? 1 : 0) | (hasColor ? 2 : 0) | (hasProps ? 4 : 0));
+  if (hasText) w.str(u!.text!);
+  if (hasColor) w.u8(u!.color![0]).u8(u!.color![1]).u8(u!.color![2]).u8(u!.color![3]);
+  if (hasProps) w.bytes(u!.properties!);
+  return chunk(0x2020, w);
+}
+
 function tagChunks(tags: AseTag[]): Uint8Array[] {
   const w = new Writer().u16(tags.length).zeros(8);
   for (const t of tags) {
@@ -361,7 +428,7 @@ function tagChunks(tags: AseTag[]): Uint8Array[] {
   }
   const out = [chunk(0x2018, w)];
   for (const t of tags) {
-    out.push(chunk(0x2020, new Writer().u32(2).u8(t.color[0]).u8(t.color[1]).u8(t.color[2]).u8(t.color[3])));
+    out.push(userDataChunk({ ...t.userData, color: t.color }, true)!);
   }
   return out;
 }
@@ -379,17 +446,27 @@ export function encodeAse(file: AseFile): Uint8Array {
   file.frames.forEach((frame, fi) => {
     const chunks: Uint8Array[] = [];
     if (fi === 0) {
+      if (file.externalFiles) chunks.push(chunk(0x2008, new Writer().bytes(file.externalFiles)));
+      if (file.colorProfile) chunks.push(chunk(0x2007, new Writer().bytes(file.colorProfile)));
       let opaque = true;
       for (let i = 3; i < file.palette.length; i += 4) if (file.palette[i] !== 255) opaque = false;
       if (opaque && colors <= 256) chunks.push(oldPaletteChunk(file.palette));
       chunks.push(newPaletteChunk(file.palette));
+      const sprite = userDataChunk(file.userData);
+      if (sprite) chunks.push(sprite);
+      if (file.tags.length > 0) chunks.push(...tagChunks(file.tags));
       for (const l of file.layers) {
         chunks.push(layerChunk(l));
-        if (l.text !== undefined) chunks.push(chunk(0x2020, new Writer().u32(1).str(l.text)));
+        const ud = userDataChunk(l.userData);
+        if (ud) chunks.push(ud);
       }
-      if (file.tags.length > 0) chunks.push(...tagChunks(file.tags));
     }
-    for (const cel of frame.cels) chunks.push(celChunk(cel));
+    for (const cel of frame.cels) {
+      chunks.push(celChunk(cel));
+      if (cel.extra) chunks.push(chunk(0x2006, new Writer().bytes(cel.extra)));
+      const ud = userDataChunk(cel.userData);
+      if (ud) chunks.push(ud);
+    }
     const size = FRAME_HEADER_SIZE + chunks.reduce((n, c) => n + c.length, 0);
     out.u32(size).u16(FRAME_MAGIC).u16(Math.min(chunks.length, 0xffff)).u16(frame.durationMs).zeros(2).u32(chunks.length);
     for (const c of chunks) out.bytes(c);
@@ -458,10 +535,15 @@ function readImage(
   r: Reader,
   compressed: boolean,
   bpp: number,
+  budget: { pixels: number },
 ): AseCelImage {
   const width = r.u16();
   const height = r.u16();
-  if (width > MAX_DECODE_SIZE || height > MAX_DECODE_SIZE) throw new Error("ase: cel image is too large");
+  if (width === 0 || height === 0) throw new Error("ase: cel image is empty");
+  budget.pixels -= width * height;
+  if (width > MAX_DECODE_SIZE || height > MAX_DECODE_SIZE || budget.pixels < 0) {
+    throw new RangeError(`ase: cel images hold more than ${MAX_CEL_PIXELS} pixels in all`);
+  }
   const expected = width * height * bpp;
   let pixels: Uint8Array;
   if (compressed) {
@@ -477,7 +559,35 @@ function readImage(
   return { width, height, pixels };
 }
 
+function readUserData(r: Reader): AseUserData {
+  const flags = r.u32();
+  const u: AseUserData = {};
+  if (flags & 1) u.text = r.str();
+  if (flags & 2) u.color = [r.u8(), r.u8(), r.u8(), r.u8()];
+  if (flags & 4) {
+    const at = r.pos;
+    const size = r.u32();
+    if (size < 8) throw new Error("ase: properties block is smaller than its own header");
+    r.pos = at;
+    u.properties = Uint8Array.from(r.bytes(size));
+  }
+  return u;
+}
+
+const KNOWN_CHUNKS = new Set([
+  0x0004, 0x0011, 0x2004, 0x2005, 0x2006, 0x2007, 0x2008, 0x2016, 0x2017, 0x2018, 0x2019, 0x2020, 0x2021, 0x2022, 0x2023,
+]);
+
+/** What the next user data chunk belongs to, as Aseprite's last_object_with_user_data. */
+type UserTarget =
+  | { kind: "sprite" }
+  | { kind: "layer"; layer: AseLayer }
+  | { kind: "cel"; cel: AseCel }
+  | { kind: "tag"; index: number }
+  | undefined;
+
 export function decodeAse(bytes: Uint8Array): AseDecoded {
+  const budget = { pixels: MAX_CEL_PIXELS };
   if (bytes.length < HEADER_SIZE) throw new Error("ase: file is shorter than the 128-byte header");
   const h = new Reader(bytes, 0, HEADER_SIZE);
   h.skip(4);
@@ -489,7 +599,7 @@ export function decodeAse(bytes: Uint8Array): AseDecoded {
   const headerFlags = h.u32();
   const speed = h.u16();
   h.skip(8);
-  const transparentIndex = h.u8();
+  const headerTransparent = h.u8();
   h.skip(5);
   const pixelW = h.u8();
   const pixelH = h.u8();
@@ -500,16 +610,33 @@ export function decodeAse(bytes: Uint8Array): AseDecoded {
   if (width < 1 || height < 1 || width > MAX_DECODE_SIZE || height > MAX_DECODE_SIZE) {
     throw new Error(`ase: unsupported sprite size ${width}x${height}`);
   }
+  if (frameCount === 0) throw new Error("ase: file has no frames");
   const bpp = BYTES_PER_PIXEL[colorMode];
+  const transparentIndex = colorMode === "indexed" ? headerTransparent : 0;
 
-  const features: AseFeatures = { slices: 0, tilesets: 0, tilemapCels: 0, zIndexCels: 0, paletteChanges: 0 };
+  const features: AseFeatures = {
+    slices: 0,
+    tilesets: 0,
+    tilemapCels: 0,
+    zIndexCels: 0,
+    paletteChanges: 0,
+    layerUuids: 0,
+    unknownChunks: 0,
+    droppedCels: 0,
+    unreadFrameBytes: 0,
+  };
 
   const layers: AseLayer[] = [];
   const frames: AseFrame[] = [];
   const tags: AseTag[] = [];
   let oldPalette: Uint8Array = new Uint8Array(0);
   let newPalette: Uint8Array | undefined;
-  let tagUserData = { next: 0, end: 0 };
+  let userData: AseUserData | undefined;
+  let colorProfile: Uint8Array | undefined;
+  let externalFiles: Uint8Array | undefined;
+  let target: UserTarget = { kind: "sprite" };
+  // Aseprite keeps the last cel it accepted, so a cel extra after a dropped cel lands on an older one.
+  let lastCel: AseCel | undefined;
 
   let pos = HEADER_SIZE;
   for (let fi = 0; fi < frameCount; fi++) {
@@ -521,14 +648,13 @@ export function decodeAse(bytes: Uint8Array): AseDecoded {
     const duration = fr.u16();
     fr.skip(2);
     const newCount = fr.u32();
-    const chunkCount = newCount === 0 ? oldCount : newCount;
+    const chunkCount = oldCount === 0xffff && oldCount < newCount ? newCount : oldCount;
     const frameEnd = pos + frameSize;
     if (frameSize < FRAME_HEADER_SIZE || frameEnd > bytes.length) throw new Error("ase: frame size is out of range");
 
-    const frame: AseFrame = { durationMs: duration === 0 ? speed : duration, cels: [] };
+    const frame: AseFrame = { durationMs: duration === 0 ? speed || 1 : duration, cels: [] };
+    const celLayers = new Set<number>();
     let cp = pos + FRAME_HEADER_SIZE;
-    let afterTags = false;
-    let afterLayer = false;
     for (let ci = 0; ci < chunkCount; ci++) {
       if (cp + 6 > frameEnd) throw new Error("ase: chunk header is outside its frame");
       const cr = new Reader(bytes, cp, frameEnd);
@@ -538,10 +664,6 @@ export function decodeAse(bytes: Uint8Array): AseDecoded {
       const body = new Reader(bytes, cp + 6, cp + chunkSize);
       cp += chunkSize;
 
-      const wasAfterTags = afterTags;
-      const wasAfterLayer = afterLayer;
-      afterTags = false;
-      afterLayer = false;
       const isPalette = type === 0x0004 || type === 0x0011 || type === 0x2019;
       if (fi > 0 && isPalette) {
         // The palette is the first frame's, as Aseprite's load_palette reads it; later ones are only counted.
@@ -570,10 +692,14 @@ export function decodeAse(bytes: Uint8Array): AseDecoded {
           const kind = LAYER_TYPES[layerType];
           if (kind === undefined) throw new Error(`ase: unknown layer type ${layerType}`);
           if (kind === "tilemap") body.skip(4);
-          if (headerFlags & 4) body.skip(16);
+          if (headerFlags & 4) {
+            body.skip(16);
+            features.layerUuids++;
+          }
           // NOTE.6: opacity needs header flag 1, and a group's blend mode and opacity need flag 2.
-          const blendValid = kind !== "group" || (headerFlags & 2) !== 0;
-          layers.push({
+          // Aseprite also ignores both on a background layer.
+          const blendValid = (kind !== "group" || (headerFlags & 2) !== 0) && (flags & 8) === 0;
+          const layer: AseLayer = {
             name,
             type: kind,
             childLevel,
@@ -586,12 +712,15 @@ export function decodeAse(bytes: Uint8Array): AseDecoded {
             reference: (flags & 64) !== 0,
             blendMode: blendValid ? blendMode : 0,
             opacity: blendValid && headerFlags & 1 ? opacity : 255,
-          });
-          afterLayer = true;
+            otherFlags: flags & ~NAMED_LAYER_FLAGS,
+          };
+          layers.push(layer);
+          target = { kind: "layer", layer };
           break;
         }
         case 0x2005: {
           const layer = body.u16();
+          if (layer >= layers.length) throw new Error(`ase: cel on layer ${layer}, but there are ${layers.length} layers`);
           const x = body.i16();
           const y = body.i16();
           const opacity = body.u8();
@@ -601,7 +730,7 @@ export function decodeAse(bytes: Uint8Array): AseDecoded {
           const cel: AseCel = { layer, x, y, opacity, zIndex };
           if (zIndex !== 0) features.zIndexCels++;
           if (celType === 0 || celType === 2) {
-            cel.image = readImage(body, celType === 2, bpp);
+            cel.image = readImage(body, celType === 2, bpp, budget);
           } else if (celType === 1) {
             cel.linkedFrame = body.u16();
           } else if (celType === 3) {
@@ -610,13 +739,34 @@ export function decodeAse(bytes: Uint8Array): AseDecoded {
           } else {
             throw new Error(`ase: unknown cel type ${celType}`);
           }
+          const linkTarget =
+            cel.linkedFrame === undefined
+              ? undefined
+              : cel.linkedFrame < fi && frames[cel.linkedFrame]!.cels.some((c) => c.layer === layer);
+          // A link to this frame or a later one has no cel to point at yet; the writer only links backwards.
+          if (linkTarget === false || celLayers.has(layer)) {
+            features.droppedCels++;
+            target = undefined;
+            break;
+          }
+          celLayers.add(layer);
           frame.cels.push(cel);
+          lastCel = cel;
+          target = { kind: "cel", cel };
           break;
         }
+        case 0x2006:
+          if (lastCel) lastCel.extra = Uint8Array.from(body.rest());
+          break;
+        case 0x2007:
+          colorProfile = Uint8Array.from(body.rest());
+          break;
+        case 0x2008:
+          externalFiles = Uint8Array.from(body.rest());
+          break;
         case 0x2018: {
           const n = body.u16();
           body.skip(8);
-          const start = tags.length;
           for (let i = 0; i < n; i++) {
             const from = body.u16();
             const to = body.u16();
@@ -630,50 +780,68 @@ export function decodeAse(bytes: Uint8Array): AseDecoded {
             const name = body.str();
             const direction = DIRECTIONS[dir];
             if (direction === undefined) throw new Error(`ase: unknown tag direction ${dir}`);
+            if (from > to || to >= frameCount) throw new Error(`ase: tag "${name}" covers frames ${from}..${to} of ${frameCount}`);
             tags.push({ name, from, to, direction, repeat, color: [r, g, b, 255] });
           }
-          tagUserData = { next: start, end: tags.length };
-          afterTags = true;
+          // Aseprite starts again from its first tag, even when an earlier tags chunk added others.
+          target = tags.length > 0 ? { kind: "tag", index: 0 } : undefined;
           break;
         }
-        case 0x2020:
-          if (wasAfterLayer) {
-            const flags = body.u32();
-            if (flags & 1) layers[layers.length - 1]!.text = body.str();
-          } else if (wasAfterTags && tagUserData.next < tagUserData.end) {
-            const flags = body.u32();
-            if (flags & 1) body.str();
-            if (flags & 2) {
-              tags[tagUserData.next]!.color = [body.u8(), body.u8(), body.u8(), body.u8()];
+        case 0x2020: {
+          const u = readUserData(body);
+          if (target?.kind === "sprite") userData = u;
+          else if (target?.kind === "layer") target.layer.userData = u;
+          else if (target?.kind === "cel") target.cel.userData = u;
+          else if (target?.kind === "tag") {
+            // A tag's user data replaces what the tags chunk said, so no color means no color.
+            const tag = tags[target.index]!;
+            tag.color = u.color ?? [0, 0, 0, 0];
+            delete tag.userData;
+            if (u.text !== undefined || u.properties !== undefined) {
+              tag.userData = {};
+              if (u.text !== undefined) tag.userData.text = u.text;
+              if (u.properties !== undefined) tag.userData.properties = u.properties;
             }
-            tagUserData.next++;
-            afterTags = true;
+            const following: number = target.index + 1;
+            target = following < tags.length ? { kind: "tag", index: following } : undefined;
           }
           break;
+        }
         case 0x2022:
           features.slices++;
+          target = undefined;
           break;
         case 0x2023:
           features.tilesets++;
+          target = undefined;
           break;
         default:
+          if (!KNOWN_CHUNKS.has(type)) features.unknownChunks++;
           break;
       }
     }
+    features.unreadFrameBytes += frameEnd - cp;
     frames.push(frame);
     pos = frameEnd;
   }
 
+  const palette = newPalette ?? oldPalette;
+  if (colorMode === "indexed" && transparentIndex >= palette.length / 4) {
+    throw new Error("ase: transparent index is outside the palette");
+  }
   return {
     width,
     height,
     colorMode,
     transparentIndex,
-    palette: newPalette ?? oldPalette,
+    palette,
     layers,
     frames,
     tags,
     pixelRatio,
     features,
+    ...(userData ? { userData } : {}),
+    ...(colorProfile ? { colorProfile } : {}),
+    ...(externalFiles ? { externalFiles } : {}),
   };
 }
