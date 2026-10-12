@@ -216,3 +216,23 @@ test("the recolor tool runs over MCP", async () => {
   assert.equal(sprite.modified, true);
   await server.close();
 });
+
+test("a shade the palette absorbs says why nothing changed and what to try; a real change or a snap says nothing extra", async () => {
+  const { server, studio } = createServer();
+  sketch(studio, 2, 1, [[0, 0, RED]], { palette: [RED] });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const client = new Client({ name: "test", version: "0" });
+  await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
+  const text = async (args: Record<string, unknown>) => {
+    const r = await client.callTool({ name: "recolor", arguments: args });
+    assert.notEqual(r.isError, true);
+    return (r.content as { type: string; text: string }[]).map((c) => c.text).join(" ");
+  };
+
+  const absorbed = await text({ op: "shade" });
+  assert.match(absorbed, /^0 pixel\(s\) recoloured\. Nothing changed: .*clampToPalette.*clampToPalette: false/);
+  assert.match(await text({ op: "desaturate" }), /Nothing changed/);
+  assert.doesNotMatch(await text({ op: "snap" }), /Nothing changed/);
+  assert.doesNotMatch(await text({ op: "shade", clampToPalette: false }), /Nothing changed/);
+  await server.close();
+});
