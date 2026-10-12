@@ -51,6 +51,9 @@ test("over stdio, with no editor anywhere, a sprite goes from preflight to a sav
     const created = await call("sprite_manage", { op: "new", width: 16, height: 16 });
     assert.equal(created.structuredContent.id, 1);
 
+    // Every legend colour is a PICO-8 entry, so palette lock keeps them as written.
+    await call("palette", { op: "preset", preset: "pico8", replace: true });
+
     const drawn = await call("draw", { ops: [{ kind: "grid", x: 2, y: 6, legend, rows: slime }] });
     assert.equal(drawn.structuredContent.pixelsChanged, 96);
 
@@ -58,6 +61,11 @@ test("over stdio, with no editor anywhere, a sprite goes from preflight to a sav
     const image = preview.content.find((c) => c.type === "image");
     assert.ok(image?.data, "preview carries an image");
     assert.equal(decodePng(Buffer.from(image.data, "base64")).width, 16 * Number(preview.structuredContent.scale));
+
+    const ascii = await call("look", { op: "ascii", rulers: false });
+    const rows = ascii.structuredContent.gridRows as string[];
+    assert.equal(rows.length, 16);
+    assert.equal(rows[6]!.slice(2, 14).replace(/[^.]/g, "O"), slime[0], "the crown row reads back where it was drawn");
 
     const pngPath = path.join(dir, "slime.png");
     await call("sprite_manage", { op: "save_as", path: pngPath });
@@ -77,15 +85,13 @@ test("over stdio, with no editor anywhere, a sprite goes from preflight to a sav
     const gifPath = path.join(dir, "slime.gif");
     await call("sprite_manage", { op: "save_as", path: gifPath });
 
-    // Palette lock snapped the legend onto the new sprite's default palette, so
-    // compare the files with each other rather than with the legend's hexes.
     const png = decodePng(readFileSync(pngPath));
     assert.deepEqual([png.width, png.height], [16, 16]);
     const body = rgbaToHex(png.get(6, 6));
-    const eye = rgbaToHex(png.get(5, 8));
+    assert.equal(body, legend.O);
+    assert.equal(rgbaToHex(png.get(5, 8)), legend.W);
+    assert.equal(rgbaToHex(png.get(5, 9)), legend.K);
     assert.equal(rgbaToHex(png.get(0, 0)), "#00000000");
-    assert.notEqual(body, "#00000000");
-    assert.notEqual(eye, body);
 
     const gif = decodeGif(readFileSync(gifPath));
     assert.deepEqual(gif.frames.map((f) => f.durationMs), [300, 300]);
