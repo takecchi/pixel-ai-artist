@@ -79,7 +79,7 @@ one template shape, and a test that every `rules://` reference in skills and
 agents resolves.
 
 **Bad.** Rules distilled from books can still be wrong at pixel scale.
-Mitigated by rendering every template and by re-running the gallery benchmark
-before and after.
+Mitigated by rendering every template, and in aseprite-ai-artist by re-running
+its gallery benchmark before and after; this port has no benchmark yet.
 
 [ADR-0009]: 0009-concept-first.md

@@ -23,8 +23,7 @@ the user's time and yours. Five questions, one answer, then draw.
 
 ## Procedure
 
-1. **`preflight`.** If not ready, stop and tell the user — nothing below works
-   without a live Aseprite.
+1. **`preflight`.**
 
 2. **Read what already exists.** If a sprite is open, `sprite_info` it. The
    user's existing canvas size and palette usually answer half the questions,

@@ -1,6 +1,9 @@
 # ADR-0008 — Headless mode: a batch Aseprite the server owns, chosen explicitly
 
-**Status:** accepted · 2026-09-29
+**Status:** superseded · 2026-10-12 — the port has no Aseprite at all, so there
+is no live or headless mode to choose between: documents always live in the
+server's memory (see [ARCHITECTURE](../ARCHITECTURE.md)). What carried over:
+nothing is on disk until the agent saves or exports, and the agent is told so.
 
 ## Context
 

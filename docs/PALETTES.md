@@ -31,7 +31,7 @@ refresh, so it does not come back with the next ranking.
 
 ```bash
 node --experimental-strip-types scripts/fetch-lospec-palettes.ts [count=2000]
-pnpm run build && node --test --experimental-strip-types tests/palettes.test.ts
+npm run build && node --test --experimental-strip-types tests/palettes.test.ts
 ```
 
 The script rewrites the Lospec part from the current download ranking. The file is written

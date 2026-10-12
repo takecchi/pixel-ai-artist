@@ -38,7 +38,7 @@ and `rules://23-materials-soft`.
    budget: 2–4 frames for a tile; 8 frames at ~8 fps for ocean waves or they look choppy.
 7. Surface sparkle is a 6-frame loop of simple linear moves; bright patches mirror the clouds above. Animate
    tiles inside each autotile index. Rivers without a grid: small pulsing-line loops (4 frames) where flow shows.
-8. Blend trick for wet contrast: duplicate the water layer, lower one *multiply*, the upper *overlay*, both ~50 %.
+8. Wet contrast: deepen the ramp step under the water's lower half and lift the one along its top edge. Layers have no blend modes here, so build it from palette steps, not a multiply/overlay pair.
 
 **Shores and edges**
 

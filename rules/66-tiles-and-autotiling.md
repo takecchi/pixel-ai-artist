@@ -25,9 +25,9 @@ A tile is drawn once and shown a thousand times, so every flaw is multiplied: a 
 
 **Autotile sets** — layouts in the section below
 
-14. **Pick the set by the terrain, not by habit.** Rectangles and UI boxes: 9-slice (+ 4 inner corners). Pipes, roads, wall lines: 4-bit, 16 tiles. Smooth terrain at minimum art: dual-grid, 16 tiles. Full terrain with the `tileset` export: blob47. RPG Maker: A2 (20 minitiles → the same 47 shapes).
+14. **Pick the set by the terrain, not by habit.** Rectangles and UI boxes: 9-slice (+ 4 inner corners). Pipes, roads, wall lines: 4-bit, 16 tiles. Smooth terrain at minimum art: dual-grid, 16 tiles. Full terrain for an engine's autotiler: blob47. RPG Maker: A2 (20 minitiles → the same 47 shapes).
 15. **A diagonal neighbour counts only when both cardinals beside it are present.** That rule collapses 256 masks to exactly 47. Bit order, clockwise from north: N=1, NE=2, E=4, SE=8, S=16, SW=32, W=64, NW=128.
-16. **The `tileset` tool expects canonical order**: the 47 reduced masks in ascending numeric order at Aseprite tile indices 1–47 (index 0 is the reserved empty tile). Wangtile id = index − 1. Any other order autotiles wrongly; the export refuses an incomplete set.
+16. **Author in canonical order**: the 47 reduced masks in ascending numeric order at tile indices 1–47, after an empty tile at index 0, so the index → mask table below is the one you give the engine. An order that matches no table autotiles wrongly.
 17. **Build the body tile first, then edges, then corners**; draw no detail until every connection works. Squeeze every tile: avoid rare cases. Test with a single cell, a 3×3 patch (9 different tiles), an L shape (inner corner), a ring (hole), a plus.
 18. **Two terrains on one map**: give them priorities and draw overlays lowest to highest; the higher terrain's open sides read the lower one as its background.
 19. **Animated tiles** cycle frames inside one autotile index; the index changes only when a neighbour changes.
@@ -158,9 +158,9 @@ BBBBBBBBBBLLBBBB
 BBBBBBBBBBBBBBBB
 ```
 
-### Layout: blob47 (what `tileset` export `layout="blob47"` expects)
+### Layout: blob47 (canonical order)
 
-`#` = neighbour is the same terrain, `.` = not, centre always terrain. Each cell is `index=mask`; the index is the Aseprite tile index, the mask is the sum of the set bits. Author in this order.
+`#` = neighbour is the same terrain, `.` = not, centre always terrain. Each cell is `index=mask`; the index is the tile's position in the sheet, the mask is the sum of the set bits. Author in this order.
 
 ```text
  1=0     2=1     3=4     4=5     5=7     6=16    7=17    8=20
@@ -246,25 +246,22 @@ Every minitile always lands in the same quarter of the assembled tile (a top-lef
 
 Edge contract: draw edges per minitile, not per tile. The right edge of every top-left piece must match the left edge of every top-right piece it can touch; same for top and bottom pairs. 4 quarters × 5 states = 20 minitiles cover all 47 shapes.
 
-### What this means for the `tileset` tool
+### Handing a tile set to an engine
 
-- Supported layouts: `grid` and `blob47`. `blob47` writes a Tiled wangset (`format="tiled"`, two explicit colours, wangid order N, NE, E, SE, S, SW, W, NW) and a `blob47` index → mask list in `format="json"`. `format="godot"` writes the atlas without terrain data: set peering bits in the editor from the same mask table.
-- The set must have 48 tiles including the empty tile 0, in canonical order, all pixel-distinct.
-- Wang-16, dual-grid, 4-bit and A2 have no wangset export: export `grid`, or for RPG Maker export the sheet with `export` op `png`. State your index convention to the user.
-- `pack` assigns indices by first appearance scanning the mockup row by row, skipping empty cells, and deduplicates identical cells. So paint the 47 tiles in canonical order, left to right, 8 per row, and make sure no two are identical.
-- `stamp` places tiles by grid cell (x, y in cells), the way to test a set with a patch.
-- To build blob47 from A2 pieces: for each of the 47 masks, take each quarter's state from the table, `draw` op `blit` the four minitiles into its cell of the mockup, then `pack`.
+There are no tilemap layers or tileset export here. Draw the tiles as cells of one sprite — 8 per row, left to right, in canonical order — and `export` op `png` the sheet. The engine's own terrain setup (a Tiled wangset, Godot peering bits, RPG Maker's A2) takes the bits from the index → mask table above; state your index convention to the user.
+
+To build blob47 from A2 pieces: for each of the 47 masks, take each quarter's state from the table and `draw` op `blit` the four minitiles into its cell.
 
 ## Procedure
 
-1. Fix the tile size and palette (`rules://21-limited-and-platform-palettes` for platform sets). Make the canvas a whole number of tiles: `pack` refuses otherwise.
+1. Fix the tile size and palette (`rules://21-limited-and-platform-palettes` for platform sets). Make the canvas a whole number of tiles.
 2. Master tile: draw it, blit the four quadrants swapped to move the seam to the middle (`transform` op `translate` does not wrap), rework, swap back.
 3. Wrap test: `draw` op `blit` the tile into its eight neighbours on a scratch layer, `look` op `preview`, then `look` op `ascii` the first and last columns and rows and check they continue each other.
 4. Transitions: composite A and B through the mask, then the boundary pass (rule 12). One edge, one outer corner, one inner corner cover all four sides once flipped and re-lit.
 5. Autotile set: paint the mockup cells in canonical order, body tile (mask 255, index 47) first. For every pair of tiles that show terrain on touching sides, `read_pixels` the border column or row and check it is identical.
-6. `tileset` op `pack` (`tileWidth`, `tileHeight`). Read `tileCount` and `cellCount`: tileCount 47 means all distinct. Fewer means two tiles are identical: redraw the pair.
-7. Test patches with `tileset` op `stamp` on a tilemap layer, `look` op `preview`: single cell, 3×3, L, ring, plus.
-8. `tileset` op `export` `layout="blob47"` `format="tiled"`; then `format="json"` and compare a few `blob47` entries to the diagram above by eye.
+6. No two tiles may be identical: `look` op `ascii` any pair that looks alike, and redraw one if they match.
+7. Test patches on a scratch layer: `draw` op `blit` tiles into a single cell, 3×3, L, ring and plus, then `look` op `preview`.
+8. `export` op `png` the sheet, and give the user the index → mask table with it.
 9. `validate` `layers`, `strays`.
 
 ## Mistakes

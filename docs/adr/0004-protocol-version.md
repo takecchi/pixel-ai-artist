@@ -40,9 +40,9 @@ dependency bump rather than a rewrite:
 **Good.** Works today in every client, and the eventual upgrade is a version
 bump plus adopting cache hints.
 
-**Good.** The stateless discipline is better design regardless of the spec: two
-agent windows can drive one Aseprite session without stepping on each other's
-"current sprite", which a stateful server would have made impossible.
+**Good.** The stateless discipline is better design regardless of the spec: a
+call that names its sprite (`'#7'`) means the same thing whatever was active
+before it.
 
 **Bad.** No Tasks extension, so a long spritesheet export blocks its tool call
 rather than returning a handle. Acceptable at the sizes involved; worth

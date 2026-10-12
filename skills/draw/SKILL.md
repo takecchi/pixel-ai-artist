@@ -40,7 +40,7 @@ pixel, so you see the whole silhouette while you write it instead of finding
 out afterwards what a stack of ellipses and rects added up to.
 
 ```
-draw layer="base" label="block in slime" ops=[
+draw layer="base" ops=[
   { kind:"grid", x:8, y:10, legend:{ "O":"#5f574f" }, rows:[
     "....OOOO....",
     "..OOOOOOOO..",
@@ -61,15 +61,15 @@ Shapes are still the right tool for big regular forms — a sky gradient, a
 floor, a 40-pixel circle:
 
 ```
-draw layer="base" label="block in knight" ops=[
+draw layer="base" ops=[
   { kind:"ellipse", rect:{x:12,y:4,width:8,height:8}, color:"#5f574f", fill:"#5f574f" },
   { kind:"rect",    rect:{x:11,y:12,width:10,height:10}, color:"#5f574f", fill:"#5f574f" },
   …
 ]
 ```
 
-Batch aggressively. One call is one undo step for the user; forty calls are
-forty. See `rules://03-silhouette-and-form`.
+Batch aggressively. One call is one round trip and lands all or nothing;
+forty calls are forty. See `rules://03-silhouette-and-form`.
 
 ### 3. Check the silhouette immediately
 
@@ -148,7 +148,6 @@ Fix every error. Report warnings you chose not to fix, with the reason.
 - Leave `paletteLock` on. When the result says a colour moved with ΔE > 12, the
   palette has no colour for what you asked — say so rather than turning the lock
   off.
-- Use `label` to describe the intent; it becomes the user's undo entry.
 
 ## Related
 

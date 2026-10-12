@@ -1,5 +1,12 @@
 # Prior art, and why this exists anyway
 
+> This is aseprite-ai-artist's survey, kept because its reasoning about the tool
+> surface and the skills still holds. Where it says "this project" it means
+> aseprite-ai-artist, which drives a running Aseprite. The port adds one
+> difference the survey did not consider: it needs no Aseprite at all, so it
+> works where none is installed or no display exists. The notes marked
+> *(port)* say what changed.
+
 This project was started from a brief that had already been **archived** with
 the verdict *"do not build a competing general Aseprite MCP / Claude plugin"*.
 That verdict was correct about the landscape and worth taking seriously, so this
@@ -33,7 +40,8 @@ rediscover them:
 - **A decoupled singleton bridge.** `bachhoang0606`'s ADR-0002 documents exactly
   why an in-process listener fails: the host restarts the MCP server, the
   Aseprite link dies with it, and duplicate processes fight over the port. That
-  analysis shaped [our ADR-0002](adr/0002-standalone-bridge.md).
+  analysis shaped [our ADR-0002](adr/0002-standalone-bridge.md). *(port)*
+  Superseded: with no Aseprite there is no link to keep alive.
 - **Vision-legible previews.** Upscaling a 32px sprite to ~1024px before showing
   it to a vision model, because raw 1× previews are below the resolution a model
   can read.
@@ -44,9 +52,11 @@ rediscover them:
 - **Frame diffs**, so an agent can confirm what its edit actually touched.
 - **CIELAB ΔE for palette snapping**, not RGB distance.
 - **Capability negotiation with loud `unsupported_command`**, so an old
-  extension degrades visibly instead of mysteriously.
+  extension degrades visibly instead of mysteriously. *(port)* Kept: a command
+  not ported yet answers `unsupported_command`.
 - **`doNotFallBackToDisk`** on connection failures — the single most important
-  detail in this whole category of tool, and it is theirs.
+  detail in this whole category of tool, and it is theirs. *(port)* Gone with
+  the connection: there is no open window for a disk edit to go behind.
 
 ## What is different here, and why
 
@@ -71,7 +81,7 @@ This tracks the MCP Skills-over-MCP working group's direction (SEP-2640,
 resources-based). When that extension lands in the SDK, the transport becomes
 the standard one and the on-disk format does not change.
 
-### 2. Eighteen tools instead of ninety
+### 2. Eighteen tools instead of ninety (seventeen in the port)
 
 Every tool schema is resident in the model's context on every turn, whether or
 not anyone is drawing. Ninety to a hundred and twenty tool definitions is a
@@ -84,7 +94,8 @@ roughly a sixth of the schema. A test fails if the count creeps past 24.
 
 The batching has a second, better effect: `draw` applies all its operations in
 one Aseprite transaction, so the user's Ctrl+Z undoes *the agent's edit* rather
-than one stray pixel out of forty.
+than one stray pixel out of forty. *(port)* No undo; a batch lands whole or not
+at all instead.
 
 ### 3. Zero-install, one config line everywhere
 
@@ -93,7 +104,8 @@ must name a per-OS binary path, so the line a user copies from a README is wrong
 for half of them. `npx` with no native dependencies gives one line that is
 identical on macOS, Windows and Linux, in every client. That is why previews are
 upscaled inside Aseprite rather than with `sharp` — see
-[ADR-0001](adr/0001-typescript-and-npx.md).
+[ADR-0001](adr/0001-typescript-and-npx.md). *(port)* The port upscales and
+encodes in plain TypeScript, still with no native dependency.
 
 ## Honest assessment
 

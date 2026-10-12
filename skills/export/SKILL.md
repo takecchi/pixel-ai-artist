@@ -1,7 +1,7 @@
 ---
 name: export
 title: Export game-ready assets
-description: Produce the files an engine actually consumes — spritesheets with atlases, GIFs, scaled PNGs — with the tags and layout the target needs. Use when work is finished and needs to leave Aseprite.
+description: Produce the files an engine actually consumes — spritesheets with atlases, GIFs, scaled PNGs — with the tags and layout the target needs. Use when work is finished and needs to leave the server as files.
 ---
 
 # Export game-ready assets
@@ -44,11 +44,6 @@ says otherwise.
 
 The JSON atlas is written beside the PNG and carries per-frame rectangles and
 per-tag ranges.
-
-**9-patch panels and hotspots** — `sprite_manage op="slice_create"` names a
-region with an optional `center` (the stretchable middle, for 9-slicing) or
-`pivot`. Create slices before exporting; a `spritesheet` export carries them
-into its JSON atlas alongside the per-frame rectangles.
 
 **Animation preview for a human:**
 

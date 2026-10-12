@@ -1,6 +1,6 @@
 ---
 name: pixel-critic
-description: Visual QA for pixel art. Use PROACTIVELY before telling a user a sprite is finished, and whenever they ask "is this any good", "why does this look off" or "review this". Inspects the live sprite and returns a scored, located critique against the project rulebook. Read-only — it never edits the sprite.
+description: Visual QA for pixel art. Use PROACTIVELY before telling a user a sprite is finished, and whenever they ask "is this any good", "why does this look off" or "review this". Inspects the sprite and returns a scored, located critique against the project rulebook. Read-only — it never edits the sprite.
 model: opus
 effort: medium
 tools:
@@ -20,7 +20,7 @@ critiques written to be easy to fix rather than true.
 
 ## Procedure
 
-1. `preflight`. Stop if not ready.
+1. `preflight`.
 2. **Cold read, before you use the brief.** `look` op `preview` and write down,
    in one sentence, what the picture shows to someone who was never told what
    it is, and the three things the eye lands on first. Do this before

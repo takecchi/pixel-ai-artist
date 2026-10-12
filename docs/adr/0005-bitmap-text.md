@@ -4,9 +4,10 @@
 
 ## Context
 
-Sprites need words: HUD labels, badges, title cards, speech bubbles. Aseprite's
-Lua API offers no call that rasterises text into a cel, so the glyphs have to be
-produced somewhere and written as pixels.
+Sprites need words: HUD labels, badges, title cards, speech bubbles. Something
+has to produce the glyphs and write them as pixels. (In aseprite-ai-artist the
+reason was sharper: Aseprite's Lua API has no call that rasterises text into a
+cel.)
 
 Two sources were on the table: TrueType/OpenType files, or bitmap fonts whose
 glyphs are already pixel grids.
@@ -17,10 +18,10 @@ glyphs are already pixel grids.
   baseline, space width, and each glyph as rows of `#` and `.`. The format is
   ours, documented in [TOOLS.md](../TOOLS.md), and readable and editable by hand
   or by an agent.
-- **Layout happens in TypeScript.** `draw` op kind `text` is expanded on the
-  server into an ordinary `pixels` op before it reaches Aseprite. The Lua side
-  has no text code, and the text lands in the same single transaction, with the
-  same palette lock, as the rest of the batch.
+- **Layout happens in the tool.** `draw` op kind `text` is expanded into an
+  ordinary `pixels` op before it reaches `draw.batch`, which has no text code;
+  the text lands all or nothing, with the same palette lock, as the rest of the
+  batch.
 - **One original font ships**: `pixel5x7`, ASCII 32–126, drawn for this project
   and released CC0.
 - `measureOnly` returns the ink box without touching the sprite, so a label can
@@ -32,13 +33,11 @@ glyphs are already pixel grids.
 one means shipping a font renderer. Bitmap glyphs are pixel art already, so the
 result obeys the rulebook; a vector font rendered small is soft, uneven, or both.
 
-**Good.** Text is testable without Aseprite: the layout is pure code with
-unit tests.
+**Good.** The layout is pure code with unit tests.
 
 **Bad.** Users who want a specific typeface must transcribe it into the format.
 Fine for pixel fonts, which are small by nature.
 
 ## Revisit when
 
-Aseprite exposes text rasterisation to Lua, or users ask repeatedly for a
-specific non-bitmap face.
+Users ask repeatedly for a specific non-bitmap face.

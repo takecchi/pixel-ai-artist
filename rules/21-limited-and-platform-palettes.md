@@ -10,7 +10,7 @@ Era *style* (outlines, dither habits, tile conventions) is in `rules://90-platfo
 1. **Choose palette and budget before the first pixel, and say them back.** Counts include transparency: a "16-colour" sprite is 15 + transparent.
 2. **"8-bit" and "16-bit" name the CPU, not the palette.** NES, C64, Master System and ZX Spectrum have four different palettes. Use the table below; GIF is 256 (8 bpp).
 3. **The per-tile / per-sprite limit binds harder than the total.** NES: 3 colours + transparent per sprite, and per 16×16 background cell. Game Boy and GBC sprites: 3 + transparent.
-   SNES, Genesis, GBA: 15 + transparent per tile or sprite. Honour it inside every 8×8 block even when the Aseprite palette is larger.
+   SNES, Genesis, GBA: 15 + transparent per tile or sprite. Honour it inside every 8×8 block even when the sprite's palette is larger.
 4. **Default sizes when the user has no preference.** "Retro/8-bit" → PICO-8 (16, forgiving). "Game Boy" → 4 shades. "NES-like" → 3 colours + transparent per sprite, ≈ 25 on screen.
    "SNES/GBA/Genesis-like" → 15 per sprite from short hue-shifted ramps. Named game → `reference` op `sample_palette`.
 5. **Reduction ladder (a 24-colour sprite, measured).** 24 → 20: swap greys for skin tones, drop the barely visible darkest teal. → 15: fuse skin with brown hair, share one highlight between green and teal, drop orange AA.

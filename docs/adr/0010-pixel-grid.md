@@ -35,7 +35,7 @@ the format has to be strict about it. Two findings shaped the decision:
   not two.
 - **Compiled in TypeScript**, like `text` (ADR-0005): transparent cells become
   `clear` rectangles (runs merged across rows), painted cells one `pixels` op
-  per colour. The Lua side learns nothing new; live and headless share it.
+  per colour. `draw.batch` learns nothing new.
   `selectionOnly` had to become real for every op in the same change — it
   clipped only `pixels`, so a grid's erase would have ignored the selection its
   paint respected.
@@ -51,8 +51,8 @@ the format has to be strict about it. Two findings shaped the decision:
 by construction: rows it did not change land exactly where they were. Frame N+1
 can start as frame N's rows, which keeps volume from drifting across a cycle.
 
-**Good.** The compiler is pure and unit-tested; the round trip is tested against
-a real headless Aseprite.
+**Good.** The compiler is pure and unit-tested, and so is the round trip from
+`look ascii` through `draw` back to the same pixels.
 
 **Bad.** Large grids reintroduce the counting problem the research describes. The
 skills steer to grids up to ~32 wide and one grid per part beyond that. The
@@ -72,8 +72,8 @@ ASCII first, then Latin-1 and Latin Extended-A letters, 261 in all, so a full
 ARC grids but double the tokens, and nothing shows they help a model *write*
 pixel art. Run-length encoding and row labels in the writable form have no
 evidence either way. Each would be a schema field paid for on every turn, so
-they wait for a benchmark run (ADR-0006) that compares compact rows against
-them.
+they wait for a benchmark run that compares compact rows against them
+(aseprite-ai-artist's ADR-0006 benchmark; not part of this port).
 
 ## Revisit when
 

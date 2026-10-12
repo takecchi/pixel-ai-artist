@@ -18,7 +18,8 @@ some of it back.
 ## Decision
 
 One tool per **noun**, an `op` enum for the verbs, and a batch array wherever an
-agent would otherwise loop. Eighteen tools total.
+agent would otherwise loop. Eighteen tools total (seventeen in the port, which
+drops `tileset`).
 
 ```
 layer  op=create|rename|delete|reorder|set|group|merge|…   batch=[…]
@@ -36,14 +37,14 @@ A test asserts the count stays at or under 24, so the next person to reach for
 would, while covering what ninety do.
 
 **Good.** Batching became the default rather than an optimisation. `draw` takes
-an array of operations applied in one Aseprite transaction, which means the
-user's Ctrl+Z undoes "the agent's edit" instead of one stray pixel out of forty.
+an array of operations applied all or nothing, so a failing op late in a batch
+cannot leave forty stray pixels behind.
 
 **Bad.** An `op` enum is a weaker contract than a dedicated tool: the model has
 to know which arguments belong to which op, and a wrong combination is caught at
 runtime rather than by the schema. Mitigated by writing the per-op argument
 rules into each description, and by validating loudly.
 
-**Bad.** Something a user wants will eventually fall outside eighteen tools.
-That is what `run_lua` is for — off by default, since it is arbitrary code
-execution in the application holding the user's unsaved work.
+**Bad.** Something a user wants will eventually fall outside seventeen tools.
+aseprite-ai-artist had `run_lua` for that; the port has no Lua to run, so the
+answer is a new op on an existing tool.

@@ -1,18 +1,18 @@
 ---
 name: new
 title: Create a sprite document
-description: Create a new Aseprite document with the right canvas size, colour mode, palette and layer structure, so later work does not have to fight the setup. Use when starting fresh rather than editing an existing sprite.
+description: Create a new sprite document with the right canvas size, colour mode, palette and layer structure, so later work does not have to fight the setup. Use when starting fresh rather than editing an existing sprite.
 ---
 
 # Create a sprite document
 
-Set-up mistakes are expensive to undo: a canvas that is the wrong size means
+Set-up mistakes are expensive to reverse: a canvas that is the wrong size means
 redrawing, and a palette chosen after the art means repainting. Get these four
 things right and the rest of the work is drawing.
 
 ## Procedure
 
-1. **`preflight`.** Stop if not ready.
+1. **`preflight`.**
 
 2. **Create the canvas.**
 
@@ -21,7 +21,7 @@ things right and the rest of the work is drawing.
    ```
 
    - Use **RGB** unless the user wants hard palette enforcement at the file
-     level. Indexed mode makes the palette a hard constraint Aseprite itself
+     level. Indexed mode makes the palette a hard constraint the document itself
      enforces — good for a strict retro target, awkward for iteration.
    - Size to the game's grid if there is one: a 16×16 tile game wants character
      sprites that are a multiple of 16 in at least one dimension.
@@ -37,7 +37,7 @@ things right and the rest of the work is drawing.
    Or build one: `palette op="ramp" base="#c04030" steps=5` per material. See
    `rules://01-palette-and-color`.
 
-4. **Build the layer structure** in one batch, so it is one undo step:
+4. **Build the layer structure** in one batch, applied all or nothing:
 
    ```
    layer batch=[
@@ -51,7 +51,8 @@ things right and the rest of the work is drawing.
    For anything that will be animated, build the full character rig instead —
    see `pixel-ai-artist:rig`. Splitting baked pixels apart later is real work.
 
-5. **Save immediately**, so the user has a file and undo has an anchor:
+5. **Save immediately**, so the user has a file — the document itself lives
+   only as long as the server does:
 
    ```
    sprite_manage op="save_as" path="…/knight.aseprite"
