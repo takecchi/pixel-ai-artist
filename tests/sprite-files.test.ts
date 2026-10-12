@@ -229,7 +229,7 @@ test("save_as .png writes the visible layers composited as RGBA and leaves the h
     studio.ensureCel(sprite, hidden, 1).image = img(2, 1, [GREEN, GREEN]);
     const file = path.join(dir, "out.png");
     const reply = await manage(studio, { op: "save_as", path: file });
-    assert.deepEqual(reply, { sprite: "out.png", id: sprite.id, path: file });
+    assert.deepEqual(reply, { sprite: "out.png", id: sprite.id, path: file, files: [file] });
     const written = readPng(file);
     assert.deepEqual([written.width, written.height], [2, 1]);
     assert.deepEqual([...written.pixels], [RED, BLUE]);
@@ -257,10 +257,16 @@ test("save_as .png of a three-frame sprite writes one numbered file per frame, a
     cels.set(2, { x: 0, y: 0, image: img(2, 1, [GREEN, GREEN]), opacity: 255 });
     cels.set(3, { x: 0, y: 0, image: img(2, 1, [BLUE, BLUE]), opacity: 255 });
 
-    await manage(studio, { op: "save_as", path: path.join(dir, "walk.png") });
+    const reply = await manage(studio, { op: "save_as", path: path.join(dir, "walk.png") });
     assert.equal(existsSync(path.join(dir, "walk.png")), false);
     const numbered = [1, 2, 3].map((n) => readPng(path.join(dir, `walk${n}.png`)).get(0, 0));
     assert.deepEqual(numbered, [RED, GREEN, BLUE]);
+    // `path` stays the name given, as the extension answered; `files` is what is on disk.
+    assert.equal(reply.path, path.join(dir, "walk.png"));
+    assert.deepEqual(reply.files, [1, 2, 3].map((n) => path.join(dir, `walk${n}.png`)));
+
+    const again = await manage(studio, { op: "save" });
+    assert.deepEqual(again.files, reply.files, "a later save writes the same numbered files, not walk11.png");
 
     await manage(studio, { op: "save_as", path: path.join(dir, "run_{frame}.png") });
     const zeroBased = [0, 1, 2].map((n) => readPng(path.join(dir, `run_${n}.png`)).get(0, 0));
@@ -276,7 +282,7 @@ test("save_as .gif writes every frame with its duration", async () => {
     sprite.layers[0]!.cels.set(2, { x: 0, y: 0, image: img(2, 1, [BLUE, RED]), opacity: 255 });
     const file = path.join(dir, "anim.gif");
     const reply = await manage(studio, { op: "save_as", path: file });
-    assert.deepEqual(reply, { sprite: "anim.gif", id: sprite.id, path: file });
+    assert.deepEqual(reply, { sprite: "anim.gif", id: sprite.id, path: file, files: [file] });
     const gif = readGif(file);
     assert.deepEqual(gif.frames.map((f) => f.durationMs), [60, 200]);
     assert.deepEqual(gif.frames.map((f) => [...f.image.pixels]), [[RED, BLUE], [BLUE, RED]]);
@@ -361,7 +367,7 @@ test("save writes an opened sprite's new pixels back over its file and clears mo
     sprite.layers[0]!.cels.get(1)!.image.set(1, 0, BLUE);
     sprite.modified = true;
     const reply = await manage(studio, { op: "save" });
-    assert.deepEqual(reply, { sprite: "edit.png", id: sprite.id, path: file });
+    assert.deepEqual(reply, { sprite: "edit.png", id: sprite.id, path: file, files: [file] });
     assert.deepEqual([...readPng(file).pixels], [RED, BLUE]);
     assert.equal(sprite.modified, false);
   });
