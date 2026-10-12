@@ -104,6 +104,36 @@ export function snapToPalette(colour: Rgb, palette: readonly string[]): SnapResu
   return { index: best, hex: palette[best]!, distance: bestDistance };
 }
 
+/**
+ * The palette entry Aseprite would pick for `colour` (doc::Palette::findBestfit):
+ * channels cut to 5 bits and compared with weights g 59², r 30², b 11², a 8²,
+ * the first exact 5-bit match winning outright. This is the matching an RGB
+ * sprite goes through when Aseprite converts it to indexed; use it where the
+ * port must hand back the colours Aseprite would, and snapToPalette elsewhere.
+ * Only the first 256 entries are considered, as in Aseprite.
+ */
+export function asepriteBestFit(colour: Rgb, palette: readonly Rgb[]): number {
+  if (palette.length === 0) throw new Error("Palette is empty.");
+  const r = colour.r >> 3;
+  const g = colour.g >> 3;
+  const b = colour.b >> 3;
+  const a = colour.a >> 3;
+  let best = 0;
+  let lowest = Number.POSITIVE_INFINITY;
+  const size = Math.min(256, palette.length);
+  for (let i = 0; i < size; i++) {
+    const p = palette[i]!;
+    const diff =
+      ((p.g >> 3) - g) ** 2 * 59 * 59 + ((p.r >> 3) - r) ** 2 * 30 * 30 + ((p.b >> 3) - b) ** 2 * 11 * 11 + ((p.a >> 3) - a) ** 2 * 8 * 8;
+    if (diff < lowest) {
+      if (diff === 0) return i;
+      best = i;
+      lowest = diff;
+    }
+  }
+  return best;
+}
+
 export interface HueShiftOptions {
   /** Positive lightens, negative darkens. Roughly one ramp step per 0.15. */
   amount: number;
