@@ -35,20 +35,20 @@ workflow it names and follow that — do not do the step from memory.
    a big one ("animated knight, export for Godot") chains several. Write the
    chain down before starting — it is the plan you report progress against.
 
-4. **Decide once whether to ask.** Open-ended requests start with `libresprite:brief`,
+4. **Decide once whether to ask.** Open-ended requests start with `pixel-ai-artist:brief`,
    which puts every decision to the user in one message. Specific requests ("add
    a 1px outline", "export this as a GIF") do not — just do them. Never ask more
    than once per stage: a user who asked for a whole animation does not want to
    approve every frame.
 
 5. **Design before drawing.** Anything new — a character, a prop, a scene, an
-   animation — goes through `libresprite:concept` before a pixel is placed: it
+   animation — goes through `pixel-ai-artist:concept` before a pixel is placed: it
    writes the art spec (scenario, palette, poses), turns it into a prompt for
    an image model, and offers the user two ways on: generate a concept sheet or
    storyboard with that prompt and send it back, or continue without one. That
    offer rides in the brief's message when there is a brief, so the user still
    answers once. If they will send references, stop and wait; when the images
-   arrive, `libresprite:concept` reads them into a PixelSpec and imports them. If
+   arrive, `pixel-ai-artist:concept` reads them into a PixelSpec and imports them. If
    the user already supplied reference art, skip the prompt and go straight to
    reading it.
 
@@ -66,7 +66,7 @@ workflow it names and follow that — do not do the step from memory.
    changed, hand the result to the `pixel-critic` agent where the harness has
    one — never grade your own work in place of it; you know what you meant,
    so you see it. Give it the document name and the brief, nothing about how
-   it was made. Elsewhere, run `libresprite:review` and do its cold read first.
+   it was made. Elsewhere, run `pixel-ai-artist:review` and do its cold read first.
 
    The critique decides whether you iterate at all. A draft ships as it is
    when its critique has **no BLOCKING finding and scores 7/10 or more** —
@@ -145,20 +145,20 @@ route around. Say which mode you used in the report.
 
 | The user wants | Chain |
 |----------------|-------|
-| Something new, loosely described ("a knight") | `libresprite:brief` + `libresprite:concept` (one message) → `libresprite:new` → `libresprite:palette` if the palette is not settled → `libresprite:draw` → `libresprite:shade` → `libresprite:review` |
-| Something new, fully specified | `libresprite:concept` → `libresprite:new` → `libresprite:draw` → `libresprite:shade` → `libresprite:review` |
-| Pixel art of a picture the user supplied ("make this character a sprite") | `libresprite:brief` if size or palette is open → `libresprite:concept` from its reference step → `libresprite:new` → `libresprite:draw` → `libresprite:review` |
-| An animation of a character | the drawing chain above if nothing exists yet, with a storyboard in the concept prompt → `libresprite:rig` → `libresprite:animate` → `libresprite:review` |
-| An animation of a sprite that is already rigged | `libresprite:concept` for the storyboard (offer) → `libresprite:animate` → `libresprite:review` |
-| Tiles, terrain, level art | `libresprite:brief` if open-ended → `libresprite:concept` (an environment sheet) → `libresprite:tileset` → `libresprite:review` |
-| Colours changed, a retro look, a cleanup | `libresprite:palette` → `libresprite:review` |
-| Volume, light, "it looks flat" | `libresprite:shade` → `libresprite:review` |
-| A change to existing art ("make it more menacing", "fix the hands") | `libresprite:fix` → `libresprite:review` |
-| An opinion ("is this good?", "why does it look off?") | `libresprite:review` only — report, do not edit unless asked |
-| Files for an engine or for sharing | `libresprite:review` if not already done → `libresprite:export` |
-| Words on the art — a label, score, title card | `libresprite:draw` (its Text section) → `libresprite:review` |
-| Nine-slice UI panels, pivots or hotspots for an engine | `libresprite:export` (slices) |
-| Share the finished work in the community gallery | `libresprite:review` if not already done → `libresprite:submit` |
+| Something new, loosely described ("a knight") | `pixel-ai-artist:brief` + `pixel-ai-artist:concept` (one message) → `pixel-ai-artist:new` → `pixel-ai-artist:palette` if the palette is not settled → `pixel-ai-artist:draw` → `pixel-ai-artist:shade` → `pixel-ai-artist:review` |
+| Something new, fully specified | `pixel-ai-artist:concept` → `pixel-ai-artist:new` → `pixel-ai-artist:draw` → `pixel-ai-artist:shade` → `pixel-ai-artist:review` |
+| Pixel art of a picture the user supplied ("make this character a sprite") | `pixel-ai-artist:brief` if size or palette is open → `pixel-ai-artist:concept` from its reference step → `pixel-ai-artist:new` → `pixel-ai-artist:draw` → `pixel-ai-artist:review` |
+| An animation of a character | the drawing chain above if nothing exists yet, with a storyboard in the concept prompt → `pixel-ai-artist:rig` → `pixel-ai-artist:animate` → `pixel-ai-artist:review` |
+| An animation of a sprite that is already rigged | `pixel-ai-artist:concept` for the storyboard (offer) → `pixel-ai-artist:animate` → `pixel-ai-artist:review` |
+| Tiles, terrain, level art | `pixel-ai-artist:brief` if open-ended → `pixel-ai-artist:concept` (an environment sheet) → `pixel-ai-artist:tileset` → `pixel-ai-artist:review` |
+| Colours changed, a retro look, a cleanup | `pixel-ai-artist:palette` → `pixel-ai-artist:review` |
+| Volume, light, "it looks flat" | `pixel-ai-artist:shade` → `pixel-ai-artist:review` |
+| A change to existing art ("make it more menacing", "fix the hands") | `pixel-ai-artist:fix` → `pixel-ai-artist:review` |
+| An opinion ("is this good?", "why does it look off?") | `pixel-ai-artist:review` only — report, do not edit unless asked |
+| Files for an engine or for sharing | `pixel-ai-artist:review` if not already done → `pixel-ai-artist:export` |
+| Words on the art — a label, score, title card | `pixel-ai-artist:draw` (its Text section) → `pixel-ai-artist:review` |
+| Nine-slice UI panels, pivots or hotspots for an engine | `pixel-ai-artist:export` (slices) |
+| Share the finished work in the community gallery | `pixel-ai-artist:review` if not already done → `pixel-ai-artist:submit` |
 
 If a request fits no row, it is usually a direct tool call ("rename the layer",
 "add a frame"): make it, `look` if pixels changed, and say what you did.
@@ -203,10 +203,10 @@ elsewhere, run the matching skill yourself.
 
 | Agent | Takes over | Instead of |
 |-------|------------|------------|
-| `palette-smith` | proposing and justifying a palette | `libresprite:palette` |
-| `rig-builder` | planning and building the layer rig | `libresprite:rig` |
-| `animation-director` | key poses, timing and tags before frames are drawn — and the storyboard panels for the concept prompt | the planning half of `libresprite:animate` |
-| `pixel-critic` | a scored, located critique; read-only | `libresprite:review` |
+| `palette-smith` | proposing and justifying a palette | `pixel-ai-artist:palette` |
+| `rig-builder` | planning and building the layer rig | `pixel-ai-artist:rig` |
+| `animation-director` | key poses, timing and tags before frames are drawn — and the storyboard panels for the concept prompt | the planning half of `pixel-ai-artist:animate` |
+| `pixel-critic` | a scored, located critique; read-only | `pixel-ai-artist:review` |
 
 Give an agent the brief, the PixelSpec if there is one, the document name and
 the stage it owns — it starts with no memory of this conversation. Run agents

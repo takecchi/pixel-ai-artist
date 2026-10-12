@@ -71,18 +71,18 @@ async function main(): Promise<void> {
     return;
   }
 
-  const pluginPort = num(flags, "plugin-port", envPort("LIBRESPRITE_AI_PLUGIN_PORT", DEFAULT_PLUGIN_PORT));
-  const controlPort = num(flags, "control-port", envPort("LIBRESPRITE_AI_CONTROL_PORT", pluginPort + 1));
+  const pluginPort = num(flags, "plugin-port", envPort("PIXEL_AI_PLUGIN_PORT", DEFAULT_PLUGIN_PORT));
+  const controlPort = num(flags, "control-port", envPort("PIXEL_AI_CONTROL_PORT", pluginPort + 1));
 
   switch (command) {
     case "serve":
       return serve({
         pluginPort,
         controlPort,
-        allowLua: truthy(flags.allowLua ?? process.env.LIBRESPRITE_AI_ALLOW_LUA),
-        // Plugin manifests set LIBRESPRITE_AI_PROMPTS=0; see ServerOptions.prompts.
-        prompts: process.env.LIBRESPRITE_AI_PROMPTS !== "0",
-        headless: truthy(flags.headless ?? process.env.LIBRESPRITE_AI_HEADLESS),
+        allowLua: truthy(flags.allowLua ?? process.env.PIXEL_AI_ALLOW_LUA),
+        // Plugin manifests set PIXEL_AI_PROMPTS=0; see ServerOptions.prompts.
+        prompts: process.env.PIXEL_AI_PROMPTS !== "0",
+        headless: truthy(flags.headless ?? process.env.PIXEL_AI_HEADLESS),
         asepritePath: typeof flags.aseprite === "string" ? flags.aseprite : undefined,
       });
     case "bridge":
@@ -175,15 +175,15 @@ async function runInstall(positional: string[], flags: Flags): Promise<void> {
   const dryRun = truthy(flags["dry-run"]);
 
   const env: Record<string, string> = {};
-  if (typeof flags.aseprite === "string") env.LIBRESPRITE_PATH = flags.aseprite;
-  if (truthy(flags.allowLua)) env.LIBRESPRITE_AI_ALLOW_LUA = "1";
-  if (truthy(flags.headless)) env.LIBRESPRITE_AI_HEADLESS = "1";
+  if (typeof flags.aseprite === "string") env.ASEPRITE_PATH = flags.aseprite;
+  if (truthy(flags.allowLua)) env.PIXEL_AI_ALLOW_LUA = "1";
+  if (truthy(flags.headless)) env.PIXEL_AI_HEADLESS = "1";
 
   const opts = {
     scope: scope as "user" | "project",
     projectDir,
     command: "npx",
-    args: ["-y", "libresprite-ai-artist@latest", "serve"],
+    args: ["-y", "pixel-ai-artist@latest", "serve"],
     env,
     dryRun,
   };
@@ -240,7 +240,7 @@ async function runInstallExtension(flags: Flags): Promise<void> {
 }
 
 async function doctor(opts: { pluginPort: number; controlPort: number }): Promise<void> {
-  const lines: string[] = [`libresprite-ai-artist ${packageVersion()}`, ""];
+  const lines: string[] = [`pixel-ai-artist ${packageVersion()}`, ""];
 
   const configDir = findAsepriteConfigDir();
   lines.push(
@@ -255,7 +255,7 @@ async function doctor(opts: { pluginPort: number; controlPort: number }): Promis
   lines.push(
     binary
       ? `✓ Aseprite executable   ${binary} (used by --headless)`
-      : "· Aseprite executable   not found — only needed for --headless; set LIBRESPRITE_PATH",
+      : "· Aseprite executable   not found — only needed for --headless; set ASEPRITE_PATH",
   );
 
   // Probe before spawning anything. "The bridge is up" and "the bridge is up
@@ -343,14 +343,14 @@ async function doctor(opts: { pluginPort: number; controlPort: number }): Promis
 
 function printHelp(): void {
   process.stdout.write(
-    `libresprite-ai-artist ${packageVersion()} — agent control layer for Aseprite
+    `pixel-ai-artist ${packageVersion()} — agent control layer for Aseprite
 
 Usage:
-  libresprite-ai-artist [serve]                 Speak MCP over stdio (what agents run)
-  libresprite-ai-artist bridge                  Run the WebSocket relay (usually auto-started)
-  libresprite-ai-artist install <client…>       Write MCP config for an agent
-  libresprite-ai-artist install-extension       Install the Aseprite Lua extension
-  libresprite-ai-artist doctor                  Diagnose a broken setup
+  pixel-ai-artist [serve]                 Speak MCP over stdio (what agents run)
+  pixel-ai-artist bridge                  Run the WebSocket relay (usually auto-started)
+  pixel-ai-artist install <client…>       Write MCP config for an agent
+  pixel-ai-artist install-extension       Install the Aseprite Lua extension
+  pixel-ai-artist doctor                  Diagnose a broken setup
 
 Clients: ${CLIENTS.join(", ")}
 
@@ -359,7 +359,7 @@ Options:
   --project            Write project-scoped config instead of user-scoped
   --dir <path>         Project directory (default: cwd)
   --agents [path]      Also write an AGENTS.md section (default: ./AGENTS.md)
-  --aseprite <path>    Path to the Aseprite executable (headless mode; written as LIBRESPRITE_PATH by install)
+  --aseprite <path>    Path to the Aseprite executable (headless mode; written as ASEPRITE_PATH by install)
   --allowLua           Enable the run_lua escape hatch (arbitrary code in Aseprite)
   --headless           Run a batch Aseprite this server owns instead of driving an open window
   --plugin-port <n>    Port the Aseprite extension dials (default ${DEFAULT_PLUGIN_PORT})
@@ -368,10 +368,10 @@ Options:
   --version, --help
 
 Examples:
-  npx libresprite-ai-artist install --all --agents
-  npx libresprite-ai-artist install codex cursor --project
-  npx libresprite-ai-artist doctor
-  npx libresprite-ai-artist serve --headless --aseprite /Applications/Aseprite.app/Contents/MacOS/aseprite
+  npx pixel-ai-artist install --all --agents
+  npx pixel-ai-artist install codex cursor --project
+  npx pixel-ai-artist doctor
+  npx pixel-ai-artist serve --headless --aseprite /Applications/Aseprite.app/Contents/MacOS/aseprite
 `,
   );
 }

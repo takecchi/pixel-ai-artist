@@ -1,9 +1,9 @@
 {
-  "//": "Claude Code — user scope goes in ~/.claude.json, project scope in .mcp.json. Prefer installing the plugin instead: /plugin marketplace add takecchi/libresprite-ai-artist",
+  "//": "Claude Code — user scope goes in ~/.claude.json, project scope in .mcp.json. Prefer installing the plugin instead: /plugin marketplace add takecchi/pixel-ai-artist",
   "mcpServers": {
-    "libresprite-ai-artist": {
+    "pixel-ai-artist": {
       "command": "npx",
-      "args": ["-y", "libresprite-ai-artist@latest", "serve"]
+      "args": ["-y", "pixel-ai-artist@latest", "serve"]
     }
   }
 }

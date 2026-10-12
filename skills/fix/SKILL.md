@@ -88,7 +88,7 @@ Report what changed and what you deliberately left alone.
 | "muddy colours" | Too many near-duplicates — `palette op="extract"` on a copy, or `analyze` + `snap` |
 | "add a label / score / title" | `draw` kind `text`; measure with `measureOnly` first so it lands centred |
 | "closer to the reference / concept" | `look op="compare"`, list the three to five largest mismatches, fix only those |
-| "off / uncanny" | Run `libresprite:review`; name the specific cause |
+| "off / uncanny" | Run `pixel-ai-artist:review`; name the specific cause |
 
 Reflect your reading back before acting on it. "More detail" on a 16×16 sprite
 usually means the sprite needs to be bigger, and that is worth one question.
@@ -103,7 +103,7 @@ usually means the sprite needs to be bigger, and that is worth one question.
 
 ## Related
 
-`libresprite:review`, `rules://00-core-principles`, `rules://92-generated-art-tells`
+`pixel-ai-artist:review`, `rules://00-core-principles`, `rules://92-generated-art-tells`
 for what makes art read as machine-made, and the subject file for the part you
 are fixing (`skill://studio`, *Subject rules*) — "fix the hands" starts at
 `rules://34-hands-and-feet`.

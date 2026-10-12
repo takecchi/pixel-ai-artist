@@ -8,14 +8,14 @@ description: Build an idle, walk, run or attack cycle from key poses, set timing
 
 ## Before you start
 
-The sprite must be rigged onto named layers — see `libresprite:rig`. Animating a
+The sprite must be rigged onto named layers — see `pixel-ai-artist:rig`. Animating a
 flattened sprite means redrawing every frame by hand.
 
 ## Procedure
 
 ### 0. With a storyboard
 
-If `libresprite:concept` delivered a storyboard, its panels are the key poses —
+If `pixel-ai-artist:concept` delivered a storyboard, its panels are the key poses —
 the plan in step 1 is written from them, not invented. Import it once the
 frames exist: `frame op="add" count=N-1`, then
 `reference op="import" path=… grid={columns: N, rows: 1}` puts panel i on

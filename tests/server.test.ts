@@ -176,10 +176,10 @@ test("every skill is also reachable as a prompt", async () => {
   const { prompts } = await client.listPrompts();
   assert.ok(prompts.length > 0, "no prompts registered");
   assert.ok(
-    prompts.every((p) => p.name.startsWith("libresprite:")),
-    "every workflow is namespaced libresprite:<name>, the same as in Claude Code and omp",
+    prompts.every((p) => p.name.startsWith("pixel-ai-artist:")),
+    "every workflow is namespaced pixel-ai-artist:<name>, the same as in Claude Code and omp",
   );
-  assert.ok(prompts.some((p) => p.name === "libresprite:studio"));
+  assert.ok(prompts.some((p) => p.name === "pixel-ai-artist:studio"));
 
   const first = prompts[0]!;
   const got = await client.getPrompt({ name: first.name, arguments: {} });
@@ -189,8 +189,8 @@ test("every skill is also reachable as a prompt", async () => {
 });
 
 test("plugin installs drop the prompts but keep the skill resources", async () => {
-  // Claude Code and omp already list skills as /libresprite:<name>; prompts there
-  // would reappear as /libresprite:libresprite:libresprite:<name>.
+  // Claude Code and omp already list skills as /pixel-ai-artist:<name>; prompts there
+  // would reappear as /pixel-ai-artist:pixel-ai-artist:pixel-ai-artist:<name>.
   const { client, close } = await connected({ prompts: false });
   const { prompts } = await client.listPrompts().catch(() => ({ prompts: [] }));
   assert.equal(prompts.length, 0);

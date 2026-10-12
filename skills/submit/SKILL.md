@@ -1,7 +1,7 @@
 ---
 name: submit
 title: Submit a finished sprite to the community gallery
-description: Turn the sprite you just made into a gallery pull request against takecchi/libresprite-ai-artist — exported files, an honest generation.yaml (prompts verbatim, model, plugin version, validate results, optional benchmark scoring), checked with `pnpm gallery:check`, opened with the gh CLI. Use when the user wants to share, publish or submit their work to the gallery or the benchmark.
+description: Turn the sprite you just made into a gallery pull request against takecchi/pixel-ai-artist — exported files, an honest generation.yaml (prompts verbatim, model, plugin version, validate results, optional benchmark scoring), checked with `pnpm gallery:check`, opened with the gh CLI. Use when the user wants to share, publish or submit their work to the gallery or the benchmark.
 ---
 
 # Submit a finished sprite to the community gallery
@@ -21,14 +21,14 @@ exactly what to do; never route around it.
 
 - **`preflight` is ready.** Not ready → stop. Never export or edit files on
   disk instead of the live document.
-- **The work is finished and reviewed.** Run `libresprite:review` if it has not
+- **The work is finished and reviewed.** Run `pixel-ai-artist:review` if it has not
   been. Submitting art that fails review puts it in public.
 - **`gh` is installed and authenticated.** Run `gh auth status`. Missing →
   tell the user to install it (`https://cli.github.com`) and run `gh auth
   login`. There is no other route to a pull request.
 
 Then **ask for consent**, once, before anything leaves the machine: "I will fork
-`takecchi/libresprite-ai-artist` on your GitHub account, push a branch, and
+`takecchi/pixel-ai-artist` on your GitHub account, push a branch, and
 open a public pull request with your sprite and the prompts used. OK?" Forking,
 pushing and opening a PR act as the user, in public. No yes, no fork.
 
@@ -43,10 +43,10 @@ message.
 | `author.name`, `author.github` | `gh api user --jq '.name,.login'` as the default; let the user override. Handle without `@`. |
 | `harness` | You know which you run in: `claude-code`, `omp`, `codex`, `gemini-cli`, `cursor`… |
 | `models` | The model id exactly as the harness names it (`claude-opus-4-1`, `gpt-5`). Not a nickname. If different models ran different steps, list each once and name the model on every step. |
-| `plugin` | `preflight` returns `extensionVersion` — the plugin build attached to Aseprite. Use it. If its `directive` says the extension and the server differ, the run mixed two builds and has no single version: stop and tell the user to align them (`install-extension`, restart Aseprite) before submitting. If `extensionVersion` is null, run `npx libresprite-ai-artist --version`. It must be a **released** version listed in the repo's `CHANGELOG.md`; a dev or unreleased build cannot be submitted — say so. |
+| `plugin` | `preflight` returns `extensionVersion` — the plugin build attached to Aseprite. Use it. If its `directive` says the extension and the server differ, the run mixed two builds and has no single version: stop and tell the user to align them (`install-extension`, restart Aseprite) before submitting. If `extensionVersion` is null, run `npx pixel-ai-artist --version`. It must be a **released** version listed in the repo's `CHANGELOG.md`; a dev or unreleased build cannot be submitted — say so. |
 | `steps[].text` | Every user prompt that shaped the work, **verbatim** and in order, copied from the conversation. Never paraphrase or merge. A prompt sent in another language may be rendered in English here only if the verbatim text goes into `steps[].original` — never for a benchmark run. |
 | `steps[].interventions` | Each clarifying question you asked and the answer the user gave, plus any steering beyond the prompt. Empty if none. |
-| `references` | Where the design came from — required, never guessed. `source: none` when the work was drawn from words alone (the user chose "continue without" in `libresprite:concept`, or it was never offered). `generated` when an image model made a concept sheet or storyboard: ask which model if you do not know, list it in `imageModels`, the kinds in `kinds`, and put the image prompt you wrote in `prompt`. `supplied` when the user handed over their own art. Copy the reference image into the folder as a `reference` file when you have it. |
+| `references` | Where the design came from — required, never guessed. `source: none` when the work was drawn from words alone (the user chose "continue without" in `pixel-ai-artist:concept`, or it was never offered). `generated` when an image model made a concept sheet or storyboard: ask which model if you do not know, list it in `imageModels`, the kinds in `kinds`, and put the image prompt you wrote in `prompt`. `supplied` when the user handed over their own art. Copy the reference image into the folder as a `reference` file when you have it. |
 | `date` | Today, `yyyy-mm-dd`. |
 | `tags` | A few lowercase words: `character`, `animation`, `32x32`. |
 
@@ -62,13 +62,13 @@ maintainer. Benchmark runs are the project's own measurements; the checker and
 CI refuse a `benchmark:` block from anyone else. Check first: take the login
 from `gh api user --jq .login` (never from what the user typed or the YAML), and
 look for it, case-insensitively, in
-`https://raw.githubusercontent.com/takecchi/libresprite-ai-artist/main/gallery/MAINTAINERS`.
+`https://raw.githubusercontent.com/takecchi/pixel-ai-artist/main/gallery/MAINTAINERS`.
 Not listed, or either call fails → not a maintainer: say benchmarks are run by
 the maintainers, skip this section and submit a gallery generation. A maintainer
 sets `author.github` to that same login.
 
 1. Fetch its definition: the local clone's `gallery/prompts/<id>/prompt.yaml`,
-   or `https://raw.githubusercontent.com/takecchi/libresprite-ai-artist/main/gallery/prompts/<id>/prompt.yaml`.
+   or `https://raw.githubusercontent.com/takecchi/pixel-ai-artist/main/gallery/prompts/<id>/prompt.yaml`.
 2. Confirm the run followed the fixed `setup` (canvas, palette, the `rules`
    list) and that every step's text equals the prompt's step text **word for
    word** — only surrounding whitespace and line endings are ignored. Any difference — a reworded step, extra steering, a
@@ -170,7 +170,7 @@ They are about to publish it under their name.
 ## 6. Validate in a clone
 
 1. Use a clone of the user's fork if one exists; otherwise fork and clone
-   (`gh repo fork takecchi/libresprite-ai-artist --clone`) — consent from step 1
+   (`gh repo fork takecchi/pixel-ai-artist --clone`) — consent from step 1
    covers this. Make sure the checkout is up to date with upstream `main`.
 2. Copy the staging folder to `gallery/generations/<folder>/`.
 3. `pnpm install` if `node_modules` is missing, then `pnpm gallery:check`.
@@ -187,7 +187,7 @@ git switch -c gallery/<folder>
 git add gallery/generations/<folder>
 git commit -m "gallery: <title>"
 git push -u origin gallery/<folder>
-gh pr create --repo takecchi/libresprite-ai-artist --head <login>:gallery/<folder> --title "gallery: <title>" --body-file <filled body>
+gh pr create --repo takecchi/pixel-ai-artist --head <login>:gallery/<folder> --title "gallery: <title>" --body-file <filled body>
 ```
 
 Build the body from `.github/PULL_REQUEST_TEMPLATE/generation.md` in the clone:
@@ -215,5 +215,5 @@ maintainer reviews it.
 
 ## Related
 
-`libresprite:review` before submitting, `libresprite:export` for export options,
+`pixel-ai-artist:review` before submitting, `pixel-ai-artist:export` for export options,
 `rules://07-review-checklist`.

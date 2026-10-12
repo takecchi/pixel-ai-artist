@@ -12,7 +12,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "mcp__plugin_libresprite_libresprite__draw|mcp__plugin_libresprite_libresprite__recolor|mcp__plugin_libresprite_libresprite__transform",
+        "matcher": "mcp__plugin_pixel-ai-artist_pixel-ai-artist__draw|mcp__plugin_pixel-ai-artist_pixel-ai-artist__recolor|mcp__plugin_pixel-ai-artist_pixel-ai-artist__transform",
         "hooks": [
           {
             "type": "command",

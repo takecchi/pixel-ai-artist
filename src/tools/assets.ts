@@ -205,7 +205,7 @@ export function registerAssetTools(server: McpServer, live: AsepriteLink): void 
         if (!live.hasFeature("tileset")) {
           return fail(
             new Error(
-              "This Aseprite extension build does not advertise the 'tileset' feature. Update the extension (npx libresprite-ai-artist install-extension) and restart Aseprite.",
+              "This Aseprite extension build does not advertise the 'tileset' feature. Update the extension (npx pixel-ai-artist install-extension) and restart Aseprite.",
             ),
           );
         }

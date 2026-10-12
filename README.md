@@ -1,9 +1,9 @@
-# libresprite-ai-artist
+# pixel-ai-artist
 
 Your coding agent makes pixel art with the same tools and skills as
 aseprite-ai-artist — without Aseprite. Sprites live inside the MCP server and
-come out as files you can open in [LibreSprite](https://github.com/LibreSprite/LibreSprite)
-or any image editor. For Claude Code, omp, Codex, Gemini CLI, Cursor and
+come out as PNG and GIF files and sprite sheets you can open in any image
+editor. For Claude Code, omp, Codex, Gemini CLI, Cursor and
 OpenCode.
 
 Work in progress — not usable yet.

@@ -20,7 +20,7 @@ onto the canvas ("pixelize") keeps the worst of both.
 Split the job. The image model owns the **design**; the agent owns the **pixel
 interpretation**.
 
-- **`libresprite:concept`** writes an art spec (scenario, palette hexes, view,
+- **`pixel-ai-artist:concept`** writes an art spec (scenario, palette hexes, view,
   proportions, key poses), turns it into a prompt for a concept sheet or a
   storyboard with a sliceable layout contract (equal panels, one row, same scale
   and ground line), and offers the user the choice — generate and send it back,

@@ -64,7 +64,7 @@ export interface HeadlessClientOptions {
   /**
    * The operator enabled `lua.run` server-side. The extension gates the hatch
    * on its own environment, and this child is ours, so the flag has to reach
-   * it as LIBRESPRITE_AI_ALLOW_LUA.
+   * it as PIXEL_AI_ALLOW_LUA.
    */
   allowLua?: boolean;
   guard?: EditorGuard | null;
@@ -114,7 +114,7 @@ export class HeadlessClient implements AsepriteLink {
     this.root = opts.root ?? packageRoot();
     this.cwd = opts.cwd ?? process.cwd();
     this.userFolder =
-      opts.userFolder ?? process.env.ASEPRITE_USER_FOLDER ?? path.join(tmpdir(), "libresprite-ai-artist-headless");
+      opts.userFolder ?? process.env.ASEPRITE_USER_FOLDER ?? path.join(tmpdir(), "pixel-ai-artist-headless");
     this.allowLua = opts.allowLua ?? false;
     this.guard = opts.guard ?? null;
     this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -277,7 +277,7 @@ export class HeadlessClient implements AsepriteLink {
         new LiveError("headless_unavailable", "Headless mode is on, but no Aseprite executable was found.", {
           doNotFallBackToDisk: true,
           remediation:
-            "Set LIBRESPRITE_PATH to the Aseprite binary (on macOS: /Applications/Aseprite.app/Contents/MacOS/aseprite), or pass --aseprite <path> to serve.",
+            "Set ASEPRITE_PATH to the Aseprite binary (on macOS: /Applications/Aseprite.app/Contents/MacOS/aseprite), or pass --aseprite <path> to serve.",
         }),
       );
     }
@@ -320,7 +320,7 @@ export class HeadlessClient implements AsepriteLink {
             ASEPRITE_USER_FOLDER: this.userFolder,
             // The extension refuses `lua.run` unless the Aseprite process
             // itself carries the switch; when the flag is on, honour it.
-            ...(this.allowLua ? { LIBRESPRITE_AI_ALLOW_LUA: "1" } : {}),
+            ...(this.allowLua ? { PIXEL_AI_ALLOW_LUA: "1" } : {}),
           },
           stdio: ["pipe", "pipe", "pipe"],
           windowsHide: true,
@@ -355,7 +355,7 @@ export class HeadlessClient implements AsepriteLink {
         settle(
           new LiveError("headless_unavailable", `Could not run '${binary}': ${err.message}`, {
             doNotFallBackToDisk: true,
-            remediation: "Point LIBRESPRITE_PATH at the Aseprite executable itself, not the app bundle or a shortcut.",
+            remediation: "Point ASEPRITE_PATH at the Aseprite executable itself, not the app bundle or a shortcut.",
           }),
         );
       });

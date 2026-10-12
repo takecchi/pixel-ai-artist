@@ -1,9 +1,9 @@
 {
   "//": "Cursor — ~/.cursor/mcp.json for user scope, .cursor/mcp.json for a project.",
   "mcpServers": {
-    "libresprite-ai-artist": {
+    "pixel-ai-artist": {
       "command": "npx",
-      "args": ["-y", "libresprite-ai-artist@latest", "serve"]
+      "args": ["-y", "pixel-ai-artist@latest", "serve"]
     }
   }
 }

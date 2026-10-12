@@ -127,12 +127,12 @@ function splitFrontmatter(raw: string): { frontmatter: Frontmatter; body: string
  * wrong catastrophically, and points at the skills for everything else.
  */
 export function serverInstructions(skills: SkillDoc[], mode: "live" | "headless" = "live"): string {
-  const catalogue = skills.map((s) => `  - libresprite:${s.name} (skill://${s.name}): ${s.description}`).join("\n");
+  const catalogue = skills.map((s) => `  - pixel-ai-artist:${s.name} (skill://${s.name}): ${s.description}`).join("\n");
 
   const where =
     mode === "headless"
-      ? "LibreSprite AI Artist — draw pixel art. This session starts HEADLESS: a batch Aseprite this server runs, with no window."
-      : "LibreSprite AI Artist — draw pixel art in the user's OPEN Aseprite window.";
+      ? "Pixel AI Artist — draw pixel art. This session starts HEADLESS: a batch Aseprite this server runs, with no window."
+      : "Pixel AI Artist — draw pixel art in the user's OPEN Aseprite window.";
 
   return `${where} \`preflight\` with mode='live' or mode='headless' switches between the user's window and a headless batch Aseprite — only when the user asked (e.g. --headless) or the request plainly needs no window; never to get around a window that is not ready.
 
@@ -147,5 +147,5 @@ Non-negotiables:
 Craft rules live in the \`rules://\` resources (read \`rules://index\` first). Workflows live in the \`skill://\` resources and as prompts:
 ${catalogue}
 
-Read the skill that matches the task before starting it. When a request spans several steps, or none of them obviously fits, start with libresprite:studio: it picks and orders the others.`;
+Read the skill that matches the task before starting it. When a request spans several steps, or none of them obviously fits, start with pixel-ai-artist:studio: it picks and orders the others.`;
 }

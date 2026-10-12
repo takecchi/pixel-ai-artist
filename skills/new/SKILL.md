@@ -49,7 +49,7 @@ things right and the rest of the work is drawing.
    ```
 
    For anything that will be animated, build the full character rig instead —
-   see `libresprite:rig`. Splitting baked pixels apart later is real work.
+   see `pixel-ai-artist:rig`. Splitting baked pixels apart later is real work.
 
 5. **Save immediately**, so the user has a file and undo has an anchor:
 
@@ -63,7 +63,7 @@ things right and the rest of the work is drawing.
 
 ## Then
 
-`libresprite:draw` to block in the art.
+`pixel-ai-artist:draw` to block in the art.
 
 ## Related
 

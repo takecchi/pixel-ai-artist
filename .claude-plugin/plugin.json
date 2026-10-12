@@ -1,18 +1,17 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
-  "name": "libresprite",
-  "displayName": "LibreSprite AI Artist",
+  "name": "pixel-ai-artist",
+  "displayName": "Pixel AI Artist",
   "version": "0.1.0",
-  "description": "Make pixel art from your agent, no editor required; files open in LibreSprite. An MCP server with a deliberately small tool surface, an encoded pixel-art rulebook, /libresprite:* workflows and review/palette/rig/animation subagents. The same skills are served over MCP, so Codex, Gemini CLI and Cursor get them too.",
+  "description": "Make pixel art from your agent, no editor required; the results are ordinary PNG and GIF files. An MCP server with a deliberately small tool surface, an encoded pixel-art rulebook, /pixel-ai-artist:* workflows and review/palette/rig/animation subagents. The same skills are served over MCP, so Codex, Gemini CLI and Cursor get them too.",
   "author": {
     "name": "takecchi",
     "url": "https://github.com/takecchi"
   },
-  "homepage": "https://github.com/takecchi/libresprite-ai-artist#readme",
-  "repository": "https://github.com/takecchi/libresprite-ai-artist",
+  "homepage": "https://github.com/takecchi/pixel-ai-artist#readme",
+  "repository": "https://github.com/takecchi/pixel-ai-artist",
   "license": "MIT",
   "keywords": [
-    "libresprite",
     "pixel-art",
     "sprites",
     "animation",
@@ -20,16 +19,16 @@
     "mcp"
   ],
   "mcpServers": {
-    "libresprite": {
+    "pixel-ai-artist": {
       "command": "node",
       "args": [
-        "${CLAUDE_PLUGIN_ROOT}/bin/libresprite-ai-artist.mjs",
+        "${CLAUDE_PLUGIN_ROOT}/bin/pixel-ai-artist.mjs",
         "serve"
       ],
       "env": {
-        "LIBRESPRITE_AI_PLUGIN_PORT": "9941",
-        "LIBRESPRITE_AI_CONTROL_PORT": "9942",
-        "LIBRESPRITE_AI_PROMPTS": "0"
+        "PIXEL_AI_PLUGIN_PORT": "9941",
+        "PIXEL_AI_CONTROL_PORT": "9942",
+        "PIXEL_AI_PROMPTS": "0"
       }
     }
   },

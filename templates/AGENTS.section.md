@@ -1,6 +1,6 @@
 ## Pixel art in Aseprite
 
-This project has `libresprite-ai-artist` wired in as an MCP server. It draws into
+This project has `pixel-ai-artist` wired in as an MCP server. It draws into
 the Aseprite window that is open on this machine — not into files on disk.
 
 **Before any pixel-art work:**

@@ -24,8 +24,8 @@ Two things stand in the way of copying that:
 ## Decision
 
 - **A mode chosen explicitly, never by failure** — at startup (`serve
-  --headless`, `LIBRESPRITE_AI_HEADLESS=1`), or per session with `preflight
-  mode="headless"|"live"`, which `libresprite:studio` sets from the request and
+  --headless`, `PIXEL_AI_HEADLESS=1`), or per session with `preflight
+  mode="headless"|"live"`, which `pixel-ai-artist:studio` sets from the request and
   `--headless`/`--live` in the request force. Never a runtime fallback: a live
   session whose window goes away still refuses with `not_connected`, and the
   skill tells the agent to ask the user rather than switch. Both links, once

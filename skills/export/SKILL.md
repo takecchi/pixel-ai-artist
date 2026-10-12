@@ -21,7 +21,7 @@ re-export. If you do not know, ask — it is one question.
 
 ## Before exporting
 
-Run `libresprite:review`. Exporting broken art just distributes it.
+Run `pixel-ai-artist:review`. Exporting broken art just distributes it.
 
 Then check specifically:
 
