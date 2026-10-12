@@ -714,6 +714,132 @@ test("color with no match is an empty selection, and without a colour is invalid
   await rejectsWith(select(studio, { op: "color" }), "invalid_args", /Missing required argument 'color'\./);
 });
 
+/** The selection as rows of '#' and '.', for comparing against a hand-drawn picture. */
+function selected(sprite: Sprite): string[] {
+  const mask = sprite.selection?.mask ?? new Uint8Array(sprite.width * sprite.height);
+  const rows: string[] = [];
+  for (let y = 0; y < sprite.height; y++) {
+    let row = "";
+    for (let x = 0; x < sprite.width; x++) row += mask[y * sprite.width + x] ? "#" : ".";
+    rows.push(row);
+  }
+  return rows;
+}
+
+const paint = (draw: ReturnType<typeof setup>["draw"], cells: Record<string, [number, number][]>) =>
+  draw(Object.entries(cells).map(([color, at]) => ({ kind: "pixels", color, points: at.map(([x, y]) => ({ x, y })) })));
+
+test("select color with contiguous picks only the region connected to the seed", async () => {
+  const { studio, sprite, draw } = setup(4, 2);
+  await paint(draw, { [R]: [[0, 0], [1, 0], [1, 1], [3, 0], [3, 1]], [B]: [[2, 0], [2, 1], [0, 1]] });
+  const res = await select(studio, { op: "color", color: R, contiguous: true, x: 0, y: 0 });
+  assert.deepEqual(selected(sprite), ["##..", ".#.."]);
+  assert.equal(res.pixelCount, 3);
+  assert.deepEqual(res.bounds, { x: 0, y: 0, width: 2, height: 2 });
+  assert.equal(sprite.modified, true);
+});
+
+test("select color without contiguous picks every match, wherever the seed would have been", async () => {
+  const { studio, sprite, draw } = setup(4, 2);
+  await paint(draw, { [R]: [[0, 0], [1, 0], [1, 1], [3, 0], [3, 1]], [B]: [[2, 0], [2, 1], [0, 1]] });
+  await select(studio, { op: "color", color: R, contiguous: false, x: 0, y: 0 });
+  assert.deepEqual(selected(sprite), ["##.#", ".#.#"]);
+});
+
+test("select color with contiguous does not cross diagonally", async () => {
+  const { studio, sprite, draw } = setup(3, 2);
+  await paint(draw, { [R]: [[0, 0], [1, 1]] });
+  await select(studio, { op: "color", color: R, contiguous: true, x: 0, y: 0 });
+  assert.deepEqual(selected(sprite), ["#..", "..."]);
+});
+
+test("select color with a tolerance takes colours within that per-channel distance and no further", async () => {
+  const { studio, sprite, draw } = setup(4, 1);
+  // #fa0505 is 5 away from red in every channel; #f01010 is 16 away in two.
+  await paint(draw, { [R]: [[0, 0]], "#fa0505": [[1, 0]], "#f01010": [[2, 0]], [B]: [[3, 0]] });
+  await select(studio, { op: "color", color: R });
+  assert.deepEqual(selected(sprite), ["#..."]);
+  await select(studio, { op: "color", color: R, tolerance: 4 });
+  assert.deepEqual(selected(sprite), ["#..."]);
+  await select(studio, { op: "color", color: R, tolerance: 5 });
+  assert.deepEqual(selected(sprite), ["##.."]);
+  await select(studio, { op: "color", color: R, tolerance: 16 });
+  assert.deepEqual(selected(sprite), ["###."]);
+});
+
+test("select color with a tolerance counts alpha like fill does, while no tolerance still ignores it", async () => {
+  const { studio, sprite, draw } = setup(3, 1);
+  await paint(draw, { [R]: [[0, 0]], "#ff000080": [[1, 0]], "#ff0000f8": [[2, 0]] });
+  await select(studio, { op: "color", color: R });
+  assert.deepEqual(selected(sprite), ["###"]);
+  await select(studio, { op: "color", color: R, tolerance: 7 });
+  assert.deepEqual(selected(sprite), ["#.#"]);
+  await select(studio, { op: "color", color: R, tolerance: 127 });
+  assert.deepEqual(selected(sprite), ["###"]);
+});
+
+test("select color with a tolerance never selects transparent pixels", async () => {
+  const { studio, sprite, draw } = setup(3, 1);
+  await paint(draw, { [R]: [[0, 0]] });
+  await select(studio, { op: "color", color: R, tolerance: 255 });
+  assert.deepEqual(selected(sprite), ["#.."]);
+});
+
+test("select color with a tolerance and contiguous stops at a colour outside the tolerance", async () => {
+  const { studio, sprite, draw } = setup(4, 1);
+  await paint(draw, { [R]: [[0, 0], [3, 0]], "#fa0505": [[1, 0]], [B]: [[2, 0]] });
+  await select(studio, { op: "color", color: R, tolerance: 5 });
+  assert.deepEqual(selected(sprite), ["##.#"]);
+  await select(studio, { op: "color", color: R, tolerance: 5, contiguous: true, x: 1, y: 0 });
+  assert.deepEqual(selected(sprite), ["##.."]);
+});
+
+test("select color with contiguous from a seed that is not that colour selects nothing", async () => {
+  const { studio, sprite, draw } = setup(3, 1);
+  await paint(draw, { [R]: [[0, 0]], [B]: [[1, 0]] });
+  const res = await select(studio, { op: "color", color: R, contiguous: true, x: 1, y: 0 });
+  assert.equal(res.empty, true);
+  assert.equal(sprite.selection, null);
+});
+
+test("select color with contiguous needs a seed on the canvas, else invalid_args", async () => {
+  const { studio, draw } = setup(3, 1);
+  await paint(draw, { [R]: [[0, 0]] });
+  await rejectsWith(
+    select(studio, { op: "color", color: R, contiguous: true }),
+    "invalid_args",
+    /select op 'color' with contiguous needs a starting point: pass 'x' and 'y'\./,
+  );
+  await rejectsWith(select(studio, { op: "color", color: R, contiguous: true, x: 0 }), "invalid_args", /starting point/);
+  await rejectsWith(
+    select(studio, { op: "color", color: R, contiguous: true, x: 3, y: 0 }),
+    "invalid_args",
+    /Starting point \(3, 0\) is outside the 3x1 canvas\./,
+  );
+});
+
+test("a contiguous color selection combines with the existing selection by mode", async () => {
+  const { studio, sprite, draw } = setup(4, 2);
+  await paint(draw, { [R]: [[0, 0], [1, 0], [3, 0], [3, 1]] });
+  await select(studio, { op: "rect", rect: { x: 3, y: 1, width: 1, height: 1 } });
+  await select(studio, { op: "color", color: R, contiguous: true, x: 0, y: 0, mode: "add" });
+  assert.deepEqual(selected(sprite), ["##..", "...#"]);
+  await select(studio, { op: "color", color: R, contiguous: true, x: 0, y: 0, mode: "subtract" });
+  assert.deepEqual(selected(sprite), ["....", "...#"]);
+  await select(studio, { op: "all" });
+  await select(studio, { op: "color", color: R, contiguous: true, x: 3, y: 0, mode: "intersect" });
+  assert.deepEqual(selected(sprite), ["...#", "...#"]);
+});
+
+test("select color reads the composited frame, so a seed on an upper layer's paint counts", async () => {
+  const { studio, sprite, draw } = setup(3, 1);
+  await paint(draw, { [R]: [[0, 0]] });
+  studio.addLayer(sprite, "Top");
+  await studio.call("draw.batch", { layer: "Top", paletteLock: false, ops: [{ kind: "pixels", color: R, points: [{ x: 1, y: 0 }] }] });
+  await select(studio, { op: "color", color: R, contiguous: true, x: 0, y: 0 });
+  assert.deepEqual(selected(sprite), ["##."]);
+});
+
 test("invert selects what was not selected, and everything when nothing was", async () => {
   const { studio } = setup(3, 2);
   assert.equal((await select(studio, { op: "invert" })).pixelCount, 6);
@@ -851,6 +977,39 @@ test("the draw tool returns a failed batch as a tool error with its code", async
   });
   assert.equal(res.isError, true);
   assert.equal((res.structuredContent as Res).code, "invalid_args");
+  await close();
+});
+
+test("the select tool's magic wand takes tolerance, contiguous and a start point through MCP", async () => {
+  const { client, studio, close } = await connected();
+  const sprite = studio.addSprite({ width: 4, height: 1 });
+  await studio.call("draw.batch", {
+    paletteLock: false,
+    ops: [
+      { kind: "pixels", color: R, points: [{ x: 0, y: 0 }, { x: 3, y: 0 }] },
+      { kind: "pixels", color: "#fa0505", points: [{ x: 1, y: 0 }] },
+      { kind: "pixels", color: B, points: [{ x: 2, y: 0 }] },
+    ],
+  });
+  // Defaults (tolerance 0, not contiguous) keep the old exact, whole-canvas match.
+  const exact = await client.callTool({ name: "select", arguments: { op: "color", color: R } });
+  assert.deepEqual(selected(sprite), ["#..#"]);
+  assert.equal((exact.structuredContent as Res).pixelCount, 2);
+  const wand = await client.callTool({
+    name: "select",
+    arguments: { op: "color", color: R, tolerance: 5, contiguous: true, x: 0, y: 0 },
+  });
+  assert.ok(!wand.isError);
+  assert.deepEqual(selected(sprite), ["##.."]);
+  assert.deepEqual(wand.structuredContent, {
+    sprite: "Sprite",
+    empty: false,
+    bounds: { x: 0, y: 0, width: 2, height: 1 },
+    pixelCount: 2,
+  });
+  const bad = await client.callTool({ name: "select", arguments: { op: "color", color: R, contiguous: true } });
+  assert.equal(bad.isError, true);
+  assert.equal((bad.structuredContent as Res).code, "invalid_args");
   await close();
 });
 

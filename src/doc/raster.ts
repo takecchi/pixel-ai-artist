@@ -183,8 +183,23 @@ export function polygon(
 /**
  * `tolerance` is the largest per-channel difference (0–255) still counted as
  * the clicked colour. Indexed and grayscale pixels have no RGB channels to
- * compare, so they stay exact.
+ * compare, so they stay exact. Shared by fill and the select tool so the two
+ * can never disagree about what "the same colour" means.
  */
+export function colorMatcher(mode: ColorMode, target: number, tolerance: number): (px: number) => boolean {
+  if (!(tolerance > 0 && mode === "rgb")) return (px) => px === target;
+  const [r, g, b, a] = channels(target);
+  return (px) => {
+    const [pr, pg, pb, pa] = channels(px);
+    return (
+      Math.abs(pr - r) <= tolerance &&
+      Math.abs(pg - g) <= tolerance &&
+      Math.abs(pb - b) <= tolerance &&
+      Math.abs(pa - a) <= tolerance
+    );
+  };
+}
+
 export function flood(
   s: Surface,
   sx: number,
@@ -200,19 +215,7 @@ export function flood(
   const target = img.pixels[ly * img.width + lx]!;
   if (target === (value >>> 0)) return 0;
 
-  let matches = (px: number): boolean => px === target;
-  if (tolerance > 0 && s.mode === "rgb") {
-    const [r, g, b, a] = channels(target);
-    matches = (px) => {
-      const [pr, pg, pb, pa] = channels(px);
-      return (
-        Math.abs(pr - r) <= tolerance &&
-        Math.abs(pg - g) <= tolerance &&
-        Math.abs(pb - b) <= tolerance &&
-        Math.abs(pa - a) <= tolerance
-      );
-    };
-  }
+  const matches = colorMatcher(s.mode, target, tolerance);
 
   let count = 0;
   if (!contiguous) {
