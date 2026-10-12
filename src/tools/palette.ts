@@ -15,7 +15,7 @@ export function registerPaletteTools(server: McpServer, studio: Studio): void {
         "Read and shape the sprite's palette. Ops:\n" +
         "• 'get' — current palette with per-colour usage counts.\n" +
         "• 'set' — write specific indices, or replace the palette wholesale.\n" +
-        "• 'preset' — load a bundled palette by key: ~2000 of them, the classics (pico8, gameboy, cga, nes…) and the most-downloaded on Lospec (sweetie-16, endesga-32, resurrect-64, aap-64…). An unknown key or a name answers with the matching keys, so 'preset: \"gameboy\"' or 'preset: \"endesga\"' is a search.\n" +
+        "• 'preset' — load a bundled palette by key: ~2000 of them, the classics (pico8, gameboy, gameboy-pocket, cga, 1bit…) and the most-downloaded on Lospec (sweetie-16, endesga-32, resurrect-64, aap-64…). An unknown key or a name answers with the matching keys, so 'preset: \"gameboy\"' or 'preset: \"endesga\"' is a search.\n" +
         "• 'load' — replace the palette with one read from disk (or append it, with replace=false): .gpl, .hex, JASC .pal, .act, .col, or a PNG/GIF/JPEG (an indexed PNG gives its own palette; other images the colours they use, up to 256). Art is repainted only with remapArt.\n" +
         "• 'ramp' — generate a hue-shifted ramp from a base colour and append it. Shadows rotate toward blue, highlights toward orange; a ramp that only changes brightness is the clearest tell of machine-made pixel art.\n" +
         "• 'analyze' — report ramp structure, contrast, near-duplicate entries and colours used in the art that are not in the palette.\n" +
