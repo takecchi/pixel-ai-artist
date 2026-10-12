@@ -23,24 +23,20 @@ Bottom to top in the layer stack, so nearer parts draw over farther ones:
 Add `weapon`, `cape`, `hair-back` and `hair-front` as the design needs. Keep the
 names stable — every later tool call refers to them by name.
 
-Build the whole rig in one `layer` call with a `batch` array; that is one undo
-step for the user and one round trip for you.
+Build the whole rig in one `layer` call with a `batch` array; it lands all or
+nothing, in one round trip.
 
-## Groups
-
-Group related layers (`arms`, `legs`) once the count passes about eight. Groups
-hold no pixels themselves — target their children when drawing.
+Give every layer a unique name. There are no layer groups to tell two `arm`s
+apart, so a name two layers share is refused rather than guessed.
 
 ## Cels
 
-A **cel** is one layer's image on one frame. Cels are only as big as their
-content, which is why moving a limb between frames is `cel` op `move` (cheap,
-lossless) rather than redrawing it.
+A **cel** is one layer's image on one frame, with a position. Moving a limb
+between frames is `cel` op `move` (cheap, lossless) rather than redrawing it.
 
-**Linked cels** share one image across several frames: edit once, every linked
-frame updates. Use them for parts that genuinely do not move in a cycle — a
-static torso under moving arms. Do not link something you will later want to
-differ; unlinking after the fact loses the shared history.
+A part that does not move in a cycle — a static torso under moving arms — is
+`cel` op `copy` to every frame; each copy is its own image, so a later edit has
+to be copied again.
 
 ## Non-destructive habits
 

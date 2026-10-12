@@ -5,9 +5,11 @@ Guidance for agents and humans changing this code. For using the tool, see the
 
 This is a port of
 [with-pebbly/aseprite-ai-artist](https://github.com/with-pebbly/aseprite-ai-artist)
-imported at `dcd5a77` (0.8.1). Docs, tool descriptions and skills still speak
-of Aseprite where the port has not reached them yet; rewrite them as the code
-under them changes, not ahead of it.
+imported at `dcd5a77` (0.8.1). Docs, tool descriptions and skills describe the
+port, with every command ported; a command still being ported answers
+`unsupported_command` until it is. Keep them in step with the code — a change
+to what a tool does changes its description and the skills that use it in the
+same pull request.
 
 ## Shape
 
@@ -20,7 +22,7 @@ under them changes, not ahead of it.
 | `agents/`, `hooks/` | Claude Code plugin surface; omp reads the same tree as a marketplace plugin |
 | `omp/`, `opencode/` | omp and OpenCode plugins replaying the hooks and skills |
 | `tests/` | Node tests |
-| `docs/adr/` | Decisions inherited from aseprite-ai-artist. Read before arguing with them. |
+| `docs/adr/` | Decisions inherited from aseprite-ai-artist. Read before arguing with them. 0006, 0007 and 0012 are its gallery and website, which were not imported. |
 
 ## How the port differs from aseprite-ai-artist
 

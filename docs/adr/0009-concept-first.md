@@ -33,7 +33,7 @@ interpretation**.
 - **Tool support is ops, not tools** ([ADR-0003]): `reference` op `import`
   gains `region` (one panel of a sheet) and `grid` (panel i onto frame i of one
   layer), and `look` gains op `compare` (reference beside the art without it).
-  The count stays at eighteen.
+  The count stays at eighteen (seventeen in the port).
 - **The reference is a guide, never the pixels.** Skills forbid importing the
   concept as the art, copying it through `read_pixels`, or adopting its colours.
 

@@ -28,7 +28,6 @@ names everywhere:
 | `pixel-ai-artist:review` | Before saying anything is finished |
 | `pixel-ai-artist:fix` | Editing art that already exists |
 | `pixel-ai-artist:export` | Handing files to a game engine |
-| `pixel-ai-artist:submit` | Sharing a finished sprite to the community gallery as a pull request |
 
 Skills reference `rules://` rather than restating craft, so a rule has exactly
 one place to be wrong.

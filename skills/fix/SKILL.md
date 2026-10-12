@@ -25,8 +25,8 @@ pixels precisely from a description.
 
 **Never assume layer names, frame counts or the palette.** Drawing into the
 wrong layer is the most common way an agent damages someone's file. When two
-groups hold same-named layers (`left/arm`, `right/arm`), a bare name is refused
-— pass the group path rather than renaming the user's layers.
+layers share a name, the name is refused rather than guessed — ask the user
+which one they mean before renaming either.
 
 ### 2. Say what you are about to change
 
@@ -44,9 +44,9 @@ Scoping is cheaper than repairing.
 
 ### 4. Make the change in one call
 
-One `draw` with all its ops, one `recolor`. That is one Ctrl+Z for the user if
-they dislike it. Use `label` to describe the intent — it becomes their undo
-entry.
+One `draw` with all its ops, one `recolor`. There is no undo, so keep the
+before state first — `look op="ascii"` the region, or `export` a scratch PNG —
+in case the user dislikes the change.
 
 For a pixel-level fix, edit the text, not coordinates: `look op="ascii"
 layer=… rulers=false region=…` gives bare rows, the legend and `origin`; change

@@ -3,43 +3,28 @@
 ## Threat model
 
 This is a local developer tool. It assumes you already trust the coding agent
-you are running with your filesystem and with the application holding your
-unsaved work. Within that assumption, here is exactly what it does and what it
-does not do.
+you are running with your filesystem. Within that assumption, here is exactly
+what it does and what it does not do.
 
-## The local network surface
+## No network surface
 
-The bridge binds **`127.0.0.1` only**, on two ports (9941 and 9942 by default).
-Nothing listens on a public interface and there is no remote transport, so there
-is nothing to authenticate against.
-
-The consequence worth stating plainly: **any process on your machine can connect
-to the bridge and drive Aseprite** — draw, save, export, close documents. That is
-the same trust boundary as any other localhost developer service, but it is a
-real one. If you share a machine with untrusted local users, do not run the
-bridge.
-
-Stop it when you are not using it:
-
-```bash
-pkill -f "pixel-ai-artist bridge"     # macOS / Linux
-taskkill /F /FI "WINDOWTITLE eq pixel-ai-artist*"   # Windows, or use Task Manager
-```
+The server speaks MCP over stdio to the agent that started it, and nothing
+else. It opens no port, listens on no interface and starts no other program.
+The documents it edits live in its own memory and go away with it.
 
 ## Filesystem access
 
-Tools that take a `path` — `export`, `sprite_manage` (`open` / `save_as`),
-`reference` (`import`), `tileset` (`export`) — write wherever the model asks.
-There is no sandbox root. Paths are passed to Aseprite as given; nothing is
-interpolated into a shell.
-
-`look` writes temporary PNGs into the OS temp directory and deletes them after
-reading.
+Tools that take a `path` — `export`, `sprite_manage` (`open`, `save_as`),
+`reference` (`import`), `palette` (`load`) — read or write wherever the model
+asks, creating missing directories on write. There is no sandbox root. Paths are
+used as given; nothing is interpolated into a shell.
 
 In short: these tools read and write files wherever you point them, with the
-same reach you have yourself. That is deliberate for a local tool, and it is the
-same reach `run_lua` grants — but it is worth knowing before you hand a path to
-an agent.
+same reach you have yourself. That is deliberate for a local tool, but it is
+worth knowing before you hand a path to an agent.
+
+Images read from disk are refused above 16384 pixels on either side, so a
+hostile or broken file cannot make the server allocate an unbounded canvas.
 
 ## Editing your agent configuration
 
@@ -64,35 +49,6 @@ There is no file lock. If your agent writes its own config at the same moment,
 one side's change can still be lost. Run `install` while the agent is closed, or
 use `--dry-run` first to see exactly what would change.
 
-`install-extension` copies the Lua extension into Aseprite's config directory.
-Nothing else is touched.
-
-## `run_lua`
-
-`run_lua` executes arbitrary Lua inside the Aseprite process holding your
-unsaved work. It has full Aseprite API access, which includes the filesystem.
-
-It is **off by default, and gated twice**:
-
-- The server hides the tool unless `--allowLua` on the CLI, or
-  `PIXEL_AI_ALLOW_LUA=1` in the server's environment, is set. The agent
-  cannot see or call it.
-- The extension itself refuses `lua.run` unless the Aseprite process was
-  started with `PIXEL_AI_ALLOW_LUA=1`. The capability is absent, not just
-  the tool entry.
-
-A live session therefore needs the variable in the environment that started
-**Aseprite**, not in the agent's — the extension cannot see the agent's
-environment. Headless mode has nothing extra to do: when the server runs with
-`--allowLua`, it passes the variable to the batch Aseprite it starts.
-
-**What the gate does not cover.** The rest of the bridge stays open: while it
-runs, any local process that connects to the control port can drive the
-ordinary tools — draw, save, export, close documents — no matter how this
-server was started. That is the same trust boundary as any other localhost
-developer service, and it is a real one. If it matters on your machine, stop
-the bridge when you are not using it.
-
 ## Instructions served to the agent
 
 The server serves `skill://` and `rules://` resources read from `skills/` and
@@ -104,12 +60,6 @@ would any other executable content in a repository you have installed.
 
 Nothing leaves the machine. There is no telemetry, no network egress, and no
 credential handling anywhere in this codebase.
-
-## Resource limits
-
-The bridge refuses WebSocket frames over 16 MiB and more than 64 simultaneous
-control clients. Both exist because the socket is unauthenticated: without them,
-any local process could exhaust memory with one connection.
 
 ## Reporting a vulnerability
 

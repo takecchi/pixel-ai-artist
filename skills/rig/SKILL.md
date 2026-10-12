@@ -26,13 +26,13 @@ shadow       ← ground contact, if the style has one
 Add `weapon`, `cape`, `hair-front`, `hair-back` as the design needs. Keep names
 stable — every later call refers to them by name.
 
-Two limbs with the same name — `arm-near` inside two different groups, say —
-make later calls ambiguous: passing just the name fails, naming every match,
-until you pass a `group/child` path (e.g. `torso/arm-near`) instead.
+Two layers with the same name make later calls ambiguous: passing the name
+fails rather than guessing. Give every limb a unique name (`arm-near`,
+`arm-far`), never two `arm`s.
 
 ## Building it fresh
 
-One batch, one undo step:
+One batch, applied all or nothing:
 
 ```
 layer batch=[

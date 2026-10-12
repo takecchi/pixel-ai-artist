@@ -23,11 +23,11 @@ is to make sure that never becomes the user's problem.
 Bottom to top: `shadow`, `leg-far`, `arm-far`, `torso`, `head`, `leg-near`,
 `arm-near`, plus `weapon` / `cape` / `hair-front` / `hair-back` as needed.
 
-Build it in one `layer` call with a `batch` array — one undo step for the user.
+Build it in one `layer` call with a `batch` array — applied all or nothing.
 
-Grouping twins is fine: `left/arm` and `right/arm` can both be named `arm`, and
-every tool takes the group path. A bare `arm` is then refused rather than
-guessed, so always address those layers by path.
+Every layer needs a unique name: two layers called `arm` make every later call
+that names `arm` fail rather than guess. Name twins by side (`arm-near`,
+`arm-far`).
 
 Reusing a part from another open sprite (the same sword for two characters):
 `layer op="duplicate" toSprite="#<id>"` copies it with its cels.

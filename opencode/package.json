@@ -2,6 +2,6 @@
   "name": "opencode-pixel-ai-artist",
   "version": "0.1.0",
   "type": "module",
-  "description": "OpenCode plugin for pixel-ai-artist: /pixel-ai-artist:* commands, skills and the two hooks.",
+  "description": "OpenCode plugin for pixel-ai-artist: /pixel-ai-artist:* commands, skills and the look hook.",
   "exports": { ".": "./index.mjs" }
 }

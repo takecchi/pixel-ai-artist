@@ -1,13 +1,14 @@
-## Pixel art in Aseprite
+## Pixel art
 
-This project has `pixel-ai-artist` wired in as an MCP server. It draws into
-the Aseprite window that is open on this machine — not into files on disk.
+This project has `pixel-ai-artist` wired in as an MCP server. It keeps sprite
+documents in its own memory, with no editor and no window, and writes them out
+as image files when asked.
 
 **Before any pixel-art work:**
 
-1. Call `preflight`. If `ready` is false, stop and tell the person. Do **not**
-   fall back to editing `.aseprite` or `.png` files directly: they would not see
-   the change in their open editor, and their next save would overwrite it.
+1. Call `preflight`. Nothing reaches disk until `sprite_manage` saves or
+   `export` writes it — save before you finish, and never write sprite files by
+   any other route.
 2. Call `sprite_info`. Layer names, frame count and palette come from the
    document, never from assumption.
 3. Read the workflow that matches the task. The server exposes them as MCP
@@ -18,7 +19,7 @@ the Aseprite window that is open on this machine — not into files on disk.
 **While working:**
 
 - **Batch.** One `draw` call carrying every operation is correct; forty calls
-  carrying one each is wrong. Every call is one undo step for the person.
+  carrying one each is wrong. There is no undo; a batch lands whole or not at all.
 - **Look at your work.** After drawing, call `look` — op `preview` for the
   overall read, op `ascii` for exact pixel positions, op `filmstrip` to review
   an animation. A tool result saying "412 pixels changed" is not evidence that

@@ -1,6 +1,8 @@
 # ADR-0002 — The WebSocket bridge is a separate, singleton process
 
-**Status:** accepted · 2026-09-08
+**Status:** superseded · 2026-10-12 — the port answers every command in-process
+(see [ARCHITECTURE](../ARCHITECTURE.md)); there is no Aseprite, extension or
+bridge any more. Kept for the history of the tool surface.
 
 ## Context
 

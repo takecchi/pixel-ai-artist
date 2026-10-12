@@ -1,6 +1,6 @@
 # Tools
 
-Eighteen tools, grouped by noun with an `op` enum for the verbs. See
+Seventeen tools, grouped by noun with an `op` enum for the verbs. See
 [ADR-0003](adr/0003-compact-tool-surface.md) for why.
 
 Every tool returns `structuredContent` validated against an `outputSchema`.
@@ -11,9 +11,9 @@ has to see them to recover.
 
 | Tool | Ops | Notes |
 |------|-----|-------|
-| `preflight` | — | Connection, capabilities, active sprite, `mode` (`live` or `headless`) and a one-line directive. **Call this first.** Always answers, never fails. `mode: "headless"\|"live"` switches the session's Aseprite (reported as `switched`); each side keeps its documents. In headless mode it starts the batch Aseprite and reports why when it cannot. |
-| `sprite_info` | — | Full document state: dimensions, colour mode, palette, layers with nesting, frames with durations, tags, slices (with 9-patch `center`/`pivot` when set), selection. |
-| `sprite_manage` | `list` `new` `open` `activate` `save` `save_as` `close` `resize_canvas` `set_properties` `slice_create` `slice_update` `slice_delete` | `close` refuses on unsaved changes unless `force`. Slices name a rectangle for an engine to read back: `bounds` always, plus an optional 9-patch `center` and a hotspot `pivot`; these land in the spritesheet atlas on export. |
+| `preflight` | — | `ready`, the server `version`, the active sprite and a one-line directive. **Call this first.** Always answers, never fails. |
+| `sprite_info` | — | Full document state: dimensions, colour mode, palette, layers, frames with durations, tags, selection. |
+| `sprite_manage` | `list` `new` `open` `activate` `save` `save_as` `close` `resize_canvas` `set_properties` | Documents live in the server's memory; `open` reads a file into one, `save`/`save_as` write it back. `close` refuses on unsaved changes unless `force` — there is no undo. |
 
 ## Looking
 
@@ -56,13 +56,13 @@ has to see them to recover.
 
 | Tool | Ops / kinds | Notes |
 |------|-------------|-------|
-| `draw` | `pixels` `line` `polyline` `rect` `ellipse` `fill` `replace` `dither` `gradient` `clear` `blit` `text` `grid` | Batch. One transaction, one undo step. |
-| `select` | `get` `none` `all` `rect` `ellipse` `color` `invert` `grow` `shrink` | Scopes `draw`, `transform` and `recolor`. |
+| `draw` | `pixels` `line` `polyline` `rect` `ellipse` `fill` `replace` `dither` `gradient` `clear` `blit` `text` `grid` | Batch, all or nothing: if any op fails, the cel is left as it was. |
+| `select` | `get` `none` `all` `rect` `ellipse` `color` `invert` `grow` `shrink` | Scopes `draw`, `transform` and `recolor`. `color` is a magic wand: `tolerance`, and `contiguous` from a start point `x`/`y`. |
 | `transform` | `translate` `flip` `rotate` `scale` `outline` `crop_to_content` | Acts on ONE cel; there is no scope parameter. Non-90° rotation needs `allowLossy`. `outline`'s `side` (`outside` default, `inside`) picks which pixels get painted; `diagonals` (default `false`) switches 4- to 8-neighbour. |
-| `recolor` | `shade` `snap` `replace` `hue_shift` `desaturate` | Operates on distinct colours, not pixels; one pass, one undo step. |
+| `recolor` | `shade` `snap` `replace` `hue_shift` `desaturate` | Operates on distinct colours, not pixels, in one pass. |
 
 `draw` op kind `text` lays out a string from a bitmap font and expands it to
-plain pixels before it reaches Aseprite: `text`, `x`, `y`, `color`, `font`
+plain pixels before it is drawn: `text`, `x`, `y`, `color`, `font`
 (name in `knowledge/fonts/`, default `pixel5x7`), `anchor` (one of
 `top_left` `top` `top_right` `left` `center` `right` `bottom_left` `bottom`
 `bottom_right` `baseline_left` `baseline` `baseline_right`, resolved against
@@ -99,16 +99,14 @@ default width. One font ships: `pixel5x7`, hand-drawn ASCII 32–126, CC0.
 
 | Tool | Ops | Notes |
 |------|-----|-------|
-| `layer` | `list` `create` `rename` `delete` `reorder` `set` `group` `ungroup` `merge` `duplicate` `activate` | Accepts a `batch` array. `duplicate` takes an optional `toSprite` to copy a layer's cels into another OPEN sprite by frame index; frames past the target's frame count are dropped and reported. |
+| `layer` | `list` `create` `rename` `delete` `reorder` `set` `merge` `duplicate` `activate` | Accepts a `batch` array, applied all or nothing. `duplicate` takes an optional `toSprite` to copy a layer's cels into another OPEN sprite by frame index; frames past the target's frame count are dropped and reported. |
 | `frame` | `list` `add` `duplicate` `delete` `set_duration` `activate` `reorder` | `durations` sets a whole cycle's timing at once. |
 | `tag` | `list` `create` `update` `delete` | Untagged animation frames are unusable by an engine. |
-| `cel` | `list` `create` `clear` `delete` `move` `copy` `link` `unlink` `set` `tween` `oscillate` | `move` shifts a limb without redrawing it. `tween` interpolates position or opacity between two frames with an easing curve (`linear` `ease_in` `ease_out` `ease_in_out` `smoothstep`); `oscillate` adds a sinusoidal position offset (`amplitudeX`/`amplitudeY`, `period`, `phase`) over a frame range. Both fill in any missing in-between cels from the start cel, in one transaction. |
+| `cel` | `list` `create` `clear` `delete` `move` `copy` `set` `tween` `oscillate` | `move` shifts a limb without redrawing it. `tween` interpolates position or opacity between two frames with an easing curve (`linear` `ease_in` `ease_out` `ease_in_out` `smoothstep`); `oscillate` adds a sinusoidal position offset (`amplitudeX`/`amplitudeY`, `period`, `phase`) over a frame range. Both fill in any missing in-between cels from the start cel. |
 
-Every `layer` parameter takes a plain name or a `group/child` path. A name
-that matches more than one layer — the same name inside two groups, or a
-path that resolves more than one way — fails with `invalid_args` naming every
-match (`Layer name 'X' is ambiguous: A/X, B/X. Pass a group path.`) instead of
-silently picking one.
+Every `layer` parameter takes a layer name. A name that more than one layer
+shares fails with `invalid_args` (`Layer name 'X' is ambiguous: 2 layers share
+it.`) instead of silently picking one; rename one of them first.
 
 ## Colour and quality
 
@@ -131,17 +129,10 @@ frame where both layers' opaque pixels intersect.
 | Tool | Ops | Notes |
 |------|-----|-------|
 | `reference` | `import` `sample_palette` `list` `remove` | Imports on a locked, semi-transparent layer. `region` crops one panel of the source (source pixels, also for `sample_palette`); `grid` `{columns, rows, count?, gap?}` cuts a storyboard into panels and puts panel i on frame `frame`+i-1 of one layer — the sprite needs the frames first. |
-| `export` | `png` `gif` `spritesheet` `frames` `aseprite` | `spritesheet` writes a JSON atlas beside the PNG. `layers` (png, gif, frames, spritesheet) exports only those layers; `tags` (gif, frames, spritesheet) only the frames they cover. `aseprite` refuses both, and an unknown name is refused rather than exported as everything. Named layers export visible even if hidden; with `tags`, `frames` filenames count from the first kept frame. |
-| `tileset` | `list` `create_layer` `get` `stamp` `pack` `export` | Needs the `tileset` feature. `pack` turns a painted mockup into a tileset plus a reconstructing tilemap; `export` writes Tiled (`.tsj` + `.tmj`), Godot 4 (`.tres`) or JSON, with the packed PNG. |
+| `export` | `png` `gif` `spritesheet` `frames` `aseprite` | `spritesheet` writes a JSON atlas, in Aseprite's format, beside the PNG. `layers` (png, gif, frames, spritesheet) exports only those layers; `tags` (gif, frames, spritesheet) only the frames they cover. `aseprite` refuses both, and an unknown name is refused rather than exported as everything. Named layers export visible even if hidden; with `tags`, `frames` filenames count from the first kept frame. |
 
-## Escape hatch
-
-`run_lua` executes Lua inside Aseprite. **Off by default, and gated twice** — it
-is arbitrary code execution in the application holding the user's unsaved work.
-The server hides the tool unless `--allowLua` (or `PIXEL_AI_ALLOW_LUA=1` in
-its environment) is set, and the extension itself refuses the call unless the
-**Aseprite process** was started with `PIXEL_AI_ALLOW_LUA=1`. Headless
-sessions need only the flag: the server passes the variable on.
+Tilesets, slices, layer groups, linked cels, blend modes and aseprite-ai-artist's
+`run_lua` escape hatch are not ported.
 
 ## Resources and prompts
 
