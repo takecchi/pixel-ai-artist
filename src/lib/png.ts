@@ -299,3 +299,29 @@ export function decodePng(bytes: Uint8Array): Image {
 
   return fromRgbaBytes(width, height, data);
 }
+
+/**
+ * A palette PNG's PLTE, with tRNS alphas, including entries no pixel uses;
+ * null for other colour types. Call it on bytes decodePng has accepted.
+ */
+export function decodePngPalette(bytes: Uint8Array): number[] | null {
+  if (bytes[25] !== 3) return null;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let plte: Uint8Array | null = null;
+  let trns: Uint8Array = new Uint8Array(0);
+  for (let pos = 8; pos + 8 <= bytes.length; ) {
+    const length = view.getUint32(pos);
+    const type = String.fromCharCode(bytes[pos + 4]!, bytes[pos + 5]!, bytes[pos + 6]!, bytes[pos + 7]!);
+    const body = bytes.subarray(pos + 8, pos + 8 + length);
+    if (type === "PLTE") plte = body;
+    else if (type === "tRNS") trns = body;
+    else if (type === "IDAT") break;
+    pos += 12 + length;
+  }
+  if (!plte) return null;
+  const out: number[] = [];
+  for (let i = 0; i < plte.length / 3; i++) {
+    out.push(((plte[i * 3]! << 24) | (plte[i * 3 + 1]! << 16) | (plte[i * 3 + 2]! << 8) | (i < trns.length ? trns[i]! : 255)) >>> 0);
+  }
+  return out;
+}
