@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { AsepriteLink } from "../bridge/link.js";
+import type { Studio } from "../doc/index.js";
 import {
   PixelRegion,
   filmstripLayout,
@@ -16,7 +16,7 @@ import { fail, ok, okWithImage, targetShape } from "./kit.js";
  * The "see your own work" tool. Drawing without looking is how an agent ends up
  * confidently reporting a finished sprite that is a smear of misplaced pixels.
  */
-export function registerLookTools(server: McpServer, live: AsepriteLink): void {
+export function registerLookTools(server: McpServer, studio: Studio): void {
   server.registerTool(
     "look",
     {
@@ -125,7 +125,7 @@ export function registerLookTools(server: McpServer, live: AsepriteLink): void {
       try {
         switch (args.op) {
           case "ascii": {
-            const [region, palette] = await Promise.all([readRegion(live, args), readPalette(live, args.sprite)]);
+            const [region, palette] = await Promise.all([readRegion(studio, args), readPalette(studio, args.sprite)]);
             const view = renderAscii(region, { showRulers: args.rulers, palette });
             return ok(
               {
@@ -147,9 +147,9 @@ export function registerLookTools(server: McpServer, live: AsepriteLink): void {
             const from = args.fromFrame ?? 1;
             const to = args.toFrame ?? from + 1;
             const [before, after, palette] = await Promise.all([
-              readRegion(live, { ...args, frame: from }),
-              readRegion(live, { ...args, frame: to }),
-              readPalette(live, args.sprite),
+              readRegion(studio, { ...args, frame: from }),
+              readRegion(studio, { ...args, frame: to }),
+              readPalette(studio, args.sprite),
             ]);
             const view = renderDiff(before, after, palette);
             return ok(
@@ -172,7 +172,7 @@ export function registerLookTools(server: McpServer, live: AsepriteLink): void {
 
           case "onion": {
             const out = tempPng("onion");
-            const meta = await live.call<{
+            const meta = await studio.call<{
               sprite: string;
               frame: number;
               frames: number[];
@@ -209,7 +209,7 @@ export function registerLookTools(server: McpServer, live: AsepriteLink): void {
 
           case "filmstrip": {
             const out = tempPng("filmstrip");
-            const meta = await live.call<{
+            const meta = await studio.call<{
               sprite: string;
               frames: number;
               width: number;
@@ -241,7 +241,7 @@ export function registerLookTools(server: McpServer, live: AsepriteLink): void {
 
           case "compare": {
             const out = tempPng("compare");
-            const meta = await live.call<{
+            const meta = await studio.call<{
               sprite: string;
               frame: number;
               reference: string;
@@ -277,7 +277,7 @@ export function registerLookTools(server: McpServer, live: AsepriteLink): void {
 
           default: {
             const out = tempPng("preview");
-            const meta = await live.call<{
+            const meta = await studio.call<{
               sprite: string;
               sourceWidth: number;
               sourceHeight: number;
@@ -349,7 +349,7 @@ export function registerLookTools(server: McpServer, live: AsepriteLink): void {
     },
     async (args) => {
       try {
-        const region = await readRegion(live, args);
+        const region = await readRegion(studio, args);
         return ok(
           {
             sprite: region.spriteName,
@@ -375,7 +375,7 @@ interface NamedRegion extends PixelRegion {
 }
 
 async function readRegion(
-  live: AsepriteLink,
+  studio: Studio,
   args: {
     sprite?: string | undefined;
     layer?: string | undefined;
@@ -384,7 +384,7 @@ async function readRegion(
     composite?: boolean | undefined;
   },
 ): Promise<NamedRegion> {
-  const data = await live.call<{
+  const data = await studio.call<{
     sprite: string;
     x: number;
     y: number;
@@ -405,8 +405,8 @@ async function readRegion(
   return { ...data, spriteName: data.sprite };
 }
 
-async function readPalette(live: AsepriteLink, sprite: string | undefined): Promise<string[]> {
-  const data = await live.call<{ colors?: string[] }>("palette.get", { sprite });
+async function readPalette(studio: Studio, sprite: string | undefined): Promise<string[]> {
+  const data = await studio.call<{ colors?: string[] }>("palette.get", { sprite });
   return data.colors ?? [];
 }
 

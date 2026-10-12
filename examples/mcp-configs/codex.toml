@@ -6,8 +6,3 @@
 [mcp_servers.pixel-ai-artist]
 command = "npx"
 args = ["-y", "pixel-ai-artist@latest", "serve"]
-
-# Optional: point at a non-default Aseprite, or move the ports.
-# [mcp_servers.pixel-ai-artist.env]
-# PIXEL_AI_PLUGIN_PORT = "9941"
-# PIXEL_AI_CONTROL_PORT = "9942"

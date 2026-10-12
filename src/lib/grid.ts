@@ -1,4 +1,4 @@
-import { LiveError } from "./protocol.js";
+import { ToolError } from "../doc/errors.js";
 
 /**
  * PixelGrid: a picture written as text, one glyph per pixel, compiled into the
@@ -12,7 +12,7 @@ import { LiveError } from "./protocol.js";
  * a misplaced limb.
  *
  * Expansion happens here, server-side, like `text`: the Lua extension never
- * learns a new op, and the same compiler serves the live window and headless.
+ * learns a new op, and the same compiler serves every caller.
  */
 
 export const TRANSPARENT_GLYPH = ".";
@@ -55,7 +55,7 @@ export function compileGrid(op: GridOp, canvas: CanvasSize): CompiledGrid {
   for (const [glyph, color] of Object.entries(op.legend)) {
     // Code points, not UTF-16 units: a glyph outside the BMP is still one cell.
     if (Array.from(glyph).length !== 1) {
-      throw new LiveError(
+      throw new ToolError(
         "invalid_args",
         `Legend key '${glyph}' is not a single character. Every grid cell is exactly one glyph, so every legend key must be one too.`,
         { glyph },
@@ -68,10 +68,10 @@ export function compileGrid(op: GridOp, canvas: CanvasSize): CompiledGrid {
   const height = grid.length;
   const width = grid[0]?.length ?? 0;
   if (height === 0 || width === 0) {
-    throw new LiveError("invalid_args", "A grid needs at least one row with at least one cell.");
+    throw new ToolError("invalid_args", "A grid needs at least one row with at least one cell.");
   }
   if (width > canvas.width || height > canvas.height) {
-    throw new LiveError(
+    throw new ToolError(
       "too_large",
       `Grid is ${width}×${height} but the canvas is ${canvas.width}×${canvas.height}. A grid can cover the whole canvas, not more — ` +
         `check for extra rows or columns.`,
@@ -85,7 +85,7 @@ export function compileGrid(op: GridOp, canvas: CanvasSize): CompiledGrid {
   for (let r = 0; r < height; r++) {
     const length = grid[r]!.length;
     if (length !== width) {
-      throw new LiveError(
+      throw new ToolError(
         "invalid_args",
         `Grid row ${r} (y=${op.y + r}) has ${length} cell(s) but row 0 has ${width}. Every row must be the same width — ` +
           `pad with '${TRANSPARENT_GLYPH}' rather than leaving a row short.`,
@@ -95,7 +95,7 @@ export function compileGrid(op: GridOp, canvas: CanvasSize): CompiledGrid {
     for (let c = 0; c < width; c++) {
       const glyph = grid[r]![c]!;
       if (!legend.has(glyph)) {
-        throw new LiveError(
+        throw new ToolError(
           "invalid_args",
           `Grid row ${r}, column ${c} (x=${op.x + c}, y=${op.y + r}) uses '${glyph}', which is not in the legend. ` +
             `Add it to the legend or use '${TRANSPARENT_GLYPH}' for transparent.`,

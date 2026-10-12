@@ -1,7 +1,8 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { AsepriteLink } from "../bridge/link.js";
+import type { Studio } from "../doc/index.js";
 import { fail, hexColor, ok, targetShape } from "./kit.js";
+import { ToolError } from "../doc/errors.js";
 
 /**
  * Operations that encode pixel-art craft rather than Aseprite mechanics.
@@ -12,7 +13,7 @@ import { fail, hexColor, ok, targetShape } from "./kit.js";
  * saturation; a highlight warms. That rule is applied here, in one place, so
  * every skill and every agent gets it for free.
  */
-export function registerCraftTools(server: McpServer, live: AsepriteLink): void {
+export function registerCraftTools(server: McpServer, studio: Studio): void {
   server.registerTool(
     "recolor",
     {
@@ -66,9 +67,9 @@ export function registerCraftTools(server: McpServer, live: AsepriteLink): void 
     async (args) => {
       try {
         if (args.op === "replace" && (!args.from || !args.to)) {
-          return fail(new Error("op 'replace' needs both `from` and `to`."));
+          return fail(new ToolError("invalid_args", "op 'replace' needs both `from` and `to`."));
         }
-        const data = await live.call<Record<string, unknown>>("recolor.apply", args, {
+        const data = await studio.call<Record<string, unknown>>("recolor.apply", args, {
           expect: ["pixelsChanged"],
         });
         const mapping = (data.mapping as { from: string; to: string; pixels: number }[]) ?? [];
@@ -153,7 +154,7 @@ export function registerCraftTools(server: McpServer, live: AsepriteLink): void 
     },
     async (args) => {
       try {
-        const data = await live.call<{
+        const data = await studio.call<{
           sprite: string;
           findings: {
             check: string;
@@ -164,12 +165,7 @@ export function registerCraftTools(server: McpServer, live: AsepriteLink): void 
             at: { x: number; y: number } | null;
             count: number | null;
           }[];
-          // A thorough pass reads every pixel of every visible cel and its four
-          // neighbours. On a large rigged sprite that is tens of millions of
-          // reads and legitimately outruns the default budget — the failure
-          // then reads as "Aseprite is not answering", which is the one message
-          // that makes an agent go looking for a workaround.
-        }>("validate.run", args, { expect: ["findings"], timeoutMs: 120_000 });
+        }>("validate.run", args, { expect: ["findings"] });
 
         const errors = data.findings.filter((f) => f.severity === "error");
         const warnings = data.findings.filter((f) => f.severity === "warning");

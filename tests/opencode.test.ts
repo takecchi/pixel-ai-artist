@@ -9,10 +9,6 @@ import plugin, { isPixelMutation, resolveSkillsDir } from "../opencode/index.mjs
 // @ts-ignore
 import { LOOK_NUDGE } from "../hooks/shared.mjs";
 
-// Nothing listens here, so the status probe answers fast and never touches a
-// real Aseprite session.
-process.env.PIXEL_AI_CONTROL_PORT = "19971";
-
 type Any = Record<string, any>;
 
 function load() {
@@ -76,7 +72,7 @@ test("the look nudge lands in the next context call, once per session", async ()
   await after(result("s1", "pixel-ai-artist_draw"));
   const first = { sessionID: "s1", system: [] };
   await context(first);
-  assert.equal(first.system.length, 2, "status message plus the nudge");
+  assert.equal(first.system.length, 1, "just the nudge");
   assert.ok(first.system.some((p: Any) => p.text === LOOK_NUDGE));
 
   // The same session is never nudged again, no matter how many draws follow.
@@ -104,33 +100,16 @@ test("non-mutations, failures and odd results never nudge", async () => {
   // Non-array content must not throw and must not spend the session's one nudge.
   await after({ status: "completed", sessionID: "s3", tool: "pixel-ai-artist_draw", result: { content: "a string" } });
 
-  // None of the above queued a nudge; the next context call is status-only.
+  // None of the above queued a nudge; the next context call carries nothing.
   const first = { sessionID: "s3", system: [] };
   await context(first);
-  assert.equal(first.system.length, 1);
-  assert.ok(first.system.every((p: Any) => p.text !== LOOK_NUDGE));
+  assert.equal(first.system.length, 0);
 
   // A well-formed mutation afterwards still nudges — the odd ones did not spend it.
   await after(result("s3", "pixel-ai-artist_draw"));
   const second = { sessionID: "s3", system: [] };
   await context(second);
   assert.ok(second.system.some((p: Any) => p.text === LOOK_NUDGE));
-});
-
-test("status lands once per session on the first context call", async () => {
-  const { ready, sessionHooks } = load();
-  await ready;
-  const context = sessionHooks.get("context");
-  const a = { sessionID: "s1", system: [] };
-  await context(a);
-  assert.equal(a.system.length, 1);
-  assert.match(a.system[0].text, /no bridge on :19971/);
-  const again = { sessionID: "s1", system: [] };
-  await context(again);
-  assert.equal(again.system.length, 0);
-  const fresh = { sessionID: "s2", system: [] };
-  await context(fresh);
-  assert.equal(fresh.system.length, 1);
 });
 
 test("isPixelMutation matches OpenCode tool ids, not Claude's", () => {

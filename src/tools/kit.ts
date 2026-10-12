@@ -9,7 +9,7 @@
 
 import { z } from "zod";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { LiveError } from "../lib/protocol.js";
+import { ToolError } from "../doc/errors.js";
 
 export const hexColor = z
   .string()
@@ -57,22 +57,15 @@ export function okWithImage(
 /**
  * Errors are returned as tool results, not thrown as protocol errors: the model
  * has to see them to recover, and a JSON-RPC error is swallowed by most hosts.
- * `doNotFallBackToDisk` rides along so a disconnected session cannot quietly
- * become an edit to the file on disk that the user never sees.
  */
 export function fail(err: unknown): CallToolResult {
-  const live = err instanceof LiveError ? err : null;
-  const code = live?.code ?? "aseprite_error";
+  const tool = err instanceof ToolError ? err : null;
+  const code = tool?.code ?? "internal_error";
   const message = err instanceof Error ? err.message : String(err);
-  const details = live?.details ?? {};
+  const details = tool?.details ?? {};
 
   const lines = [`${code}: ${message}`];
   if (details.remediation) lines.push(`Fix: ${String(details.remediation)}`);
-  if (details.doNotFallBackToDisk) {
-    lines.push(
-      "Do not retry this as a file edit — the user's open Aseprite window would not show it.",
-    );
-  }
 
   return {
     isError: true,

@@ -1,9 +1,9 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { AsepriteLink } from "../bridge/link.js";
+import type { Studio } from "../doc/index.js";
 import { fail, ok, targetShape } from "./kit.js";
 
-export function registerAssetTools(server: McpServer, live: AsepriteLink): void {
+export function registerAssetTools(server: McpServer, studio: Studio): void {
   server.registerTool(
     "reference",
     {
@@ -67,7 +67,7 @@ export function registerAssetTools(server: McpServer, live: AsepriteLink): void 
     },
     async (args) => {
       try {
-        const data = await live.call<Record<string, unknown>>("reference.apply", args);
+        const data = await studio.call<Record<string, unknown>>("reference.apply", args);
         return ok(data);
       } catch (err) {
         return fail(err);
@@ -123,13 +123,8 @@ export function registerAssetTools(server: McpServer, live: AsepriteLink): void 
     },
     async (args) => {
       try {
-        const data = await live.call<Record<string, unknown>>("export.run", args, {
+        const data = await studio.call<Record<string, unknown>>("export.run", args, {
           expect: ["files"],
-          // Aseprite's first GIF write in a session takes tens of seconds — it
-          // warms a codec once, then answers in about two. Measured at 38s on
-          // a 32x32 sprite, so the default 20s turned the very first animation
-          // export anyone tries into a timeout on work that then succeeded.
-          timeoutMs: 120_000,
         });
         const files = (data.files as string[]) ?? [];
         return ok(data, `Wrote ${files.length} file(s): ${files.join(", ")}`);
@@ -152,8 +147,7 @@ export function registerAssetTools(server: McpServer, live: AsepriteLink): void 
         "• 'pack' — turn a hand-painted mockup layer into a tileset plus a tilemap that reconstructs it exactly. Deduplicates identical cells; `tolerance` also merges near-identical ones. The canvas must be a whole number of tiles, and the source layer is hidden rather than deleted so you can compare.\n" +
         "• 'export' — writes the packed PNG plus the file the engine reads: 'tiled' (.tsj tileset and a .tmj map that uses it), 'godot' (Godot 4 .tres TileSet), or 'json' (tile grid plus the tilemap layout).\n" +
         "Painting a level by hand and packing it produces better tilesets than authoring tiles in isolation, because you see the whole picture while drawing. " +
-        "`layout: 'blob47'` adds a Tiled wangset for autotiling, and assumes the tileset is authored in canonical blob47 order after the empty tile — it refuses rather than writing a wangset that would autotile wrongly. " +
-        "Requires an extension build advertising the 'tileset' feature — check preflight first.",
+        "`layout: 'blob47'` adds a Tiled wangset for autotiling, and assumes the tileset is authored in canonical blob47 order after the empty tile — it refuses rather than writing a wangset that would autotile wrongly.",
       inputSchema: {
         op: z.enum(["list", "create_layer", "get", "stamp", "pack", "export"]),
         ...targetShape,
@@ -202,14 +196,7 @@ export function registerAssetTools(server: McpServer, live: AsepriteLink): void 
     },
     async (args) => {
       try {
-        if (!live.hasFeature("tileset")) {
-          return fail(
-            new Error(
-              "This Aseprite extension build does not advertise the 'tileset' feature. Update the extension (npx pixel-ai-artist install-extension) and restart Aseprite.",
-            ),
-          );
-        }
-        const data = await live.call<Record<string, unknown>>("tileset.apply", args);
+        const data = await studio.call<Record<string, unknown>>("tileset.apply", args);
         return ok(data, describeTileset(args.op, data));
       } catch (err) {
         return fail(err);

@@ -1,15 +1,5 @@
 {
   "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-status.mjs\""
-          }
-        ]
-      }
-    ],
     "PostToolUse": [
       {
         "matcher": "mcp__plugin_pixel-ai-artist_pixel-ai-artist__draw|mcp__plugin_pixel-ai-artist_pixel-ai-artist__recolor|mcp__plugin_pixel-ai-artist_pixel-ai-artist__transform",
