@@ -202,16 +202,6 @@ test("set_properties records a pixel aspect and refuses one that is not W:H", as
   assert.deepEqual(sprite.pixelRatio, { w: 2, h: 1 });
 });
 
-test("open, save and save_as answer unsupported_command until file I/O lands, and touch nothing", async () => {
-  const studio = createStudio();
-  await manage(studio, { op: "new", width: 2, height: 2 });
-  for (const op of ["open", "save", "save_as"]) {
-    await rejectsWith(manage(studio, { op, path: "/tmp/never-written.png" }), "unsupported_command", new RegExp(op));
-  }
-  assert.equal(studio.sprites().length, 1);
-  assert.equal(studio.activeSprite()!.filename, null);
-});
-
 test("slice ops answer unsupported_command, because slices are not ported", async () => {
   const studio = createStudio();
   await manage(studio, { op: "new", width: 2, height: 2 });

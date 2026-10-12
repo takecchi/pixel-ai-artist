@@ -13,6 +13,7 @@
  */
 
 import { deltaE, rgbToLab } from "../lib/color.js";
+import { presets } from "../lib/palettes.js";
 import { ToolError } from "./errors.js";
 
 /** A colour packed as 0xRRGGBBAA, unsigned. */
@@ -41,6 +42,11 @@ export function hexToRgba(hex: string): Rgba {
     throw new ToolError("invalid_args", `Colour '${hex}' must be #rrggbb or #rrggbbaa.`);
   }
   return Number.parseInt(h.length === 6 ? `${h}ff` : h, 16) >>> 0;
+}
+
+/** Aseprite gives every new sprite its default palette, DawnBringer 32. */
+export function defaultPalette(): Rgba[] {
+  return presets()["dawnbringer-32"]!.colors.map(hexToRgba);
 }
 
 export class Image {
