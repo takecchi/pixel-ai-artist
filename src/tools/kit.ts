@@ -57,6 +57,11 @@ export function okWithImage(
 /**
  * Errors are returned as tool results, not thrown as protocol errors: the model
  * has to see them to recover, and a JSON-RPC error is swallowed by most hosts.
+ * The first line is `<code>: <message>`, the part an agent branches on.
+ *
+ * No `structuredContent`: an output schema describes the success shape, and
+ * MCP clients (the SDK's `callTool` among them) check structured content
+ * against it even on an error, turning a tool error into a protocol error.
  */
 export function fail(err: unknown): CallToolResult {
   const tool = err instanceof ToolError ? err : null;
@@ -70,7 +75,6 @@ export function fail(err: unknown): CallToolResult {
   return {
     isError: true,
     content: [{ type: "text", text: lines.join("\n") }],
-    structuredContent: { ok: false, code, message, details },
   };
 }
 

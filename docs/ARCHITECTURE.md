@@ -72,9 +72,12 @@ to the handler table built in `src/doc/commands.ts` from `src/doc/handlers/`.
 
 ## Failing loudly
 
-Every tool returns its errors as tool results with `isError` and a structured
-`{ ok: false, code, message, details }`, never as protocol errors: the model has
-to see an error to recover from it, and most hosts swallow JSON-RPC errors.
+Every tool returns its errors as tool results, never as protocol errors: the
+model has to see an error to recover from it, and most hosts swallow JSON-RPC
+errors. An error result has `isError: true` and text whose first line is
+`<code>: <message>`, and no structured content — an output schema describes the
+success shape, and clients check structured content against it even on an
+error.
 
 There is no undo. Instead, a `draw` or `layer` batch lands whole or not at
 all: a failing op puts back what the batch changed.

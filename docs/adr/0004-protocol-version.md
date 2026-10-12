@@ -25,7 +25,9 @@ dependency bump rather than a rewrite:
   calls that the caller could not pass back as an argument. The sprite target is
   named in every call; there is no "current sprite" held in the server.
 - **`outputSchema` and `structuredContent` on every tool.** Results are typed
-  data, not text the model re-parses.
+  data, not text the model re-parses. *(Amended in the port: on success only.
+  An error result carries no structured content, because clients validate it
+  against the success schema; its code leads the text instead.)*
 - **No reliance on server→client requests.** No sampling, no roots, no
   elicitation. Confirmation that needs a human — closing an unsaved sprite, a
   lossy rotation — is handled by refusing with an explanation and requiring an

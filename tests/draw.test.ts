@@ -927,6 +927,10 @@ test("a selection is read back by sprite.info", async () => {
 
 // ── through the MCP tools ───────────────────────────────────────────────────
 
+function errorText(result: { content?: unknown }): string {
+  return ((result.content as { type: string; text?: string }[]).find((c) => c.type === "text")?.text) ?? "";
+}
+
 async function connected() {
   const { server, studio } = createServer();
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -976,7 +980,7 @@ test("the draw tool returns a failed batch as a tool error with its code", async
     arguments: { ops: [{ kind: "clear" }], selectionOnly: true },
   });
   assert.equal(res.isError, true);
-  assert.equal((res.structuredContent as Res).code, "invalid_args");
+  assert.match(errorText(res), /^invalid_args: /);
   await close();
 });
 
@@ -1009,7 +1013,7 @@ test("the select tool's magic wand takes tolerance, contiguous and a start point
   });
   const bad = await client.callTool({ name: "select", arguments: { op: "color", color: R, contiguous: true } });
   assert.equal(bad.isError, true);
-  assert.equal((bad.structuredContent as Res).code, "invalid_args");
+  assert.match(errorText(bad), /^invalid_args: /);
   await close();
 });
 

@@ -3,9 +3,11 @@
 Seventeen tools, grouped by noun with an `op` enum for the verbs. See
 [ADR-0003](adr/0003-compact-tool-surface.md) for why.
 
-Every tool returns `structuredContent` validated against an `outputSchema`.
-Errors come back as tool results — never as protocol errors — because the model
-has to see them to recover.
+Every successful call returns `structuredContent` validated against the tool's
+`outputSchema`. Errors come back as tool results — never as protocol errors —
+because the model has to see them to recover: `isError: true`, no structured
+content, and text whose first line is `<code>: <message>` (`invalid_args`,
+`no_active_sprite`, `refused`, `unsupported_command`…).
 
 ## Session
 
