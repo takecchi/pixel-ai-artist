@@ -169,6 +169,72 @@ test("inside outline recolours opaque pixels that touch transparency or the cel 
   assert.deepEqual(rows(b.sprite, b.cel), ["GGG", "GRG", "GGG"]);
 });
 
+test("outside outline of thickness 2 reaches two steps: a diamond with four neighbours, a square with eight", async () => {
+  const studio = createStudio();
+  const { sprite, cel } = sketch(studio, 3, 3, [[1, 1, RED]]);
+  const r = await studio.call<Reply>("transform.apply", { op: "outline", color: "#00ff00", thickness: 2 });
+  assert.equal(r.pixelsChanged, 12);
+  assert.deepEqual(r.bounds, { x: -2, y: -2, width: 7, height: 7 });
+  assert.deepEqual(rows(sprite, cel), [".......", "...G...", "..GGG..", ".GGRGG.", "..GGG..", "...G...", "......."]);
+
+  const diag = createStudio();
+  const d = sketch(diag, 3, 3, [[1, 1, RED]]);
+  const r2 = await diag.call<Reply>("transform.apply", { op: "outline", color: "#00ff00", thickness: 2, diagonals: true });
+  assert.equal(r2.pixelsChanged, 24);
+  assert.deepEqual(r2.bounds, { x: -2, y: -2, width: 7, height: 7 });
+  assert.deepEqual(rows(d.sprite, d.cel), [
+    ".......",
+    ".GGGGG.",
+    ".GGGGG.",
+    ".GGRGG.",
+    ".GGGGG.",
+    ".GGGGG.",
+    ".......",
+  ]);
+});
+
+test("inside outline of thickness 2 recolours what lies within two steps of transparency or the cel edge", async () => {
+  const studio = createStudio();
+  const px: [number, number, number][] = [];
+  for (let y = 0; y < 9; y++) for (let x = 0; x < 9; x++) if (x !== 4 || y !== 4) px.push([x, y, RED]);
+  const { sprite, cel } = sketch(studio, 9, 9, px);
+  const r = await studio.call<Reply>("transform.apply", { op: "outline", color: "#00ff00", side: "inside", thickness: 2 });
+  // The hole reaches two steps along rows and columns only, so the corners of the
+  // 5x5 core stay red; the edge reaches two pixels in everywhere else.
+  assert.equal(r.pixelsChanged, 68);
+  assert.deepEqual(r.bounds, { x: 0, y: 0, width: 9, height: 9 });
+  assert.deepEqual(rows(sprite, cel), [
+    "GGGGGGGGG",
+    "GGGGGGGGG",
+    "GGRRGRRGG",
+    "GGRGGGRGG",
+    "GGGG.GGGG",
+    "GGRGGGRGG",
+    "GGRRGRRGG",
+    "GGGGGGGGG",
+    "GGGGGGGGG",
+  ]);
+
+  const diag = createStudio();
+  const d = sketch(diag, 9, 9, px);
+  const r2 = await diag.call<Reply>("transform.apply", { op: "outline", color: "#00ff00", side: "inside", thickness: 2, diagonals: true });
+  assert.equal(r2.pixelsChanged, 80);
+  assert.ok(rows(d.sprite, d.cel).every((row, y) => row === (y === 4 ? "GGGG.GGGG" : "GGGGGGGGG")));
+});
+
+test("outline thickness 1 is the same as no thickness, on either side", async () => {
+  for (const side of ["outside", "inside"]) {
+    const results: unknown[] = [];
+    for (const extra of [{}, { thickness: 1 }]) {
+      const studio = createStudio();
+      const { sprite, cel } = sketch(studio, 4, 4, [[1, 1, RED], [2, 1, RED], [1, 2, RED]]);
+      const r = await studio.call<Reply>("transform.apply", { op: "outline", color: "#00ff00", side, diagonals: true, ...extra });
+      results.push([r, cel.x, cel.y, rows(sprite, cel)]);
+    }
+    assert.deepEqual(results[0], results[1], side);
+  }
+});
+
 test("outline without a colour, or with an unknown side, is invalid_args", async () => {
   const studio = createStudio();
   sketch(studio, 3, 3, [[1, 1, RED]]);
@@ -265,6 +331,23 @@ test("transforms keep raw palette indices in an indexed sprite", async () => {
   assert.equal(r.pixelsChanged, 2);
   assert.deepEqual([...cel.image.pixels], [3, 3]);
   assert.deepEqual(rows(sprite, cel), ["GG"]);
+});
+
+test("the transform tool passes outline thickness through over MCP", async () => {
+  const { server, studio } = createServer();
+  sketch(studio, 3, 3, [[1, 1, RED]]);
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const client = new Client({ name: "test", version: "0" });
+  await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
+  const result = await client.callTool({ name: "transform", arguments: { op: "outline", color: "#00ff00", thickness: 2 } });
+  assert.notEqual(result.isError, true);
+  assert.deepEqual(result.structuredContent, {
+    sprite: "Sprite",
+    op: "outline",
+    pixelsChanged: 12,
+    bounds: { x: -2, y: -2, width: 7, height: 7 },
+  });
+  await server.close();
 });
 
 test("the transform tool runs over MCP and reports pixelsChanged and bounds", async () => {
