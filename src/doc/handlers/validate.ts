@@ -341,7 +341,8 @@ function validateRun(studio: Studio, args: Record<string, unknown>) {
 
   // Say what was not looked at, rather than letting a clean result imply the
   // whole document was checked.
-  if (hiddenSkipped > 0) {
+  const skipsHidden = ["strays", "outline", "banding", "antialiasing"].some((c) => wanted.has(c));
+  if (hiddenSkipped > 0 && skipsHidden) {
     finding(
       findings,
       "layers",

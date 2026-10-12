@@ -36,10 +36,6 @@ function resize(img: Image, w: number, h: number): Image {
   return out;
 }
 
-function isReference(name: string): boolean {
-  return name.startsWith("reference");
-}
-
 /**
  * One panel of a concept sheet, in source pixels. Checked rather than clamped:
  * a region off the image means the sheet was misread, and a silently shrunk
@@ -125,6 +121,7 @@ function importReference(studio: Studio, sprite: Sprite, img: Image, args: Recor
   sprite.activeLayerId = active;
   layer.opacity = args.opacity === undefined ? 128 : Number(args.opacity);
   layer.editable = false;
+  layer.reference = true;
 
   const frames: number[] = [];
   panels.forEach((panel, i) => {
@@ -145,10 +142,16 @@ function referenceApply(studio: Studio, args: Record<string, unknown>) {
   const op = need(args.op, "op");
 
   if (op === "list") {
-    return { sprite: displayName(sprite), op, references: sprite.layers.map((l) => l.name).filter(isReference) };
+    return { sprite: displayName(sprite), op, references: sprite.layers.filter((l) => l.reference).map((l) => l.name) };
   }
   if (op === "remove") {
     const layer = studio.resolveLayer(sprite, args.name ?? "reference");
+    if (!layer.reference) {
+      throw new ToolError(
+        "invalid_args",
+        `'${layer.name}' is not a reference layer. List them with reference op="list".`,
+      );
+    }
     if (sprite.layers.length === 1) throw new ToolError("invalid_args", "A sprite keeps at least one layer.");
     sprite.layers.splice(sprite.layers.indexOf(layer), 1);
     sprite.modified = true;

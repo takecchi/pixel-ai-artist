@@ -132,7 +132,7 @@ test("sample_palette reports the source's most common colours with their share, 
   assert.equal(sprite.modified, false);
 });
 
-test("list names the layers whose name starts with 'reference', and remove deletes one", async () => {
+test("list names the imported reference layers, and remove deletes one", async () => {
   const { studio, sprite } = setup();
   const file = png("l.png", [[RED]]);
   await apply(studio, { op: "import", path: file });
@@ -143,6 +143,28 @@ test("list names the layers whose name starts with 'reference', and remove delet
   assert.deepEqual(sprite.layers.map((l) => l.name), ["Layer 1", "reference 2", "ink"]);
   await apply(studio, { op: "remove", name: "reference 2" });
   assert.deepEqual((await apply(studio, { op: "list" })).references, []);
+});
+
+test("list shows a reference imported under any name, and not a layer that merely starts with 'reference'", async () => {
+  const { studio, sprite } = setup();
+  await apply(studio, { op: "import", path: png("n.png", [[RED]]), name: "concept sheet" });
+  studio.addLayer(sprite, "reference notes");
+  assert.deepEqual((await apply(studio, { op: "list" })).references, ["concept sheet"]);
+});
+
+test("remove refuses a layer that is not a reference, pointing at list, and keeps it", async () => {
+  const { studio, sprite } = setup();
+  studio.addLayer(sprite, "ink");
+  await rejectsWith(apply(studio, { op: "remove", name: "ink" }), "invalid_args", /'ink' is not a reference layer.*reference op="list"/);
+  assert.deepEqual(sprite.layers.map((l) => l.name), ["Layer 1", "ink"]);
+});
+
+test("a duplicated reference layer is still a reference", async () => {
+  const { studio, sprite } = setup();
+  await apply(studio, { op: "import", path: png("d.png", [[RED]]), name: "pose" });
+  await studio.call("layer.apply", { op: "duplicate", name: "pose" });
+  assert.deepEqual((await apply(studio, { op: "list" })).references, ["pose", "pose Copy"]);
+  assert.equal(sprite.layers.length, 3);
 });
 
 test("an unreadable file is io_error, and import and sample_palette need a path", async () => {

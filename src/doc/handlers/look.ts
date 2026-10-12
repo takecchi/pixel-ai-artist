@@ -138,7 +138,7 @@ function compare(studio: Studio, args: Record<string, unknown>) {
   // The reference at full opacity: it is kept see-through for tracing, which would wash it out here.
   const left = crop(celCanvas(sprite, ref, frame, true), region);
   const art = studio.composite(sprite, frame, {
-    layers: sprite.layers.filter((l) => l !== ref && !l.name.startsWith("reference")),
+    layers: sprite.layers.filter((l) => l !== ref && !l.reference),
   });
   const right = crop(art, region);
 

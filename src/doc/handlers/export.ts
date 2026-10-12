@@ -117,7 +117,7 @@ function writeSheet(view: ExportView, s: Sprite, file: string, args: Record<stri
     app: ATLAS_APP,
     version: packageVersion(),
     type,
-    innerPadding: intArg(args.padding, "padding", 0, 100, 0),
+    innerPadding: intArg(args.padding, "padding", 0, 16, 0),
     trim: args.trim === true,
     splitTags: args.byTag === true,
     tags: view.tags,

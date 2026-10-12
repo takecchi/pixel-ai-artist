@@ -96,8 +96,19 @@ export function registerAssetTools(server: McpServer, studio: Studio): void {
           .enum(["horizontal", "vertical", "rows", "columns", "packed"])
           .default("horizontal")
           .describe("Spritesheet layout."),
-        byTag: z.boolean().default(false).describe("Split the sheet by animation tag."),
-        padding: z.number().int().min(0).max(16).default(0).describe("Pixels between frames; prevents bleed at non-integer zoom."),
+        byTag: z
+          .boolean()
+          .default(false)
+          .describe(
+            "Spritesheet: write only the frames that carry a tag, once per tag, so a frame in overlapping tags appears twice (no tags: every frame, as without it). Tags fill separate bands only with sheetType 'rows' or 'columns'; the other layouts keep one run.",
+          ),
+        padding: z
+          .number()
+          .int()
+          .min(0)
+          .max(16)
+          .default(0)
+          .describe("Spritesheet: transparent pixels added inside each frame on all four sides (0–16), so neighbouring frames sit 2×padding apart; prevents bleed at non-integer zoom."),
         trim: z.boolean().default(false).describe("Trim transparent margins; the atlas keeps the original offsets."),
         includeJson: z.boolean().default(true).describe("Write a sibling JSON atlas for 'spritesheet'."),
         layers: z

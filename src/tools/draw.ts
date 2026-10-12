@@ -84,7 +84,10 @@ const drawOp = z.discriminatedUnion("kind", [
     rect: rectShape,
     colorA: hexColor,
     colorB: hexColor,
-    pattern: z.enum(["checker", "bayer2", "bayer4", "bayer8", "noise"]).default("bayer4"),
+    pattern: z
+      .enum(["checker", "bayer2", "bayer4", "bayer8", "noise"])
+      .default("bayer4")
+      .describe("'checker' and 'bayer2' are the same 2×2 pattern."),
     ratio: z
       .number()
       .min(0)

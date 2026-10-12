@@ -117,6 +117,8 @@ export interface Layer {
   editable: boolean;
   /** 0–255. */
   opacity: number;
+  /** Set on layers made by reference op 'import'; the name says nothing, since import takes any. */
+  reference?: true;
   /** Keyed by 1-based frame number. */
   cels: Map<number, Cel>;
 }

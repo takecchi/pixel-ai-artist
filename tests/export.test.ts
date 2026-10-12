@@ -435,6 +435,18 @@ test("spritesheet padding surrounds every frame with transparent pixels and enla
   });
 });
 
+test("spritesheet padding above 16 is invalid_args, 16 is accepted", async () => {
+  await inTempDir(async (dir) => {
+    const { studio } = await fixture();
+    await assert.rejects(
+      run(studio, { op: "spritesheet", path: path.join(dir, "p17.png"), padding: 17 }),
+      (err: unknown) => err instanceof ToolError && err.code === "invalid_args" && /padding must be an integer in 0\.\.16, got 17/.test(err.message),
+    );
+    await run(studio, { op: "spritesheet", path: path.join(dir, "p16.png"), padding: 16 });
+    assert.equal(readPng(path.join(dir, "p16.png")).height, 1 + 32);
+  });
+});
+
 test("spritesheet trim crops each frame to its opaque pixels and records where they were", async () => {
   await inTempDir(async (dir) => {
     const { studio } = await fixture();
