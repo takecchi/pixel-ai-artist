@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { deflateSync } from "node:zlib";
-import { decodeAse, encodeAse } from "../dist/lib/ase.js";
+import { celSource, decodeAse, encodeAse } from "../dist/lib/ase.js";
 import type { AseFile, AseLayer } from "../dist/lib/ase.js";
 
 function layer(name: string, extra: Partial<AseLayer> = {}): AseLayer {
@@ -890,7 +890,7 @@ test("writes frame 0 as external files, color profile, palette, sprite user data
 
 test("user data with nothing in it is not written, but every tag gets a user data chunk", () => {
   const file = sample("rgba");
-  file.userData = { text: "", color: [1, 1, 1, 0] };
+  file.userData = { color: [1, 1, 1, 0] };
   file.layers[0]!.userData = {};
   file.tags = [{ name: "t", from: 0, to: 0, direction: "forward", repeat: 0, color: [0, 0, 0, 0] }];
   const chunks = chunksOfFirstFrame(encodeAse(file));
@@ -1094,4 +1094,101 @@ test("a frame duration of 0 falls back to the header speed, and to 1 when that i
 test("a file written by encodeAse decodes with no dropped, unknown or unread parts", () => {
   const d = decodeAse(encodeAse(decorated()));
   assert.deepEqual(d.features, { ...NO_FEATURES, zIndexCels: 2 });
+});
+
+// ── linked cel chains, header grid, empty user data text ────────────────
+
+function chainFile(): AseFile {
+  const link = (linkedFrame: number) => ({ layer: 0, x: 0, y: 0, opacity: 255, zIndex: 0, linkedFrame });
+  return {
+    width: 2,
+    height: 2,
+    colorMode: "rgba",
+    transparentIndex: 0,
+    palette: rgbaPalette([[0, 0, 0, 255]]),
+    layers: [layer("only")],
+    frames: [
+      { durationMs: 100, cels: [{ layer: 0, x: 0, y: 0, opacity: 255, zIndex: 0, image: { width: 1, height: 1, pixels: Uint8Array.of(1, 2, 3, 4) } }] },
+      { durationMs: 100, cels: [link(0)] },
+      { durationMs: 100, cels: [link(1)] },
+    ],
+    tags: [],
+  };
+}
+
+test("a linked cel that links to a linked cel is kept, as Aseprite shares the data of the cel it links to", () => {
+  const d = decodeAse(encodeAse(chainFile()));
+  assert.deepEqual(d.frames.map((f) => f.cels.map((c) => c.linkedFrame ?? null)), [[null], [0], [1]]);
+  assert.equal(d.features.droppedCels, 0);
+});
+
+test("celSource follows a chain of links back to the cel that holds the image", () => {
+  const d = decodeAse(encodeAse(chainFile()));
+  const root = d.frames[0]!.cels[0]!;
+  assert.equal(celSource(d.frames, 2, d.frames[2]!.cels[0]!), root);
+  assert.equal(celSource(d.frames, 1, d.frames[1]!.cels[0]!), root);
+  assert.equal(celSource(d.frames, 0, root), root);
+});
+
+test("celSource refuses a link to the same or a later frame, a missing cel, and a chain that ends with no image", () => {
+  const cel = (linkedFrame?: number) => ({ layer: 0, x: 0, y: 0, opacity: 255, zIndex: 0, ...(linkedFrame === undefined ? {} : { linkedFrame }) });
+  const frame = (...cels: ReturnType<typeof cel>[]) => ({ durationMs: 1, cels });
+  assert.throws(() => celSource([frame(cel(1)), frame(cel(0))], 0, cel(1)), /not before it/);
+  assert.throws(() => celSource([frame(), frame()], 1, cel(0)), /no cel on that layer/);
+  assert.throws(() => celSource([frame(cel()), frame(cel(0))], 1, cel(0)), /has no image/);
+});
+
+test("a link to a cel that was itself dropped is dropped and counted too", () => {
+  const d = decodeAse(
+    mkFile([
+      mkFrame([mkLayerChunk("a"), rawCel(0, 1, 1, [1, 2, 3, 4])], 10),
+      mkFrame([linkCel(0, 7)], 10),
+      mkFrame([linkCel(0, 1)], 10),
+    ]),
+  );
+  assert.equal(d.features.droppedCels, 2);
+  assert.deepEqual(d.frames.map((f) => f.cels.length), [1, 0, 0]);
+});
+
+test("the header grid round trips, including a negative origin", () => {
+  const file = { ...chainFile(), grid: { x: -3, y: 5, w: 8, h: 9 } };
+  const bytes = encodeAse(file);
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  assert.deepEqual([dv.getInt16(36, true), dv.getInt16(38, true), dv.getUint16(40, true), dv.getUint16(42, true)], [-3, 5, 8, 9]);
+  assert.deepEqual(decodeAse(bytes).grid, file.grid);
+});
+
+test("a file with an all-zero header grid decodes with no grid, and a file with no grid writes zeros", () => {
+  const bytes = encodeAse(chainFile());
+  assert.equal(decodeAse(bytes).grid, undefined);
+  assert.deepEqual([...bytes.subarray(36, 44)], [0, 0, 0, 0, 0, 0, 0, 0]);
+});
+
+test("a grid outside the header's 16 bit fields is refused", () => {
+  for (const grid of [{ x: 40000, y: 0, w: 1, h: 1 }, { x: 0, y: -32769, w: 1, h: 1 }, { x: 0, y: 0, w: 65536, h: 1 }, { x: 0, y: 0, w: 1, h: -1 }]) {
+    assert.throws(() => encodeAse({ ...chainFile(), grid }), RangeError);
+  }
+});
+
+test("a user data chunk whose text is empty is written back with flag 1 and an empty text, for layers, cels, tags and the sprite", () => {
+  const file = chainFile();
+  file.userData = { text: "" };
+  file.layers[0]!.userData = { text: "" };
+  file.frames[0]!.cels[0]!.userData = { text: "" };
+  file.tags = [{ name: "t", from: 0, to: 0, direction: "forward", repeat: 0, color: [1, 2, 3, 255], userData: { text: "" } }];
+  const d = decodeAse(encodeAse(file));
+  assert.equal(d.userData?.text, "");
+  assert.equal(d.layers[0]!.userData?.text, "");
+  assert.equal(d.frames[0]!.cels[0]!.userData?.text, "");
+  assert.equal(d.tags[0]!.userData?.text, "");
+});
+
+test("user data with no text is written with flag 1 clear, so it reads back with no text", () => {
+  const file = chainFile();
+  file.layers[0]!.userData = { color: [1, 2, 3, 4] };
+  file.frames[0]!.cels[0]!.userData = {};
+  const d = decodeAse(encodeAse(file));
+  assert.equal(d.layers[0]!.userData?.text, undefined);
+  assert.deepEqual(d.layers[0]!.userData, { color: [1, 2, 3, 4] });
+  assert.equal(d.frames[0]!.cels[0]!.userData, undefined);
 });

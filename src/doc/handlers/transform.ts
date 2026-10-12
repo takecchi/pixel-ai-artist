@@ -264,7 +264,7 @@ function transformApply(studio: Studio, args: Record<string, unknown>) {
       // out — unlike 'outside' this never grows the cel.
       const result = img.clone();
       const gw = w + 2;
-      const dist = distances(gw, h + 2, (x, y) => !img.contains(x - 1, y - 1) || !isOpaque(sprite, img.get(x - 1, y - 1)));
+      const dist = distances(gw, h + 2, (x, y) => !img.contains(x - 1, y - 1) || !isOpaque(sprite, img.get(x - 1, y - 1), layer));
       for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
           const d = dist[(y + 1) * gw + x + 1]!;
@@ -282,7 +282,7 @@ function transformApply(studio: Studio, args: Record<string, unknown>) {
         for (let x = 0; x < w; x++) grown.set(x + n, y + n, img.get(x, y));
       }
       const result = grown.clone();
-      const dist = distances(grown.width, grown.height, (x, y) => isOpaque(sprite, grown.get(x, y)));
+      const dist = distances(grown.width, grown.height, (x, y) => img.contains(x - n, y - n) && isOpaque(sprite, img.get(x - n, y - n), layer));
       for (let y = 0; y < grown.height; y++) {
         for (let x = 0; x < grown.width; x++) {
           if (dist[y * grown.width + x]! < 1) continue;

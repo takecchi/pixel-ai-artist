@@ -61,7 +61,7 @@ function recolorApply(studio: Studio, args: Record<string, unknown>) {
   for (let y = 0; y < img.height; y++) {
     for (let x = 0; x < img.width; x++) {
       if (!inScope(x + cel.x, y + cel.y)) continue;
-      const hex = pixelToHex(sprite, img.get(x, y));
+      const hex = pixelToHex(sprite, img.get(x, y), layer);
       if (hex !== null) counts.set(hex, (counts.get(hex) ?? 0) + 1);
     }
   }
@@ -101,7 +101,7 @@ function recolorApply(studio: Studio, args: Record<string, unknown>) {
   for (let y = 0; y < img.height; y++) {
     for (let x = 0; x < img.width; x++) {
       if (!inScope(x + cel.x, y + cel.y)) continue;
-      const hex = pixelToHex(sprite, img.get(x, y));
+      const hex = pixelToHex(sprite, img.get(x, y), layer);
       const to = hex === null ? undefined : mapping.get(hex);
       if (to === undefined) continue;
       const value = rgbaToPixel(sprite, to);

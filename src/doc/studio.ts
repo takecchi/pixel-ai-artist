@@ -13,7 +13,7 @@ import {
   Image,
   channels,
   displayName,
-  layerPixelToRgba,
+  pixelToRgba,
   rgba,
   transparentPixel,
   type Cel,
@@ -277,7 +277,7 @@ export class Studio {
           const ty = cel.y + y;
           if (!out.contains(tx, ty)) continue;
           const i = ty * out.width + tx;
-          out.pixels[i] = over(out.pixels[i]!, layerPixelToRgba(sprite, layer, cel.image.pixels[y * cel.image.width + x]!), opacity);
+          out.pixels[i] = over(out.pixels[i]!, pixelToRgba(sprite, cel.image.pixels[y * cel.image.width + x]!, layer), opacity);
         }
       }
     }

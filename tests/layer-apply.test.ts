@@ -232,3 +232,34 @@ test("an out-of-range opacity is invalid_args, and an unknown op or 'list' insid
   await rejectsWith(apply(studio, { op: "explode", name: "Layer 1" }), "unsupported_command", /explode/);
   await rejectsWith(apply(studio, { batch: [{ op: "list" }] }), "unsupported_command", /list/);
 });
+
+function withBackground() {
+  const { studio, sprite } = setup();
+  sprite.layers[0]!.name = "Background";
+  sprite.layers[0]!.background = true;
+  studio.addLayer(sprite, "a");
+  studio.addLayer(sprite, "b");
+  return { studio, sprite };
+}
+
+test("reorder refuses to lift the Background off the bottom, and changes nothing", async () => {
+  const { studio, sprite } = withBackground();
+  await rejectsWith(apply(studio, { op: "reorder", name: "Background", index: 2 }), "invalid_args", /background layer cannot be moved/);
+  assert.deepEqual(sprite.layers.map((l) => l.name), ["Background", "a", "b"]);
+  assert.deepEqual(names(await apply(studio, { op: "reorder", name: "Background", index: 1 })), ["Background", "a", "b"]);
+});
+
+test("reorder and create refuse to put a layer below the Background, and change nothing", async () => {
+  const { studio, sprite } = withBackground();
+  await rejectsWith(apply(studio, { op: "reorder", name: "b", index: 1 }), "invalid_args", /below the background layer/);
+  await rejectsWith(apply(studio, { op: "reorder", name: "b", index: 0 }), "invalid_args", /below the background layer/);
+  await rejectsWith(apply(studio, { op: "create", name: "c", index: 1 }), "invalid_args", /below the background layer/);
+  assert.deepEqual(sprite.layers.map((l) => l.name), ["Background", "a", "b"]);
+  assert.deepEqual(names(await apply(studio, { op: "reorder", name: "b", index: 2 })), ["Background", "b", "a"]);
+});
+
+test("with no Background, any layer can move to the bottom", async () => {
+  const { studio } = setup();
+  await apply(studio, { op: "create", name: "a" });
+  assert.deepEqual(names(await apply(studio, { op: "reorder", name: "a", index: 1 })), ["a", "Layer 1"]);
+});

@@ -357,7 +357,7 @@ function blit(
       const ly = sy - srcCel.y;
       if (lx >= 0 && ly >= 0 && lx < srcCel.image.width && ly < srcCel.image.height) {
         const value = srcCel.image.pixels[ly * srcCel.image.width + lx]!;
-        if (!(op.skipTransparent !== false && !isOpaque(s, value))) count += Draw.pixel(surface, to.x + x, to.y + y, value);
+        if (!(op.skipTransparent !== false && !isOpaque(s, value, srcLayer))) count += Draw.pixel(surface, to.x + x, to.y + y, value);
       }
     }
   }

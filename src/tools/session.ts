@@ -201,6 +201,10 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
           .array(z.object({ frame: z.number().int(), from: z.number(), to: z.number().int() }))
           .optional()
           .describe("Ops 'save'/'save_as' to .aseprite: frame durations brought into the format's 1..65535 ms."),
+        adjustedBackgroundOpacity: z
+          .array(z.object({ layer: z.string(), from: z.number().int(), to: z.literal(255) }))
+          .optional()
+          .describe("Ops 'save'/'save_as' to .aseprite: Background layers whose opacity was written as 255, because Aseprite ignores a Background's opacity when it reads the file."),
       },
       annotations: {
         readOnlyHint: false,
@@ -238,7 +242,9 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
         const lost = kinds("lostOnSave") ? ` Saving will not keep: ${kinds("lostOnSave")}.` : "";
         const skipped = kinds("skippedOnOpen") ? ` Not read from the file: ${kinds("skippedOnOpen")}.` : "";
         const adjusted = ((data.adjustedDurations as unknown[] | undefined) ?? []).length > 0 ? " Some frame durations were brought into 1..65535 ms (adjustedDurations)." : "";
-        return ok(merged, `${args.op}: ${String(data.sprite ?? "ok")}.${hint}${renames}${lost}${skipped}${adjusted}`);
+        const background = (data.adjustedBackgroundOpacity as { layer: string; from: number }[] | undefined) ?? [];
+        const backgrounds = background.length > 0 ? ` Background opacity was written as 255 (Aseprite ignores it): ${background.map((b) => `'${b.layer}' ${b.from}`).join(", ")} (adjustedBackgroundOpacity).` : "";
+        return ok(merged, `${args.op}: ${String(data.sprite ?? "ok")}.${hint}${renames}${lost}${skipped}${adjusted}${backgrounds}`);
       } catch (err) {
         return fail(err);
       }

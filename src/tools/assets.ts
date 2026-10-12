@@ -134,6 +134,10 @@ export function registerAssetTools(server: McpServer, studio: Studio): void {
           .array(z.object({ frame: z.number().int(), from: z.number(), to: z.number().int() }))
           .optional()
           .describe("Op 'aseprite': frame durations brought into the format's 1..65535 ms."),
+        adjustedBackgroundOpacity: z
+          .array(z.object({ layer: z.string(), from: z.number().int(), to: z.literal(255) }))
+          .optional()
+          .describe("Op 'aseprite': Background layers whose opacity was written as 255, because Aseprite ignores a Background's opacity when it reads the file."),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
     },
@@ -143,7 +147,10 @@ export function registerAssetTools(server: McpServer, studio: Studio): void {
           expect: ["files"],
         });
         const files = (data.files as string[]) ?? [];
-        return ok(data, `Wrote ${files.length} file(s): ${files.join(", ")}`);
+        const durations = ((data.adjustedDurations as unknown[] | undefined) ?? []).length > 0 ? " Some frame durations were brought into 1..65535 ms (adjustedDurations)." : "";
+        const background = (data.adjustedBackgroundOpacity as { layer: string; from: number }[] | undefined) ?? [];
+        const backgrounds = background.length > 0 ? ` Background opacity was written as 255 (Aseprite ignores it): ${background.map((b) => `'${b.layer}' ${b.from}`).join(", ")} (adjustedBackgroundOpacity).` : "";
+        return ok(data, `Wrote ${files.length} file(s): ${files.join(", ")}${durations}${backgrounds}`);
       } catch (err) {
         return fail(err);
       }

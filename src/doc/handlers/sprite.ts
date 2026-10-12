@@ -165,7 +165,7 @@ function changeColorMode(sprite: Sprite, target: ColorMode): void {
     for (const cel of layer.cels.values()) {
       const converted = new Image(cel.image.width, cel.image.height);
       cel.image.pixels.forEach((v, i) => {
-        converted.pixels[i] = encode(pixelToRgba(before, v));
+        converted.pixels[i] = encode(pixelToRgba(before, v, layer));
       });
       cel.image = converted;
     }
@@ -216,13 +216,27 @@ function spriteManage(studio: Studio, args: Record<string, unknown>) {
     if (!s.filename) {
       throw new ToolError("invalid_args", "This sprite has never been saved. Use op 'save_as' with a path.");
     }
-    const { files, adjustedDurations } = saveSprite(studio, s, s.filename);
-    return { sprite: displayName(s), id: s.id, path: s.filename, files, ...(adjustedDurations.length > 0 ? { adjustedDurations } : {}) };
+    const { files, adjustedDurations, adjustedBackgroundOpacity } = saveSprite(studio, s, s.filename);
+    return {
+      sprite: displayName(s),
+      id: s.id,
+      path: s.filename,
+      files,
+      ...(adjustedDurations.length > 0 ? { adjustedDurations } : {}),
+      ...(adjustedBackgroundOpacity.length > 0 ? { adjustedBackgroundOpacity } : {}),
+    };
   }
 
   if (op === "save_as") {
-    const { files, adjustedDurations } = saveSprite(studio, s, String(need(args.path, "path")));
-    return { sprite: displayName(s), id: s.id, path: s.filename, files, ...(adjustedDurations.length > 0 ? { adjustedDurations } : {}) };
+    const { files, adjustedDurations, adjustedBackgroundOpacity } = saveSprite(studio, s, String(need(args.path, "path")));
+    return {
+      sprite: displayName(s),
+      id: s.id,
+      path: s.filename,
+      files,
+      ...(adjustedDurations.length > 0 ? { adjustedDurations } : {}),
+      ...(adjustedBackgroundOpacity.length > 0 ? { adjustedBackgroundOpacity } : {}),
+    };
   }
 
   if (op === "close") {

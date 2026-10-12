@@ -6,7 +6,7 @@
  * file saved back would silently differ.
  */
 
-import type { AseCel, AseDecoded, AseFile, AseLayer, AseUserData } from "../lib/ase.js";
+import { celSource, type AseCel, type AseDecoded, type AseFile, type AseLayer, type AseUserData } from "../lib/ase.js";
 import { ToolError } from "./errors.js";
 import { Image, rgba, type Cel, type ColorMode, type Layer, type Sprite } from "./model.js";
 import type { Studio } from "./studio.js";
@@ -19,12 +19,20 @@ import type { Studio } from "./studio.js";
  */
 export const REFERENCE_MARK = "pixel-ai-artist:reference";
 
+const isMarkLine = (line: string) => line.replace(/\r?\n$/, "").replace(/\r$/, "") === REFERENCE_MARK;
+
 function splitMark(text: string | undefined): { marked: boolean; rest: string | undefined } {
   if (text === undefined) return { marked: false, rest: undefined };
-  const lines = text.split("\n");
-  if (!lines.includes(REFERENCE_MARK)) return { marked: false, rest: text };
-  const kept = lines.filter((line) => line !== REFERENCE_MARK);
-  return { marked: true, rest: kept.length > 0 ? kept.join("\n") : undefined };
+  // Lines keep their own terminator, so what stays is byte for byte as it was, whether it used \r\n or \n.
+  const lines = text.split(/(?<=\n)/);
+  if (text.endsWith("\n")) lines.push("");
+  if (!lines.some(isMarkLine)) return { marked: false, rest: text };
+  const kept = lines.filter((line) => !isMarkLine(line));
+  if (kept.length === 0) return { marked: true, rest: undefined };
+  let rest = kept.join("");
+  // The mark was the last line, so the terminator of the line before it ended nothing.
+  if (!lines.at(-1)!.endsWith("\n") && isMarkLine(lines.at(-1)!)) rest = rest.replace(/\r?\n$/, "");
+  return { marked: true, rest };
 }
 
 const MODE_FROM_ASE: Record<AseDecoded["colorMode"], ColorMode> = { rgba: "rgb", grayscale: "grayscale", indexed: "indexed" };
@@ -153,6 +161,7 @@ export function spriteFromAse(studio: Studio, file: AseDecoded, filename: string
   sprite.transparentIndex = file.colorMode === "indexed" ? file.transparentIndex : 0;
   sprite.pixelRatio = { ...file.pixelRatio };
   const spriteExtra = {
+    ...(file.grid ? { grid: file.grid } : {}),
     ...(file.userData ? { userData: file.userData } : {}),
     ...(file.colorProfile ? { colorProfile: file.colorProfile } : {}),
     ...(file.externalFiles ? { externalFiles: file.externalFiles } : {}),
@@ -199,8 +208,12 @@ export function spriteFromAse(studio: Studio, file: AseDecoded, filename: string
   let linkedCels = 0;
   file.frames.forEach((frame, fi) => {
     for (const cel of frame.cels) {
-      // The decoder keeps only links to a cel that exists, so the source is always there.
-      const source = cel.linkedFrame === undefined ? cel : file.frames[cel.linkedFrame]!.cels.find((c) => c.layer === cel.layer)!;
+      let source: AseCel;
+      try {
+        source = celSource(file.frames, fi, cel);
+      } catch (err) {
+        throw new ToolError("io_error", `Cannot open '${filename}': ${(err as Error).message}`, { path: filename });
+      }
       if (cel.linkedFrame !== undefined) linkedCels++;
       const userData = cel.userData ?? source.userData;
       const out: Cel = {
@@ -256,7 +269,8 @@ function layerUserData(l: Layer): AseUserData | undefined {
   const kept = l.aseprite?.userData;
   const markLine = l.reference && !l.aseprite?.referenceFlag;
   if (!markLine) return kept;
-  const text = kept?.text ? `${kept.text}\n${REFERENCE_MARK}` : REFERENCE_MARK;
+  const eol = kept?.text?.includes("\r\n") ? "\r\n" : "\n";
+  const text = kept?.text ? `${kept.text}${eol}${REFERENCE_MARK}` : REFERENCE_MARK;
   return { ...kept, text };
 }
 
@@ -266,13 +280,23 @@ export interface AdjustedDuration {
   to: number;
 }
 
+export interface AdjustedBackgroundOpacity {
+  layer: string;
+  from: number;
+  to: 255;
+}
+
 /**
  * The sprite as an .aseprite file: every layer a plain image layer, every cel
  * its own image, with what an opened file carried written back. A frame
  * duration outside the format's 1..65535 ms is brought into range and
  * returned; anything else the format cannot hold is refused.
  */
-export function aseFromSprite(sprite: Sprite): { file: AseFile; adjustedDurations: AdjustedDuration[] } {
+export function aseFromSprite(sprite: Sprite): {
+  file: AseFile;
+  adjustedDurations: AdjustedDuration[];
+  adjustedBackgroundOpacity: AdjustedBackgroundOpacity[];
+} {
   if (sprite.colorMode === "indexed" && sprite.transparentIndex > 255) {
     throw new ToolError("invalid_args", `An .aseprite file stores the transparent index in one byte; ${sprite.transparentIndex} does not fit.`);
   }
@@ -283,8 +307,10 @@ export function aseFromSprite(sprite: Sprite): { file: AseFile; adjustedDuration
     palette[i * 4 + 2] = (c >>> 8) & 255;
     palette[i * 4 + 3] = c & 255;
   });
+  const adjustedBackgroundOpacity: AdjustedBackgroundOpacity[] = [];
   const layers: AseLayer[] = sprite.layers.map((l) => {
     const extra = l.aseprite ?? {};
+    if (l.background && l.opacity !== 255) adjustedBackgroundOpacity.push({ layer: l.name, from: l.opacity, to: 255 });
     const userData = layerUserData(l);
     return {
       name: l.name,
@@ -333,6 +359,7 @@ export function aseFromSprite(sprite: Sprite): { file: AseFile; adjustedDuration
     });
     return { durationMs, cels };
   });
+  const grid = sprite.aseprite?.grid;
   const file: AseFile = {
     width: sprite.width,
     height: sprite.height,
@@ -351,9 +378,10 @@ export function aseFromSprite(sprite: Sprite): { file: AseFile; adjustedDuration
       ...(t.aseprite?.userData ? { userData: t.aseprite.userData } : {}),
     })),
     pixelRatio: { ...sprite.pixelRatio },
+    ...(grid ? { grid } : {}),
     ...(sprite.aseprite?.userData ? { userData: sprite.aseprite.userData } : {}),
     ...(sprite.aseprite?.colorProfile ? { colorProfile: sprite.aseprite.colorProfile } : {}),
     ...(sprite.aseprite?.externalFiles ? { externalFiles: sprite.aseprite.externalFiles } : {}),
   };
-  return { file, adjustedDurations };
+  return { file, adjustedDurations, adjustedBackgroundOpacity };
 }

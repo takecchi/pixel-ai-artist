@@ -18,14 +18,12 @@ function compositeSource(studio: Studio, sprite: Sprite, frame: number): PixelSo
 
 /** One layer's cel at its position, ignoring layer and cel opacity, as drawImage onto an empty canvas did. */
 function celSource(studio: Studio, sprite: Sprite, layer: Layer, frame: number): PixelSource {
-  const canvas = studio.newImage(sprite);
   const cel = layer.cels.get(frame);
-  if (cel) {
-    for (let y = 0; y < cel.image.height; y++) {
-      for (let x = 0; x < cel.image.width; x++) canvas.set(cel.x + x, cel.y + y, cel.image.get(x, y));
-    }
-  }
-  return (x, y) => pixelToHex(sprite, canvas.get(x, y));
+  // Read the cel itself: off the cel there is no paint, even where a Background would read its transparent index as colour.
+  return (x, y) => {
+    if (!cel || x < 0 || y < 0 || x >= sprite.width || y >= sprite.height || !cel.image.contains(x - cel.x, y - cel.y)) return null;
+    return pixelToHex(sprite, cel.image.get(x - cel.x, y - cel.y), layer);
+  };
 }
 
 /**

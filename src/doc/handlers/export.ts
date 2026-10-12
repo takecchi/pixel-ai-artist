@@ -137,7 +137,10 @@ function writeSheet(view: ExportView, s: Sprite, file: string, args: Record<stri
 /**
  * gif and frames were saved from the sprite, or a copy of it, which keeps a
  * Background; Aseprite writes those with no transparency. png flattened into
- * a fresh sprite first and spritesheet built a new texture, so they keep it.
+ * a fresh sprite in the Lua handler, which would keep a hole in the Background
+ * transparent while sprite.manage save writes it opaque; png follows save, so
+ * one picture leaves the same way. spritesheet keeps transparency, as
+ * Aseprite renders the sheet into a new texture sprite with no Background.
  */
 function savedFrames(view: ExportView): AnimationFrame[] {
   return view.layers.some((l) => l.background) ? opaqueFrames(view.frames) : view.frames;
@@ -158,6 +161,7 @@ function exportRun(studio: Studio, args: Record<string, unknown>) {
   let frame: number | undefined;
   let atlas: string | undefined;
   let adjustedDurations: Written["adjustedDurations"] = [];
+  let adjustedBackgroundOpacity: Written["adjustedBackgroundOpacity"] = [];
 
   if (op === "png") {
     if (names(args.tags, "tags")) {
@@ -165,7 +169,7 @@ function exportRun(studio: Studio, args: Record<string, unknown>) {
     }
     frame = studio.resolveFrame(s, args.frame);
     const view = exportView(studio, s, args, scale);
-    files = writeFrames([view.frames[frame - 1]!], ownPalette(s), file);
+    files = writeFrames([savedFrames(view)[frame - 1]!], ownPalette(s), file);
   } else if (op === "aseprite") {
     if (filtered) {
       throw new ToolError("invalid_args", "'aseprite' saves the whole document; `layers` and `tags` apply to png, gif, frames and spritesheet.");
@@ -176,6 +180,7 @@ function exportRun(studio: Studio, args: Record<string, unknown>) {
     const written: Written = writeAseprite(s, file);
     files = written.files;
     adjustedDurations = written.adjustedDurations;
+    adjustedBackgroundOpacity = written.adjustedBackgroundOpacity;
   } else if (op === "gif") {
     const frames = savedFrames(exportView(studio, s, args, scale));
     const opaque = s.palette.map((c) => (c | 255) >>> 0);
@@ -199,6 +204,7 @@ function exportRun(studio: Studio, args: Record<string, unknown>) {
     frame,
     atlas,
     ...(adjustedDurations.length > 0 ? { adjustedDurations } : {}),
+    ...(adjustedBackgroundOpacity.length > 0 ? { adjustedBackgroundOpacity } : {}),
   };
 }
 

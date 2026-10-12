@@ -70,6 +70,8 @@ export interface AseFile {
   tags: AseTag[];
   /** Pixel width:height; 1:1 when absent. */
   pixelRatio?: { w: number; h: number };
+  /** The header's grid bounds; written as zeros when absent, and read only when any of the four is not zero. */
+  grid?: { x: number; y: number; w: number; h: number };
   /** The sprite's user data. */
   userData?: AseUserData;
   /** The body of the color profile chunk (0x2007). */
@@ -267,6 +269,12 @@ function validate(file: AseFile): void {
     checkInt("pixelRatio.h", file.pixelRatio.h, 1, 255);
   }
   checkInt("height", file.height, 1, MAX_ENCODE_SIZE);
+  if (file.grid) {
+    checkInt("grid.x", file.grid.x, -32768, 32767);
+    checkInt("grid.y", file.grid.y, -32768, 32767);
+    checkInt("grid.w", file.grid.w, 0, 0xffff);
+    checkInt("grid.h", file.grid.h, 0, 0xffff);
+  }
   const bpp = BYTES_PER_PIXEL[file.colorMode];
   if (bpp === undefined) throw new RangeError(`unknown color mode ${String(file.colorMode)}`);
   if (file.palette.length % 4 !== 0) throw new RangeError("palette length must be a multiple of 4");
@@ -401,7 +409,8 @@ function celChunk(cel: AseCel): Uint8Array {
 
 /** A user data chunk; undefined for one with nothing in it, which Aseprite does not write. */
 function userDataChunk(u: AseUserData | undefined, always = false): Uint8Array | undefined {
-  const hasText = u?.text !== undefined && u.text !== "";
+  // An empty text is kept because it only exists in the model when the file's flag 1 was set; Aseprite itself never writes one.
+  const hasText = u?.text !== undefined;
   const hasColor = u?.color !== undefined && u.color[3] !== 0;
   const hasProps = u?.properties !== undefined;
   if (!always && !hasText && !hasColor && !hasProps) return undefined;
@@ -440,7 +449,8 @@ export function encodeAse(file: AseFile): Uint8Array {
   out.u32(0).u16(FILE_MAGIC).u16(file.frames.length).u16(file.width).u16(file.height);
   out.u16(DEPTH_OF[file.colorMode]).u32(HEADER_FLAGS).u16(file.frames[0]!.durationMs).u32(0).u32(0);
   const ratio = file.pixelRatio ?? { w: 1, h: 1 };
-  out.u8(file.transparentIndex).zeros(3).u16(colors).u8(ratio.w).u8(ratio.h).u16(0).u16(0).u16(0).u16(0);
+  const grid = file.grid ?? { x: 0, y: 0, w: 0, h: 0 };
+  out.u8(file.transparentIndex).zeros(3).u16(colors).u8(ratio.w).u8(ratio.h).i16(grid.x).i16(grid.y).u16(grid.w).u16(grid.h);
   out.zeros(HEADER_SIZE - out.length);
 
   file.frames.forEach((frame, fi) => {
@@ -586,6 +596,25 @@ type UserTarget =
   | { kind: "tag"; index: number }
   | undefined;
 
+/**
+ * The cel that holds the image `cel` shows, found by following links back to a cel that is not a link, as Aseprite
+ * shares the data of the linked cel. Throws when a link points at this frame or a later one, or at a layer with no cel
+ * there, or the end of the chain has no image.
+ */
+export function celSource(frames: readonly AseFrame[], frameIndex: number, cel: AseCel): AseCel {
+  let current = cel;
+  let at = frameIndex;
+  while (current.linkedFrame !== undefined) {
+    if (current.linkedFrame >= at) throw new Error(`ase: cel on layer ${cel.layer} in frame ${at} links to frame ${current.linkedFrame}, which is not before it`);
+    at = current.linkedFrame;
+    const next: AseCel | undefined = frames[at]?.cels.find((c) => c.layer === cel.layer);
+    if (!next) throw new Error(`ase: cel on layer ${cel.layer} links to frame ${at}, which has no cel on that layer`);
+    current = next;
+  }
+  if (current.image === undefined && !current.tilemap) throw new Error(`ase: cel on layer ${cel.layer} in frame ${at} has no image`);
+  return current;
+}
+
 export function decodeAse(bytes: Uint8Array): AseDecoded {
   const budget = { pixels: MAX_CEL_PIXELS };
   if (bytes.length < HEADER_SIZE) throw new Error("ase: file is shorter than the 128-byte header");
@@ -603,6 +632,8 @@ export function decodeAse(bytes: Uint8Array): AseDecoded {
   h.skip(5);
   const pixelW = h.u8();
   const pixelH = h.u8();
+  const gridBounds = { x: h.i16(), y: h.i16(), w: h.u16(), h: h.u16() };
+  const hasGrid = gridBounds.x !== 0 || gridBounds.y !== 0 || gridBounds.w !== 0 || gridBounds.h !== 0;
   // The spec reads a zero in either field as 1:1.
   const pixelRatio = pixelW === 0 || pixelH === 0 ? { w: 1, h: 1 } : { w: pixelW, h: pixelH };
   const colorMode = MODE_OF_DEPTH[depth];
@@ -739,15 +770,21 @@ export function decodeAse(bytes: Uint8Array): AseDecoded {
           } else {
             throw new Error(`ase: unknown cel type ${celType}`);
           }
+          // Aseprite's layer->cel(link_frame) finds only cels already added, so a link to this frame or a later one,
+          // or to a cel that was itself dropped, finds nothing and the cel is dropped.
           const linkTarget =
             cel.linkedFrame === undefined
               ? undefined
               : cel.linkedFrame < fi && frames[cel.linkedFrame]!.cels.some((c) => c.layer === layer);
-          // A link to this frame or a later one has no cel to point at yet; the writer only links backwards.
           if (linkTarget === false || celLayers.has(layer)) {
             features.droppedCels++;
             target = undefined;
             break;
+          }
+          // Every accepted cel has a root, so a chain is never broken here; resolving checks it anyway.
+          if (linkTarget === true && celSource(frames, fi, cel).tilemap) {
+            cel.tilemap = true;
+            features.tilemapCels++;
           }
           celLayers.add(layer);
           frame.cels.push(cel);
@@ -840,6 +877,7 @@ export function decodeAse(bytes: Uint8Array): AseDecoded {
     tags,
     pixelRatio,
     features,
+    ...(hasGrid ? { grid: gridBounds } : {}),
     ...(userData ? { userData } : {}),
     ...(colorProfile ? { colorProfile } : {}),
     ...(externalFiles ? { externalFiles } : {}),

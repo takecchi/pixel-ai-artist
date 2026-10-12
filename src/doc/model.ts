@@ -196,7 +196,12 @@ export interface Sprite {
   /** Next value for `Layer.id`. */
   nextLayerId: number;
   /** What an opened .aseprite carried for the whole sprite and the model does not use, written back on save. */
-  aseprite?: { userData?: AseUserData; colorProfile?: Uint8Array; externalFiles?: Uint8Array };
+  aseprite?: {
+    userData?: AseUserData;
+    colorProfile?: Uint8Array;
+    externalFiles?: Uint8Array;
+    grid?: { x: number; y: number; w: number; h: number };
+  };
 }
 
 /** What results call a sprite: its file's base name, "Sprite" until it has one. */
@@ -213,35 +218,26 @@ export function transparentPixel(s: Sprite): number {
 /**
  * What a raw pixel looks like. An indexed pixel is its palette colour, always
  * opaque — the alpha in a palette entry does not reach indexed pixels, and an
- * index past the palette's end is no paint.
+ * index past the palette's end is no paint. On an indexed Background `layer`
+ * the transparent index is paint too, its palette colour, as Aseprite renders
+ * it. This is the only place that rule lives.
  */
-export function pixelToRgba(s: Sprite, value: number): Rgba {
+export function pixelToRgba(s: Sprite, value: number, layer?: Layer): Rgba {
   if (s.colorMode !== "indexed") return value >>> 0;
-  if (value === s.transparentIndex || value >= s.palette.length) return TRANSPARENT;
+  if (value >= s.palette.length) return TRANSPARENT;
+  if (value === s.transparentIndex && !layer?.background) return TRANSPARENT;
   return ((s.palette[value]! & 0xffffff00) | 255) >>> 0;
 }
 
-/**
- * `pixelToRgba` for a pixel of `layer`: on an indexed Background layer the
- * transparent index is paint, its palette colour, as Aseprite renders it.
- */
-export function layerPixelToRgba(s: Sprite, layer: Layer, value: number): Rgba {
-  if (layer.background && s.colorMode === "indexed" && value === s.transparentIndex && value < s.palette.length) {
-    return ((s.palette[value]! & 0xffffff00) | 255) >>> 0;
-  }
-  return pixelToRgba(s, value);
-}
-
 /** `pixelToRgba` as hex; null where there is no paint. Grayscale never shows its alpha. */
-export function pixelToHex(s: Sprite, value: number): string | null {
-  const c = pixelToRgba(s, value);
+export function pixelToHex(s: Sprite, value: number, layer?: Layer): string | null {
+  const c = pixelToRgba(s, value, layer);
   if ((c & 255) === 0) return null;
   return rgbaToHex(c, s.colorMode === "rgb");
 }
 
-export function isOpaque(s: Sprite, value: number): boolean {
-  if (s.colorMode === "indexed") return value !== s.transparentIndex && value < s.palette.length;
-  return (value & 255) !== 0;
+export function isOpaque(s: Sprite, value: number, layer?: Layer): boolean {
+  return (pixelToRgba(s, value, layer) & 255) !== 0;
 }
 
 /**

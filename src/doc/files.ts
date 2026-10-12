@@ -11,7 +11,7 @@ import type { AnimationFrame } from "../lib/image.js";
 import { readImageDocument, type ImageDocument } from "../lib/image-document.js";
 import { encodePng } from "../lib/png.js";
 import { frameFileNames } from "../lib/spritesheet.js";
-import { aseFromSprite, spriteFromAse, type AdjustedDuration, type AseOpenNotes } from "./aseprite.js";
+import { aseFromSprite, spriteFromAse, type AdjustedBackgroundOpacity, type AdjustedDuration, type AseOpenNotes } from "./aseprite.js";
 import { ToolError } from "./errors.js";
 import { Image, defaultPalette, rgbaToHex, type Layer, type Rgba, type Sprite } from "./model.js";
 import type { Studio } from "./studio.js";
@@ -71,14 +71,16 @@ export interface Written {
   files: string[];
   /** Frame durations brought into a format's range on the way out. */
   adjustedDurations: AdjustedDuration[];
+  /** Background layers whose opacity was written as 255, which is all Aseprite reads of it. */
+  adjustedBackgroundOpacity: AdjustedBackgroundOpacity[];
 }
 
 /** The whole document, layers and all, as an .aseprite file. */
 export function writeAseprite(sprite: Sprite, file: string): Written {
   const full = path.resolve(file);
-  const { file: ase, adjustedDurations } = aseFromSprite(sprite);
+  const { file: ase, adjustedDurations, adjustedBackgroundOpacity } = aseFromSprite(sprite);
   writeBytes(full, encodeAse(ase));
-  return { files: [full], adjustedDurations };
+  return { files: [full], adjustedDurations, adjustedBackgroundOpacity };
 }
 
 /** Whether a visible Background is among `layers`, which makes Aseprite write PNG and GIF with no transparency. */
@@ -160,7 +162,7 @@ export function saveSprite(studio: Studio, sprite: Sprite, file: string): Writte
   } else {
     const frames = rendered(studio, sprite);
     const out = drawsBackground(sprite.layers) ? opaqueFrames(frames) : frames;
-    written = { files: writeFrames(out, sprite.colorMode === "indexed" ? sprite.palette : [], file), adjustedDurations: [] };
+    written = { files: writeFrames(out, sprite.colorMode === "indexed" ? sprite.palette : [], file), adjustedDurations: [], adjustedBackgroundOpacity: [] };
   }
   sprite.filename = path.resolve(file);
   sprite.modified = false;

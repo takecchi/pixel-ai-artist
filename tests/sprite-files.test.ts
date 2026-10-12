@@ -5,6 +5,9 @@ import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { crc32, deflateSync } from "node:zlib";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { createServer } from "../dist/server.js";
 import { Image, ToolError, createStudio, rgba } from "../dist/doc/index.js";
 import { encodeGif, decodeGif } from "../dist/lib/gif.js";
 import { decodePng, encodePng } from "../dist/lib/png.js";
@@ -505,5 +508,49 @@ test("save after save_as overwrites that file with what was drawn since", async 
     assert.equal(reply.path, file);
     assert.deepEqual([...readPng(file).pixels], [BLUE, GREEN]);
     assert.equal(sprite.modified, false);
+  });
+});
+
+async function connected() {
+  const { server, studio } = createServer();
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const client = new Client({ name: "test", version: "0" });
+  await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
+  return { client, studio, close: async () => { await server.close(); } };
+}
+
+const textOf = (result: { content?: unknown }): string => ((result.content as { type: string; text?: string }[]).find((c) => c.type === "text")?.text) ?? "";
+
+test("sprite_manage save and save_as to .aseprite name adjustedBackgroundOpacity in the reply and its text", async () => {
+  await inTempDir(async (dir) => {
+    const { client, studio, close } = await connected();
+    const bg = studio.addSprite({ width: 1, height: 1 });
+    bg.layers[0]!.name = "Backdrop";
+    bg.layers[0]!.background = true;
+    bg.layers[0]!.opacity = 30;
+    const file = path.join(dir, "bg.aseprite");
+    const saveAs = await client.callTool({ name: "sprite_manage", arguments: { op: "save_as", path: file } });
+    assert.ok(!saveAs.isError, textOf(saveAs));
+    assert.deepEqual((saveAs.structuredContent as Record<string, any>).adjustedBackgroundOpacity, [{ layer: "Backdrop", from: 30, to: 255 }]);
+    assert.match(textOf(saveAs), /Background opacity was written as 255 .*'Backdrop' 30.*\(adjustedBackgroundOpacity\)/);
+    bg.layers[0]!.opacity = 200;
+    const save = await client.callTool({ name: "sprite_manage", arguments: { op: "save" } });
+    assert.deepEqual((save.structuredContent as Record<string, any>).adjustedBackgroundOpacity, [{ layer: "Backdrop", from: 200, to: 255 }]);
+    assert.match(textOf(save), /'Backdrop' 200/);
+    await close();
+  });
+});
+
+test("sprite_manage save_as to .png says nothing of Background opacity", async () => {
+  await inTempDir(async (dir) => {
+    const { client, studio, close } = await connected();
+    const sprite = studio.addSprite({ width: 1, height: 1 });
+    sprite.layers[0]!.background = true;
+    sprite.layers[0]!.opacity = 30;
+    const res = await client.callTool({ name: "sprite_manage", arguments: { op: "save_as", path: path.join(dir, "bg.png") } });
+    assert.ok(!res.isError, textOf(res));
+    assert.equal("adjustedBackgroundOpacity" in (res.structuredContent as object), false);
+    assert.doesNotMatch(textOf(res), /Background opacity/);
+    await close();
   });
 });

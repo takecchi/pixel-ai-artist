@@ -129,7 +129,7 @@ test("save_as .png and .gif keep their transparency when the Background is hidde
 
 // ── export ──────────────────────────────────────────────────────────────
 
-test("export gif and frames write a Background's sprite opaque, and png and spritesheet keep its transparency", async () => {
+test("export gif, frames and png write a Background's sprite opaque, as save does, and spritesheet keeps its transparency", async () => {
   await inTempDir(async (dir) => {
     const { studio } = await sprite2x1({ Ink: [RED, 0], Paper: [0, 0] }, ["Paper"]);
     const run = (args: Record<string, unknown>) => studio.call<Reply>("export.run", args);
@@ -139,7 +139,7 @@ test("export gif and frames write a Background's sprite opaque, and png and spri
     await run({ op: "spritesheet", path: path.join(dir, "sheet.png"), includeJson: false });
     assert.ok(readGif(path.join(dir, "a.gif")).frames[0]!.image.pixels.every((v) => (v & 255) === 255), "gif");
     assert.deepEqual([...readPng(path.join(dir, "frames.png")).pixels], [RED, BLACK], "frames");
-    assert.deepEqual([...readPng(path.join(dir, "still.png")).pixels], [RED, 0], "png");
+    assert.deepEqual([...readPng(path.join(dir, "still.png")).pixels], [RED, BLACK], "png");
     assert.deepEqual([...readPng(path.join(dir, "sheet.png")).pixels], [RED, 0], "spritesheet");
   });
 });

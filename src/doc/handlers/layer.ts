@@ -45,6 +45,14 @@ function restack(sprite: Sprite, layer: Layer, index: unknown): void {
   const n = Math.floor(Number(index));
   if (!Number.isFinite(n)) throw new ToolError("invalid_args", `index must be a number, got ${String(index)}.`);
   const target = Math.min(Math.max(n, 1), sprite.layers.length) - 1;
+  // Aseprite only treats the bottom layer as the Background, so it keeps it there.
+  if (layer.background && target !== 0) {
+    throw new ToolError("invalid_args", "The background layer cannot be moved.");
+  }
+  const bottom = sprite.layers.find((l) => l !== layer);
+  if (!layer.background && target === 0 && bottom?.background) {
+    throw new ToolError("invalid_args", "You cannot move or copy something below the background layer.");
+  }
   sprite.layers.splice(sprite.layers.indexOf(layer), 1);
   sprite.layers.splice(target, 0, layer);
 }
@@ -101,7 +109,7 @@ function duplicateInto(studio: Studio, source: Sprite, layer: Layer, target: Spr
     // Pixels are raw colour-mode values; a sprite in another mode needs them re-encoded.
     const image = new Image(cel.image.width, cel.image.height);
     cel.image.pixels.forEach((v, i) => {
-      image.pixels[i] = rgbaToPixel(target, pixelToRgba(source, v));
+      image.pixels[i] = rgbaToPixel(target, pixelToRgba(source, v, layer));
     });
     copy.cels.set(frame, { x: cel.x, y: cel.y, image, opacity: 255 });
   }
@@ -127,7 +135,7 @@ function mergeDown(studio: Studio, sprite: Sprite, layer: Layer): void {
         const lx = upper.x + x - lower.x;
         const ly = upper.y + y - lower.y;
         if (!lower.image.contains(lx, ly)) continue;
-        const mixed = over(pixelToRgba(sprite, lower.image.get(lx, ly)), pixelToRgba(sprite, upper.image.get(x, y)), opacity);
+        const mixed = over(pixelToRgba(sprite, lower.image.get(lx, ly), below), pixelToRgba(sprite, upper.image.get(x, y), layer), opacity);
         lower.image.set(lx, ly, (mixed & 255) === 0 ? lower.image.get(lx, ly) : rgbaToPixel(sprite, mixed));
       }
     }

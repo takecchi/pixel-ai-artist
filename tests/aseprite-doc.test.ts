@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { deflateSync } from "node:zlib";
 import { Image, ToolError, createStudio, rgba } from "../dist/doc/index.js";
+import { spriteFromAse } from "../dist/doc/aseprite.js";
 import { decodeAse, encodeAse } from "../dist/lib/ase.js";
 import type { AseFile, AseLayer } from "../dist/lib/ase.js";
 
@@ -824,5 +825,165 @@ test("save_as .aseprite writes cels at -32768 and 32767", async () => {
     [cel.x, cel.y] = [-32768, 32767];
     const cels = (await savedAse(studio, dir)).frames[0]!.cels;
     assert.deepEqual(cels.filter((c) => c.layer === 1).map((c) => [c.x, c.y]), [[-32768, 32767]]);
+  });
+});
+
+// ── linked cel chains ───────────────────────────────────────────────────
+
+function chainedFile(): AseFile {
+  const file = aseFile([aseLayer("img")]);
+  const pixels = Uint8Array.from({ length: 16 }, (_, i) => i * 9);
+  file.frames[0]!.cels[0]!.image = { width: 2, height: 2, pixels };
+  file.frames.push({ durationMs: 50, cels: [{ layer: 0, x: 0, y: 0, opacity: 255, zIndex: 0, linkedFrame: 0 }] });
+  file.frames.push({ durationMs: 60, cels: [{ layer: 0, x: 1, y: -1, opacity: 90, zIndex: 0, linkedFrame: 1 }] });
+  return file;
+}
+
+test("open of a file whose frame 3 links to frame 2, which links to frame 1, gives all three frames the same image", async () => {
+  await inTempDir(async (dir) => {
+    const studio = createStudio();
+    const reply = await manage(studio, { op: "open", path: write(dir, "chain.aseprite", encodeAse(chainedFile())) });
+    const cels = [1, 2, 3].map((n) => studio.activeSprite()!.layers[0]!.cels.get(n)!);
+    const first = [...cels[0]!.image.pixels];
+    assert.equal(first.length, 4);
+    assert.deepEqual(cels.map((c) => [...c.image.pixels]), [first, first, first]);
+    assert.deepEqual([cels[2]!.x, cels[2]!.y, cels[2]!.opacity], [1, -1, 90]);
+    assert.equal(reply.lostOnSave.linkedCels, 2);
+    assert.equal(reply.skippedOnOpen, undefined);
+  });
+});
+
+test("open counts chained links in lostOnSave.linkedCels, and a save writes each as its own image", async () => {
+  await inTempDir(async (dir) => {
+    const { studio } = await opened(write(dir, "chain.aseprite", encodeAse(chainedFile())));
+    const saved = await savedAse(studio, dir);
+    assert.deepEqual(saved.frames.map((f) => f.cels[0]!.linkedFrame), [undefined, undefined, undefined]);
+  });
+});
+
+test("a decoded file whose link chain does not end in an image is io_error on open", () => {
+  const decoded = {
+    ...chainedFile(),
+    pixelRatio: { w: 1, h: 1 },
+    features: { slices: 0, tilesets: 0, tilemapCels: 0, zIndexCels: 0, paletteChanges: 0, layerUuids: 0, unknownChunks: 0, droppedCels: 0, unreadFrameBytes: 0 },
+  };
+  decoded.frames[1]!.cels[0]!.linkedFrame = 2;
+  assert.throws(() => spriteFromAse(createStudio(), decoded, "/tmp/broken.aseprite"), (err: unknown) => err instanceof ToolError && err.code === "io_error");
+});
+
+// ── header grid ─────────────────────────────────────────────────────────
+
+test("the header grid of an opened file is kept and written back by save_as", async () => {
+  await inTempDir(async (dir) => {
+    const grid = { x: -4, y: 2, w: 8, h: 6 };
+    const { studio } = await opened(write(dir, "grid.aseprite", encodeAse(aseFile([aseLayer("a")], { grid }))));
+    assert.deepEqual((await savedAse(studio, dir)).grid, grid);
+    assert.deepEqual(decodeAse(new Uint8Array(readFileSync(path.join(dir, "saved.aseprite")))).grid, grid);
+  });
+});
+
+test("the header grid survives export op aseprite, and a file with no grid saves with none", async () => {
+  await inTempDir(async (dir) => {
+    const grid = { x: 0, y: 0, w: 16, h: 16 };
+    const { studio } = await opened(write(dir, "grid.aseprite", encodeAse(aseFile([aseLayer("a")], { grid }))));
+    const copy = path.join(dir, "copy.aseprite");
+    await studio.call("export.run", { op: "aseprite", path: copy });
+    assert.deepEqual(decodeAse(new Uint8Array(readFileSync(copy))).grid, grid);
+    const plain = await opened(write(dir, "plain.aseprite", encodeAse(aseFile([aseLayer("a")]))));
+    assert.equal((await savedAse(plain.studio, dir, "plain-saved.aseprite")).grid, undefined);
+  });
+});
+
+// ── a background's opacity ──────────────────────────────────────────────
+
+test("save_as .aseprite answers adjustedBackgroundOpacity for a Background layer below 255, and writes 255", async () => {
+  await inTempDir(async (dir) => {
+    const { studio, sprite } = await drawn("rgb");
+    sprite.layers[0]!.background = true;
+    sprite.layers[0]!.opacity = 100;
+    const file = path.join(dir, "bg.aseprite");
+    const reply = await manage(studio, { op: "save_as", path: file });
+    assert.deepEqual(reply.adjustedBackgroundOpacity, [{ layer: "Bottom", from: 100, to: 255 }]);
+    assert.equal(decodeAse(new Uint8Array(readFileSync(file))).layers[0]!.opacity, 255);
+    sprite.layers[0]!.opacity = 40;
+    assert.deepEqual((await manage(studio, { op: "save" })).adjustedBackgroundOpacity, [{ layer: "Bottom", from: 40, to: 255 }]);
+  });
+});
+
+test("export.run aseprite answers adjustedBackgroundOpacity, and nothing is answered when the Background is opaque or absent", async () => {
+  await inTempDir(async (dir) => {
+    const { studio, sprite } = await drawn("rgb");
+    const file = path.join(dir, "copy.aseprite");
+    assert.equal("adjustedBackgroundOpacity" in (await studio.call<Reply>("export.run", { op: "aseprite", path: file })), false);
+    sprite.layers[0]!.background = true;
+    sprite.layers[0]!.opacity = 255;
+    assert.equal("adjustedBackgroundOpacity" in (await manage(studio, { op: "save_as", path: file })), false);
+    sprite.layers[0]!.opacity = 7;
+    sprite.layers[1]!.opacity = 7;
+    const reply = await studio.call<Reply>("export.run", { op: "aseprite", path: file });
+    assert.deepEqual(reply.adjustedBackgroundOpacity, [{ layer: "Bottom", from: 7, to: 255 }]);
+  });
+});
+
+// ── user data whose text is empty ───────────────────────────────────────
+
+test("user data read with an empty text is written back with it, for the sprite, a layer, a cel and a tag", async () => {
+  await inTempDir(async (dir) => {
+    const file = aseFile([aseLayer("a", { userData: { text: "" } }), aseLayer("b", { userData: { color: [1, 2, 3, 4] } })], {
+      userData: { text: "" },
+      tags: [{ name: "t", from: 0, to: 0, direction: "forward", repeat: 0, color: [1, 2, 3, 255], userData: { text: "" } }],
+    });
+    file.frames[0]!.cels[0]!.userData = { text: "" };
+    const { studio } = await opened(write(dir, "empty.aseprite", encodeAse(file)));
+    const saved = await savedAse(studio, dir);
+    assert.equal(saved.userData?.text, "");
+    assert.equal(saved.layers[0]!.userData?.text, "");
+    assert.equal(saved.layers[1]!.userData?.text, undefined);
+    assert.equal(saved.frames[0]!.cels[0]!.userData?.text, "");
+    assert.equal(saved.tags[0]!.userData?.text, "");
+  });
+});
+
+test("an object with no user data in the file is saved with none", async () => {
+  await inTempDir(async (dir) => {
+    const { studio } = await opened(write(dir, "bare.aseprite", encodeAse(aseFile([aseLayer("a")]))));
+    const saved = await savedAse(studio, dir);
+    assert.deepEqual([saved.userData, saved.layers[0]!.userData, saved.frames[0]!.cels[0]!.userData], [undefined, undefined, undefined]);
+  });
+});
+
+// ── the reference mark in CRLF text ───────────────────────────────────
+
+test("a mark line ending in CRLF is found, and the rest of the text keeps its CRLF", async () => {
+  await inTempDir(async (dir) => {
+    const text = `first\r\n${MARK}\r\nsecond\r\nthird`;
+    const { sprite } = await opened(write(dir, "crlf.aseprite", encodeAse(aseFile([aseLayer("ref", { userData: { text } })]))));
+    assert.equal(sprite.layers[0]!.reference, true);
+    assert.equal(sprite.layers[0]!.aseprite?.userData?.text, "first\r\nsecond\r\nthird");
+  });
+});
+
+test("a mark on the last line, or alone, leaves no stray CR behind", async () => {
+  await inTempDir(async (dir) => {
+    const file = aseFile([
+      aseLayer("last", { userData: { text: `one\r\ntwo\r\n${MARK}` } }),
+      aseLayer("alone", { userData: { text: `${MARK}\r\n` } }),
+      aseLayer("stray", { userData: { text: `one\r\n${MARK}\r` } }),
+    ]);
+    const { sprite } = await opened(write(dir, "edge.aseprite", encodeAse(file)));
+    assert.deepEqual(sprite.layers.map((l) => l.reference), [true, true, true]);
+    assert.deepEqual(sprite.layers.map((l) => l.aseprite?.userData?.text), ["one\r\ntwo", "", "one"]);
+  });
+});
+
+test("saving a reference layer whose text uses CRLF adds the mark line with CRLF, and a text with only LF gets LF", async () => {
+  await inTempDir(async (dir) => {
+    const file = aseFile([aseLayer("crlf", { userData: { text: "a\r\nb" } }), aseLayer("lf", { userData: { text: "a\nb" } })]);
+    const { studio, sprite } = await opened(write(dir, "add.aseprite", encodeAse(file)));
+    for (const layer of sprite.layers) layer.reference = true;
+    const saved = await savedAse(studio, dir);
+    assert.deepEqual(saved.layers.map((l) => l.userData?.text), [`a\r\nb\r\n${MARK}`, `a\nb\n${MARK}`]);
+    const back = (await opened(path.join(dir, "saved.aseprite"))).sprite;
+    assert.deepEqual(back.layers.map((l) => [l.reference, l.aseprite?.userData?.text]), [[true, "a\r\nb"], [true, "a\nb"]]);
   });
 });

@@ -4,6 +4,9 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { createServer } from "../dist/server.js";
 import { Image, ToolError, createStudio, rgba } from "../dist/doc/index.js";
 import { decodeAse } from "../dist/lib/ase.js";
 import { decodeGif } from "../dist/lib/gif.js";
@@ -545,5 +548,46 @@ test("a visible reference layer is drawn into an export like any other layer, an
     ref.visible = false;
     await run(studio, { op: "png", path: path.join(dir, "hidden.png") });
     assert.deepEqual([...readPng(path.join(dir, "hidden.png")).pixels], [RED, 0]);
+  });
+});
+
+async function connected() {
+  const { server, studio } = createServer();
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const client = new Client({ name: "test", version: "0" });
+  await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
+  return { client, studio, close: async () => { await server.close(); } };
+}
+
+const textOf = (result: { content?: unknown }): string => ((result.content as { type: string; text?: string }[]).find((c) => c.type === "text")?.text) ?? "";
+
+test("the export tool's reply text names adjustedDurations and adjustedBackgroundOpacity, and both are in the structured reply", async () => {
+  await inTempDir(async (dir) => {
+    const { client, studio, close } = await connected();
+    const { sprite } = await fixture(studio);
+    sprite.frames[1]!.durationMs = 70000;
+    sprite.layers[0]!.background = true;
+    sprite.layers[0]!.opacity = 90;
+    const file = path.join(dir, "a.aseprite");
+    const res = await client.callTool({ name: "export", arguments: { op: "aseprite", path: file } });
+    assert.ok(!res.isError, textOf(res));
+    const data = res.structuredContent as Reply;
+    assert.deepEqual(data.adjustedDurations, [{ frame: 2, from: 70000, to: 65535 }]);
+    assert.deepEqual(data.adjustedBackgroundOpacity, [{ layer: "Back", from: 90, to: 255 }]);
+    assert.match(textOf(res), /Wrote 1 file\(s\): .*a\.aseprite/);
+    assert.match(textOf(res), /frame durations were brought into 1\.\.65535 ms \(adjustedDurations\)/);
+    assert.match(textOf(res), /Background opacity was written as 255 .*'Back' 90.*\(adjustedBackgroundOpacity\)/);
+    await close();
+  });
+});
+
+test("the export tool's reply text says nothing of adjustments when none were made", async () => {
+  await inTempDir(async (dir) => {
+    const { client, studio, close } = await connected();
+    await fixture(studio);
+    const res = await client.callTool({ name: "export", arguments: { op: "aseprite", path: path.join(dir, "a.aseprite") } });
+    assert.ok(!res.isError, textOf(res));
+    assert.doesNotMatch(textOf(res), /adjusted/);
+    await close();
   });
 });

@@ -22,7 +22,7 @@ export function paletteStats(sprite: Sprite): PaletteStats {
   for (const layer of sprite.layers) {
     for (const cel of layer.cels.values()) {
       for (const value of cel.image.pixels) {
-        const hex = pixelToHex(sprite, value);
+        const hex = pixelToHex(sprite, value, layer);
         if (hex === null) continue;
         const key = hex.slice(0, 7);
         counts.set(key, (counts.get(key) ?? 0) + 1);
