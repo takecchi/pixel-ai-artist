@@ -179,6 +179,10 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
         sprite: z.string().optional(),
         id: z.number().int().optional().describe("Stable id of the affected document; pass it back as '#<id>'."),
         path: z.string().optional(),
+        files: z
+          .array(z.string())
+          .optional()
+          .describe("For 'save' and 'save_as': every file written. A PNG of several frames is one numbered file per frame, none of them at `path`."),
         width: z.number().int().optional(),
         height: z.number().int().optional(),
       },

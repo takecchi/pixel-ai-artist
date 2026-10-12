@@ -208,13 +208,13 @@ function spriteManage(studio: Studio, args: Record<string, unknown>) {
     if (!s.filename) {
       throw new ToolError("invalid_args", "This sprite has never been saved. Use op 'save_as' with a path.");
     }
-    saveSprite(studio, s, s.filename);
-    return { sprite: displayName(s), id: s.id, path: s.filename };
+    const files = saveSprite(studio, s, s.filename);
+    return { sprite: displayName(s), id: s.id, path: s.filename, files };
   }
 
   if (op === "save_as") {
-    saveSprite(studio, s, String(need(args.path, "path")));
-    return { sprite: displayName(s), id: s.id, path: s.filename };
+    const files = saveSprite(studio, s, String(need(args.path, "path")));
+    return { sprite: displayName(s), id: s.id, path: s.filename, files };
   }
 
   if (op === "close") {
