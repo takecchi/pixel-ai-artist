@@ -37,11 +37,13 @@ things right and the rest of the work is drawing.
    Or build one: `palette op="ramp" base="#c04030" steps=5` per material. See
    `rules://01-palette-and-color`.
 
-4. **Build the layer structure** in one batch, applied all or nothing:
+4. **Build the layer structure** in one batch, applied all or nothing. The new
+   sprite already has one empty layer, `Layer 1`; make it the bottom layer by
+   renaming it, so no empty layer is left behind for `validate` to flag:
 
    ```
    layer batch=[
-     {op:"create", name:"sketch"},
+     {op:"rename", name:"Layer 1", newName:"sketch"},
      {op:"create", name:"base"},
      {op:"create", name:"shading"},
      {op:"create", name:"outline"},

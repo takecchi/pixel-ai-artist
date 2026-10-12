@@ -33,9 +33,11 @@ amount of cleanup turns it into pixel art (see *What this must not do*).
 
 `pixel-ai-artist:brief` has already fixed canvas size, palette, view, light, outline
 and destination. Do not ask any of it again. The prompt needs colours, not a
-palette's name: for a preset, read its hex values from the
-`knowledge://palettes` resource (no document has to exist yet); for an open
-sprite, `palette op="get"`.
+palette's name: for a preset, create the sprite at the brief's size
+(`sprite_manage op="new"`) and load the preset with `palette op="preset"` —
+its result's `colors` are the hex values. (The `knowledge://palettes` resource
+holds them too, but it is about 1 MB of JSON.) For an open sprite,
+`palette op="get"`.
 
 ### 2. Write the art spec
 

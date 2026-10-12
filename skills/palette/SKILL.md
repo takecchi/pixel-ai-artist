@@ -14,13 +14,18 @@ Match the request, in this order of preference:
    bundled one, `op="load"` for a file they have, or
    `reference op="sample_palette"` to pull one out of a screenshot they gave you.
 2. **The user described an era.** "8-bit" → PICO-8. "Game Boy" → gameboy.
-   "NES" → build 12–16 colours by hand as 3–4 hues × 4 values.
+   "NES" → `palette op="preset" preset="nintendo-entertainment-system"` is the
+   whole system palette; keep 12–16 of it (3–4 hues × 4 values) with
+   `palette op="set" replace=true colors=[…]`.
 3. **The sprite is joining an existing project.** `sprite_info` an existing
    asset and match it exactly. Consistency beats a nicer palette.
 4. **Nothing said.** PICO-8. It is 16 colours, forgiving, and reads well.
 
-`palette op="preset"` with no valid preset lists what is bundled and says that
-anything else can be loaded from a file.
+About 2000 presets are bundled. `palette op="preset"` with a name that is not a
+key searches them instead and answers up to 20 `matches` (key, name, author,
+size) and the `total` — call it again with one of those keys. Search by a word
+of the name or author (`endesga`, `gameboy`, `nes`); anything else can be
+loaded from a file with `op="load"`.
 
 ## Building ramps
 
@@ -76,9 +81,13 @@ imported at full colour and never had a curated palette to snap onto.
 
 ## Contrast
 
-Value contrast carries readability, not hue contrast. Check by running
-`recolor op="desaturate"` on a copy — if the shapes stop reading in greyscale,
-the palette's values are too close, and no amount of hue will fix it.
+Value contrast carries readability, not hue contrast. Check it on a copy of the
+art layer: `layer op="duplicate" name="…"`, then
+`recolor op="desaturate" layer="… Copy" clampToPalette=false` — without
+`clampToPalette=false` the greys snap back to the nearest palette colour — and
+`look op="preview" layer="… Copy"`. If the shapes stop reading in greyscale,
+the palette's values are too close, and no amount of hue will fix it. Delete
+the copy afterwards (`layer op="delete"`).
 
 ## Related
 

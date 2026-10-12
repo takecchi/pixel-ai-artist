@@ -36,7 +36,8 @@ merging layers, or editing a layer you did not create.
 
 ### 3. Scope the edit as tightly as you can
 
-- A **selection** limits `draw`, `recolor` and `transform` to one area.
+- A **selection** limits `draw` and `recolor` to one area (`selectionOnly`).
+  `transform` always acts on the whole cel.
 - A **layer** target keeps you out of everything else.
 - A **region** on `recolor` avoids touching the whole cel.
 
@@ -85,7 +86,7 @@ Report what changed and what you deliberately left alone.
 | "more detail" | Usually wrong at small sizes — ask what should read better |
 | "pop more" | Contrast against the background, or a brighter accent |
 | "less flat" | Shading exists but does not hue-shift, or has no light direction |
-| "muddy colours" | Too many near-duplicates — `palette op="extract"` on a copy, or `analyze` + `snap` |
+| "muddy colours" | Too many near-duplicates — `analyze` + `snap`, or `palette op="extract"` after keeping the old palette (`palette op="get"`), since extract replaces it |
 | "add a label / score / title" | `draw` kind `text`; measure with `measureOnly` first so it lands centred |
 | "closer to the reference / concept" | `look op="compare"`, list the three to five largest mismatches, fix only those |
 | "off / uncanny" | Run `pixel-ai-artist:review`; name the specific cause |

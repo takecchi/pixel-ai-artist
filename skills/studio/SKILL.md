@@ -81,7 +81,9 @@ workflow it names and follow that — do not do the step from memory.
      `layer op="duplicate" toSprite=<document>`.
    - **Fix, don't redraw.** A fix changes the pixels the finding points at —
      read that region with `look op="ascii"`, change those rows, write them
-     back as a `grid` — or recolours a mass that is too dark (`recolor`). If
+     back as a `grid` — or recolours a mass that is too dark (`recolor`; on a
+     fixed palette with no lighter step it answers 0 pixels, so add the step
+     with `palette op="ramp"` first or change the rows by hand). If
      the round changed more than about a quarter of a layer's opaque pixels,
      it was a redraw: restore the snapshot and make the smaller fix. Never
      touch pixels the brief says must stay as they are.

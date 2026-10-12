@@ -44,19 +44,27 @@ later. Attack: anticipation, strike, hold, recover.
 ### 2. Create the frames
 
 ```
-frame op="add" count=7
+frame op="duplicate" frame=1 count=7
 ```
 
-Already done if a storyboard was imported in step 0 — the import needs them.
+`duplicate` copies every layer's cel from frame 1 onto each new frame, so the
+whole rig is there to move. `frame op="add"` makes empty frames — a part you do
+not touch on them simply disappears from the animation.
+
+If a storyboard was imported in step 0, the frames already exist and were added
+empty for the panels: put the rig on them with `cel op="copy" layer=… frame=1
+toFrame=…`, once per layer and frame.
 
 ### 3. Block the key poses
 
 Move limbs by moving cels, not by redrawing:
 
 ```
-cel op="copy" layer="arm-near" frame=1 toFrame=3
 cel op="move" layer="arm-near" frame=3 dx=2 dy=-1
 ```
+
+`cel op="copy" layer="arm-near" frame=1 toFrame=3` puts frame 1's arm back on
+frame 3 if a pose went wrong.
 
 Redraw only where a part genuinely changes shape — a foreshortened arm, a
 bending knee. Do that redraw as a grid: `look op="ascii" layer=… frame=…

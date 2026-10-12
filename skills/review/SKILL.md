@@ -20,6 +20,11 @@ whatever `validate` says. Squint at the same preview for value: the subject's
 lit side should be among the lightest values and its core shadow among the
 darkest; everything in the bottom third reads as murk.
 
+A visible reference layer is part of that preview, half-transparent over the
+art. If `reference op="list"` names one, hide it for the cold read
+(`layer op="set" name=… visible=false`) and show it again after, or read the
+art from the right half of `look op="compare"`.
+
 ### 1. Mechanical checks
 
 ```
@@ -27,8 +32,9 @@ validate
 ```
 
 Reports off-palette colours, semi-transparent pixels, isolated stray pixels,
-untagged animation frames, uniform timing and unsaved state — each with a
-location where one exists.
+untagged animation frames, uniform timing and a sprite that was never saved —
+each with a location where one exists. Changes made since the last save are
+not a finding; `sprite_info`'s `modified` tells you about those.
 
 Fix every **error**. For each **warning** you do not fix, have a reason and say
 it.

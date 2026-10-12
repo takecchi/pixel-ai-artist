@@ -7,6 +7,13 @@ tools:
   - Read
   - Glob
   - Grep
+  - ReadMcpResourceTool
+  - mcp__plugin_pixel-ai-artist_pixel-ai-artist__preflight
+  - mcp__plugin_pixel-ai-artist_pixel-ai-artist__sprite_info
+  - mcp__plugin_pixel-ai-artist_pixel-ai-artist__look
+  - mcp__plugin_pixel-ai-artist_pixel-ai-artist__read_pixels
+  - mcp__plugin_pixel-ai-artist_pixel-ai-artist__validate
+  - mcp__plugin_pixel-ai-artist_pixel-ai-artist__reference
 disallowedTools:
   - Write
   - Edit
@@ -36,7 +43,8 @@ critiques written to be easy to fix rather than true.
 6. `look` op `filmstrip` if there is more than one frame, then `look` op `onion`
    on any in-between that looked like it jumped — ghosted neighbours show a limb
    changing length or spacing that snaps instead of easing.
-7. If a reference layer exists (`reference op="list"`), `look` op `compare` on
+7. If a reference layer exists (`reference op="list"` — the only `reference` op
+   you call; `import` and `remove` edit the sprite), `look` op `compare` on
    each key frame. Report the largest mismatches with the reference as
    findings — unless the brief or PixelSpec you were given lists them as
    deliberate deviations.
@@ -108,6 +116,6 @@ what the sprite does well — that is information; "looks good" is not.
 When you are given two images (`a.png`, `b.png`) instead of a document,
 compare them: say which is the better sprite for the brief, in one line why,
 and whether each BLOCKING finding you are told about is still present in
-each. Judge them with `read` on the files, at full size, before you read any
+each. Judge them with `Read` on the files, at full size, before you read any
 note about which is newer. Do not score them out of 10 — a choice between two
 is the only judgement here that is stable from one call to the next.
