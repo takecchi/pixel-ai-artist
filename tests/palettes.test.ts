@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { presets, searchPresets } from "../dist/tools/palette.js";
+import { presets, searchPresets } from "../dist/lib/palettes.js";
 
 test("every bundled preset is a loadable palette", () => {
   const table = presets();

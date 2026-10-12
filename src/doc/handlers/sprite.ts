@@ -1,4 +1,4 @@
-import { presets } from "../../tools/palette.js";
+import { presets } from "../../lib/palettes.js";
 import { ToolError, need } from "../errors.js";
 import {
   Image,
