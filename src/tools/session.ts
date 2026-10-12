@@ -100,6 +100,11 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
           .nullish(),
         activeLayer: z.string().nullish(),
         activeFrame: z.number().int().nullish(),
+        pixelAspect: z
+          .string()
+          .describe(
+            "The pixel's width:height ratio, as set by sprite_manage 'set_properties' pixelAspect, in the form 'w:h' ('1:1' by default). It changes no pixels, and nothing that exports applies it yet.",
+          ),
       },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -147,7 +152,7 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
           .enum(["top_left", "top", "top_right", "left", "center", "right", "bottom_left", "bottom", "bottom_right"])
           .default("center")
           .describe("Where existing pixels sit after 'resize_canvas'."),
-        pixelAspect: z.string().optional().describe("e.g. '1:1' or '1:2'."),
+        pixelAspect: z.string().optional().describe("For 'set_properties': the pixel's width:height ratio as 'w:h', e.g. '1:1' or '2:1'. Read it back with sprite_info. Ignored by other ops."),
         force: z
           .boolean()
           .default(false)

@@ -25,6 +25,12 @@ test("new makes the sprite active and answers an id that resolves back to it", a
   assert.equal((await studio.call<Reply>("session.site")).sprite.id, made.id);
 });
 
+test("a new sprite's pixel aspect is 1:1", async () => {
+  const studio = createStudio();
+  await manage(studio, { op: "new", width: 2, height: 2 });
+  assert.equal((await studio.call<Reply>("sprite.info")).pixelAspect, "1:1");
+});
+
 test("a new sprite of any colour mode starts on the DawnBringer 32 palette", async () => {
   const studio = createStudio();
   for (const colorMode of ["rgb", "grayscale", "indexed"]) {
@@ -198,6 +204,7 @@ test("set_properties records a pixel aspect and refuses one that is not W:H", as
   const sprite = studio.activeSprite()!;
   await manage(studio, { op: "set_properties", pixelAspect: "2:1" });
   assert.deepEqual(sprite.pixelRatio, { w: 2, h: 1 });
+  assert.equal((await studio.call<Reply>("sprite.info")).pixelAspect, "2:1");
   await rejectsWith(manage(studio, { op: "set_properties", pixelAspect: "wide" }), "invalid_args", /pixelAspect/);
   assert.deepEqual(sprite.pixelRatio, { w: 2, h: 1 });
 });
