@@ -11,45 +11,39 @@ nothing to keep open.
 
 ## 1. Get the server
 
-`pixel-ai-artist` is **not published on npm yet**. Until it is, run it from a
-checkout:
+`pixel-ai-artist` is **not published on npm yet**. Until it is, there are three
+routes, and none needs a release:
 
-```bash
-git clone https://github.com/takecchi/pixel-ai-artist
-cd pixel-ai-artist
-npm ci && npm run build
-```
+| Route | For | How |
+|-------|-----|-----|
+| **Plugin** | Claude Code, omp | `/plugin marketplace add takecchi/pixel-ai-artist` — see [Claude Code](#claude-code) and [omp](#omp-oh-my-pi). Brings the skills, subagents and hook too. |
+| **From GitHub** | Any MCP client | Name `npx -y github:takecchi/pixel-ai-artist serve` as the server. npm clones and builds it on first start (about ten seconds), then caches it (two or three). Pin a version with `#<branch, tag or commit>`. |
+| **A checkout** | Working on the server itself | `git clone`, then `npm ci` (which builds); the server is `node /path/to/pixel-ai-artist/dist/cli.js serve`. |
 
-The server is then `node /path/to/pixel-ai-artist/dist/cli.js serve`, and every
-`npx pixel-ai-artist …` command below is `node dist/cli.js …` run in the
-checkout.
-
-One catch while it is unpublished: `install` writes client entries that start
-the server with `npx -y pixel-ai-artist@latest serve`, which cannot start until
-the package exists on npm. For any client other than the Claude Code and omp
-plugins, write the entry by hand instead, pointing at the checkout — for the
-JSON clients:
+The GitHub route, in a JSON client config:
 
 ```json
 {
   "mcpServers": {
     "pixel-ai-artist": {
-      "command": "node",
-      "args": ["/path/to/pixel-ai-artist/dist/cli.js", "serve"]
+      "command": "npx",
+      "args": ["-y", "github:takecchi/pixel-ai-artist", "serve"]
     }
   }
 }
 ```
 
-`node dist/cli.js install <client> --dry-run` prints the file and the exact
-entry each client wants; take that and change `command` and `args` as above.
-The Claude Code and omp plugins need none of this: they run the checkout they
-install from GitHub.
+`install` (below) still writes `npx -y pixel-ai-artist@latest serve`, which starts
+only once the package is published. Until then, run
+`npx -y github:takecchi/pixel-ai-artist install <client> --dry-run` to see the
+file and the exact entry each client wants, and write it with the GitHub
+`command` and `args` above.
 
 ## 2. Wire up your agent
 
-The `npx` commands below work as written once the package is on npm; until
-then, see step 1.
+The `npx pixel-ai-artist …` commands below work as written once the package is
+on npm; until then, `npx -y github:takecchi/pixel-ai-artist …` runs the same
+command, and see step 1 for the entries `install` writes.
 
 ### Everything at once
 

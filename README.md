@@ -40,17 +40,25 @@ See [docs/INSTALL.md](docs/INSTALL.md). In short, for Claude Code:
 /plugin install pixel-ai-artist@pixel-ai-artist
 ```
 
-For the other clients, build a checkout and point the client's MCP config at
-it — the package is **not on npm yet**:
+For any other MCP client, start it straight from GitHub — the package is
+**not on npm yet**, and npm clones and builds it on first use:
 
-```bash
-git clone https://github.com/takecchi/pixel-ai-artist
-cd pixel-ai-artist && npm ci && npm run build
-# then the server is: node /path/to/pixel-ai-artist/dist/cli.js serve
+```json
+{
+  "mcpServers": {
+    "pixel-ai-artist": {
+      "command": "npx",
+      "args": ["-y", "github:takecchi/pixel-ai-artist", "serve"]
+    }
+  }
+}
 ```
 
-Once it is published, `npx pixel-ai-artist install codex` (or `gemini`,
-`cursor`, `opencode`, `--all`) writes that config for you.
+The first start takes about ten seconds (clone, install, build); later starts
+reuse npm's cache and take two or three. Pin a branch, tag or commit with
+`github:takecchi/pixel-ai-artist#<ref>`. Once the package is published,
+`npx pixel-ai-artist install codex` (or `gemini`, `cursor`, `opencode`,
+`--all`) writes the config for you.
 
 ## How it draws
 
