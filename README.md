@@ -1,4 +1,14 @@
+<div align="center">
+
+<img src="docs/media/slime-idle.gif" alt="A green slime in the PICO-8 palette, 16×16 pixels shown at 16×, bouncing in a four-frame idle loop: rest, squash, rest, stretch" width="256">
+
 # Pixel AI Artist
+
+<sub>16×16 · 4 frames · PICO-8 — drawn, tagged, validated and exported through
+this server's own MCP tools, with no editor anywhere
+(<a href="examples/draw-readme-sprite.mjs">the calls</a>).</sub>
+
+</div>
 
 Your coding agent makes pixel art with the same tools, skills and pixel-art
 rulebook as [aseprite-ai-artist](https://github.com/with-pebbly/aseprite-ai-artist)
