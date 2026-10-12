@@ -102,9 +102,14 @@ export function writeFrames(frames: AnimationFrame[], palette: readonly Rgba[], 
   });
 }
 
-/** Writes the sprite as its visible layers look, and the sprite then belongs to that file. */
+/**
+ * Writes the sprite as its visible layers look, and the sprite then belongs to
+ * that file. Aseprite's GIF saver keeps an RGB or grayscale sprite's colours,
+ * building the colour table from the frames, and only an indexed sprite is
+ * written in its palette.
+ */
 export function saveSprite(studio: Studio, sprite: Sprite, file: string): string[] {
-  const files = writeFrames(rendered(studio, sprite), sprite.palette, file);
+  const files = writeFrames(rendered(studio, sprite), sprite.colorMode === "indexed" ? sprite.palette : [], file);
   sprite.filename = path.resolve(file);
   sprite.modified = false;
   return files;

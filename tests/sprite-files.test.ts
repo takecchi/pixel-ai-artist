@@ -285,13 +285,38 @@ test("save_as .gif writes every frame with its duration", async () => {
   });
 });
 
-test("save_as .gif moves a colour that is not in the sprite's palette to the nearest palette colour", async () => {
+test("save_as .gif keeps an RGB sprite's colours even when its palette lacks them, as Aseprite's GIF saver does", async () => {
   await inTempDir(async (dir) => {
-    const { studio, sprite } = await drawn([rgba(250, 10, 10), rgba(20, 20, 240)]);
-    sprite.palette = [rgba(0, 0, 0), rgba(255, 0, 0), rgba(0, 0, 255)];
-    const file = path.join(dir, "snap.gif");
+    const offPalette = rgba(0xff, 0xf1, 0xe8);
+    const { studio, sprite } = await drawn([offPalette, rgba(20, 20, 240)]);
+    sprite.palette = [rgba(0, 0, 0), rgba(255, 255, 255), rgba(0, 0, 255)];
+    const file = path.join(dir, "keep.gif");
     await manage(studio, { op: "save_as", path: file });
-    assert.deepEqual([...readGif(file).frames[0]!.image.pixels], [RED, BLUE]);
+    assert.deepEqual([...readGif(file).frames[0]!.image.pixels], [offPalette, rgba(20, 20, 240)]);
+  });
+});
+
+test("save_as .gif refuses an RGB sprite with more than 256 colours rather than quantising it", async () => {
+  await inTempDir(async (dir) => {
+    const many = Array.from({ length: 257 }, (_, i) => rgba(i & 255, i >> 8, 0));
+    const { studio, sprite } = await drawn(many, 257, 1);
+    const file = path.join(dir, "many.gif");
+    await rejectsWith(manage(studio, { op: "save_as", path: file }), "invalid_args", /256/);
+    assert.equal(existsSync(file), false);
+    assert.equal(sprite.filename, null);
+  });
+});
+
+test("save_as .gif writes an indexed sprite in its palette", async () => {
+  await inTempDir(async (dir) => {
+    const studio = createStudio();
+    await manage(studio, { op: "new", width: 2, height: 1, colorMode: "indexed" });
+    const sprite = studio.activeSprite()!;
+    sprite.palette = [rgba(0, 0, 0), RED, BLUE];
+    studio.ensureCel(sprite, sprite.layers[0]!, 1).image = img(2, 1, [2, 1]);
+    const file = path.join(dir, "indexed.gif");
+    await manage(studio, { op: "save_as", path: file });
+    assert.deepEqual([...readGif(file).frames[0]!.image.pixels], [BLUE, RED]);
   });
 });
 
