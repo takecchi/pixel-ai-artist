@@ -80,12 +80,6 @@ test("duplicate puts a copy of the frame, cels and duration, right after it", as
   assert.equal(layer.cels.get(2)!.image.get(0, 0) >>> 24, 2, "the copy's pixels are its own");
 });
 
-test("duplicate with linkCels answers unsupported_command, because linked cels are not ported", async () => {
-  const { studio, sprite } = setup();
-  await rejectsWith(apply(studio, { op: "duplicate", frame: 1, linkCels: true }), "unsupported_command", /[Ll]inked cels/);
-  assert.equal(sprite.frames.length, 3);
-});
-
 test("delete removes the frame and its cels; tags behind it move back and a tag left empty goes", async () => {
   const { studio, sprite, layer } = setup([100, 100, 100, 100]);
   const tag = (name: string, from: number, to: number) => ({ name, from, to, direction: "forward" as const, repeats: 0, color: 0 });

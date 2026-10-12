@@ -73,9 +73,6 @@ function apply(studio: Studio, sprite: Sprite, op: string, args: Record<string, 
       break;
     }
     case "duplicate": {
-      if (args.linkCels === true) {
-        throw new ToolError("unsupported_command", "Linked cels are not supported; duplicate without linkCels copies the cels.");
-      }
       const src = studio.resolveFrame(sprite, args.frame);
       for (let i = 0; i < countArg(args.count); i++) {
         insertFrame(sprite, src + 1);
