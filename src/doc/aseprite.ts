@@ -1,15 +1,22 @@
 /**
  * Documents to and from the .aseprite format. The model holds a subset of
- * what the format can: no groups, tilemaps, blend modes, z-index, slices,
- * reference layers or palette changes over time. A file that uses any of them
+ * what the format can: no groups, tilemaps, blend modes, z-index, slices or
+ * palette changes over time. A file that uses any of them
  * is refused rather than opened with them dropped, because the picture or the
  * file saved back would silently differ.
  */
 
 import type { AseCel, AseDecoded, AseFile, AseLayer } from "../lib/ase.js";
 import { ToolError } from "./errors.js";
-import { Image, rgba, type Cel, type ColorMode, type Sprite } from "./model.js";
+import { Image, rgba, type Cel, type ColorMode, type Layer, type Sprite } from "./model.js";
 import type { Studio } from "./studio.js";
+
+/**
+ * How a reference layer is marked in a saved file. Aseprite's reference flag
+ * would make it a reference layer there too, which the Lua handler's import
+ * never did, so the mark goes into the layer's user data text instead.
+ */
+export const REFERENCE_MARK = "pixel-ai-artist:reference";
 
 const MODE_FROM_ASE: Record<AseDecoded["colorMode"], ColorMode> = { rgba: "rgb", grayscale: "grayscale", indexed: "indexed" };
 const MODE_TO_ASE: Record<ColorMode, AseFile["colorMode"]> = { rgb: "rgba", grayscale: "grayscale", indexed: "indexed" };
@@ -23,7 +30,6 @@ export function unsupportedAseFeatures(file: AseDecoded): Record<string, number>
   count("groups", file.layers.filter((l) => l.type === "group").length);
   count("tilemapLayers", file.layers.filter((l) => l.type === "tilemap").length);
   count("blendModes", file.layers.filter((l) => l.type === "image" && !l.background && l.blendMode !== 0).length);
-  count("referenceLayers", file.layers.filter((l) => l.reference).length);
   count("zIndexCels", file.features.zIndexCels);
   count("tilemapCels", file.features.tilemapCels);
   count("slices", file.features.slices);
@@ -47,8 +53,43 @@ function celImage(file: AseDecoded, pixels: Uint8Array, width: number, height: n
   return img;
 }
 
-/** Adds the decoded file to the studio as an unmodified, active sprite, or refuses one the model cannot hold. */
-export function spriteFromAse(studio: Studio, file: AseDecoded, filename: string): Sprite {
+export interface RenamedLayer {
+  from: string;
+  to: string;
+}
+
+/**
+ * Layer names made unique, bottom to top: the first keeps its name and each
+ * later one takes " 2", " 3", ... — the first free number among every name in
+ * the file. Tools find layers by name, and with no group paths in the model a
+ * shared name could never be told apart.
+ */
+function uniqueNames(names: readonly string[]): { names: string[]; renamed: RenamedLayer[] } {
+  const taken = new Set(names);
+  const seen = new Set<string>();
+  const renamed: RenamedLayer[] = [];
+  const out = names.map((name) => {
+    if (!seen.has(name)) {
+      seen.add(name);
+      return name;
+    }
+    let n = 2;
+    while (taken.has(`${name} ${n}`)) n++;
+    const to = `${name} ${n}`;
+    taken.add(to);
+    seen.add(to);
+    renamed.push({ from: name, to });
+    return to;
+  });
+  return { names: out, renamed };
+}
+
+/**
+ * Adds the decoded file to the studio as an unmodified, active sprite, or
+ * refuses one the model cannot hold. Layers that share a name are renamed,
+ * and the renames are returned for the caller to report.
+ */
+export function spriteFromAse(studio: Studio, file: AseDecoded, filename: string): { sprite: Sprite; renamedLayers: RenamedLayer[] } {
   const unsupported = unsupportedAseFeatures(file);
   if (Object.keys(unsupported).length > 0) {
     throw new ToolError(
@@ -81,12 +122,16 @@ export function spriteFromAse(studio: Studio, file: AseDecoded, filename: string
   }));
   sprite.layers = [];
   sprite.nextLayerId = 1;
-  const layers = file.layers.map((l) => {
-    const layer = studio.addLayer(sprite, l.name);
+  const { names, renamed } = uniqueNames(file.layers.map((l) => l.name));
+  const layers = file.layers.map((l, i) => {
+    const layer = studio.addLayer(sprite, names[i]!);
     layer.visible = l.visible;
     layer.editable = l.editable;
     // Aseprite ignores a background layer's opacity; it is always drawn opaque.
     layer.opacity = l.background ? 255 : l.opacity;
+    // A note added in Aseprite next to the mark keeps it, so the mark is looked for, not matched.
+    if (l.reference || l.text?.includes(REFERENCE_MARK)) layer.reference = true;
+    if (l.text !== undefined) layer.text = l.text;
     return layer;
   });
   file.frames.forEach((frame, fi) => {
@@ -106,7 +151,7 @@ export function spriteFromAse(studio: Studio, file: AseDecoded, filename: string
   sprite.activeLayerId = layers.at(-1)?.id ?? null;
   sprite.activeFrame = 1;
   sprite.modified = false;
-  return sprite;
+  return { sprite, renamedLayers: renamed };
 }
 
 function celPixels(sprite: Sprite, img: Image): Uint8Array {
@@ -127,6 +172,12 @@ function celPixels(sprite: Sprite, img: Image): Uint8Array {
     }
   }
   return out;
+}
+
+function layerText(l: Layer): { text?: string } {
+  if (!l.reference) return l.text === undefined ? {} : { text: l.text };
+  if (l.text === undefined || l.text === "") return { text: REFERENCE_MARK };
+  return { text: l.text.includes(REFERENCE_MARK) ? l.text : `${l.text}\n${REFERENCE_MARK}` };
 }
 
 /** The sprite as an .aseprite file: every layer a plain image layer, every cel its own image. */
@@ -151,6 +202,7 @@ export function aseFromSprite(sprite: Sprite): AseFile {
     reference: false,
     blendMode: 0,
     opacity: l.opacity,
+    ...layerText(l),
   }));
   return {
     width: sprite.width,

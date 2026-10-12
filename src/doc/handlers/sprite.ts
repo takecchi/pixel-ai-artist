@@ -193,8 +193,14 @@ function spriteManage(studio: Studio, args: Record<string, unknown>) {
   }
 
   if (op === "open") {
-    const s = openSprite(studio, String(need(args.path, "path")));
-    return { sprite: displayName(s), id: s.id, width: s.width, height: s.height };
+    const { sprite: s, renamedLayers } = openSprite(studio, String(need(args.path, "path")));
+    return {
+      sprite: displayName(s),
+      id: s.id,
+      width: s.width,
+      height: s.height,
+      ...(renamedLayers.length > 0 ? { renamedLayers } : {}),
+    };
   }
 
   const s = studio.resolveSprite(args.sprite);

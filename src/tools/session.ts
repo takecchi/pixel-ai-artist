@@ -143,7 +143,7 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
           .string()
           .optional()
           .describe(
-            "File path for 'open' (a PNG, GIF or JPEG, read by its content) and 'save_as' (.png — one file per frame, numbered as Aseprite numbers them, when there are several — or .gif in the sprite's palette).",
+            "File path for 'open' (.aseprite, PNG, GIF or JPEG, read by its content) and 'save_as' (.aseprite with every layer; .png — one file per frame, numbered as Aseprite numbers them, when there are several; or .gif). An .aseprite that uses layer groups, tilemaps, blend modes, z-index, slices or palette changes over time is refused. Layers that share a name open renamed with ' 2', ' 3' (reported in renamedLayers). An Aseprite reference layer, or one this server marked, opens as a reference layer here, but it is drawn and exported like any other layer: hide or remove it before exporting.",
           ),
         width: z.number().int().positive().optional(),
         height: z.number().int().positive().optional(),
@@ -185,6 +185,10 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
           .describe("For 'save' and 'save_as': every file written. A PNG of several frames is one numbered file per frame, none of them at `path`."),
         width: z.number().int().optional(),
         height: z.number().int().optional(),
+        renamedLayers: z
+          .array(z.object({ from: z.string(), to: z.string() }))
+          .optional()
+          .describe("Op 'open': layers that shared a name in the file and were renamed so each can be addressed."),
       },
       annotations: {
         readOnlyHint: false,
@@ -216,7 +220,9 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
         // is "Sprite" for every unsaved sprite at once, so an agent that feeds
         // the name straight back can address the wrong one.
         const hint = data.id === undefined ? "" : ` Refer to it as '#${String(data.id)}'.`;
-        return ok(merged, `${args.op}: ${String(data.sprite ?? "ok")}.${hint}`);
+        const renamed = (data.renamedLayers as { from: string; to: string }[] | undefined) ?? [];
+        const renames = renamed.length === 0 ? "" : ` Renamed layers that shared a name: ${renamed.map((r) => `'${r.from}' → '${r.to}'`).join(", ")}.`;
+        return ok(merged, `${args.op}: ${String(data.sprite ?? "ok")}.${hint}${renames}`);
       } catch (err) {
         return fail(err);
       }

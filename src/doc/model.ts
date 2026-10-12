@@ -119,6 +119,8 @@ export interface Layer {
   opacity: number;
   /** Set on layers made by reference op 'import'; the name says nothing, since import takes any. */
   reference?: true;
+  /** The layer's user data text from an .aseprite file, written back on save. */
+  text?: string;
   /** Keyed by 1-based frame number. */
   cels: Map<number, Cel>;
 }

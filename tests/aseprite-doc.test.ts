@@ -273,9 +273,6 @@ test("open refuses a layer with a blend mode other than normal, counting it", as
   await refuses(encodeAse(aseFile([aseLayer("img"), aseLayer("mul", { blendMode: 1 })])), { blendModes: 1 });
 });
 
-test("open refuses a reference layer, counting it", async () => {
-  await refuses(encodeAse(aseFile([aseLayer("ref", { reference: true })])), { referenceLayers: 1 });
-});
 
 test("open refuses a cel with a z-index other than 0, counting it", async () => {
   const file = aseFile([aseLayer("img")]);
@@ -295,8 +292,8 @@ test("open refuses a palette that changes after the first frame, counting the ch
 
 test("open of a file with several unsupported features counts every kind", async () => {
   await refuses(
-    encodeAse(aseFile([aseLayer("g1", { type: "group" }), aseLayer("g2", { type: "group" }), aseLayer("mul", { blendMode: 3 }), aseLayer("ref", { reference: true })])),
-    { groups: 2, blendModes: 1, referenceLayers: 1 },
+    encodeAse(aseFile([aseLayer("g1", { type: "group" }), aseLayer("g2", { type: "group" }), aseLayer("mul", { blendMode: 3 })])),
+    { groups: 2, blendModes: 1 },
   );
 });
 
@@ -388,5 +385,105 @@ test("export.run aseprite keeps the filename of a sprite that already has one", 
     assert.equal(sprite.filename, home);
     assert.equal(sprite.modified, true);
     assert.ok(existsSync(path.join(dir, "elsewhere.aseprite")));
+  });
+});
+
+// ── reference layers ────────────────────────────────────────────────────
+
+test("a reference layer saves with its mark in the layer's user data, not as an Aseprite reference layer", async () => {
+  await inTempDir(async (dir) => {
+    const { studio, sprite } = await drawn("rgb");
+    sprite.layers[1]!.reference = true;
+    const file = path.join(dir, "ref.aseprite");
+    await manage(studio, { op: "save_as", path: file });
+    const layers = decodeAse(new Uint8Array(readFileSync(file))).layers;
+    assert.deepEqual(layers.map((l) => [l.reference, l.text]), [[false, undefined], [false, "pixel-ai-artist:reference"], [false, undefined]]);
+    const back = await opened(file);
+    assert.deepEqual(back.sprite.layers.map((l) => l.reference === true), [false, true, false]);
+  });
+});
+
+test("open marks a layer whose user data contains the mark among other notes, and saving keeps the notes", async () => {
+  await inTempDir(async (dir) => {
+    const noted = "traced from photo\npixel-ai-artist:reference\nkeep at 50%";
+    const file = write(dir, "noted.aseprite", encodeAse(aseFile([aseLayer("art"), aseLayer("ref", { text: noted })])));
+    const { studio, sprite } = await opened(file);
+    assert.deepEqual(sprite.layers.map((l) => l.reference === true), [false, true]);
+    const again = path.join(dir, "again.aseprite");
+    await manage(studio, { op: "save_as", path: again });
+    assert.equal(decodeAse(new Uint8Array(readFileSync(again))).layers[1]!.text, noted);
+  });
+});
+
+test("saving a reference layer that already has a note appends the mark and keeps the note", async () => {
+  await inTempDir(async (dir) => {
+    const file = write(dir, "note.aseprite", encodeAse(aseFile([aseLayer("art", { text: "my note" })])));
+    const { studio, sprite } = await opened(file);
+    assert.equal(sprite.layers[0]!.reference, undefined);
+    sprite.layers[0]!.reference = true;
+    const again = path.join(dir, "again.aseprite");
+    await manage(studio, { op: "save_as", path: again });
+    assert.equal(decodeAse(new Uint8Array(readFileSync(again))).layers[0]!.text, "my note\npixel-ai-artist:reference");
+  });
+});
+
+test("an Aseprite reference layer opens as a marked ordinary layer and is written back without the flag", async () => {
+  await inTempDir(async (dir) => {
+    const file = write(dir, "aseref.aseprite", encodeAse(aseFile([aseLayer("art"), aseLayer("ref", { reference: true })])));
+    const { studio, sprite } = await opened(file);
+    assert.deepEqual(sprite.layers.map((l) => l.reference === true), [false, true]);
+    const again = path.join(dir, "again.aseprite");
+    await manage(studio, { op: "save_as", path: again });
+    const ref = decodeAse(new Uint8Array(readFileSync(again))).layers[1]!;
+    assert.deepEqual([ref.reference, ref.text], [false, "pixel-ai-artist:reference"]);
+  });
+});
+
+test("an unmarked layer's user data text survives a save", async () => {
+  await inTempDir(async (dir) => {
+    const file = write(dir, "plain.aseprite", encodeAse(aseFile([aseLayer("art", { text: "just a note" })])));
+    const { studio } = await opened(file);
+    const again = path.join(dir, "again.aseprite");
+    await manage(studio, { op: "save_as", path: again });
+    assert.equal(decodeAse(new Uint8Array(readFileSync(again))).layers[0]!.text, "just a note");
+  });
+});
+
+test("sprite.info reports the pixel aspect an opened .aseprite carries", async () => {
+  await inTempDir(async (dir) => {
+    const file = write(dir, "wide.aseprite", encodeAse(aseFile([aseLayer("art")], { pixelRatio: { w: 2, h: 1 } })));
+    const { studio } = await opened(file);
+    assert.equal((await studio.call<Record<string, any>>("sprite.info")).pixelAspect, "2:1");
+  });
+});
+
+// ── shared layer names ──────────────────────────────────────────────────
+
+test("open renames layers that share a name, bottom one first, and reports each rename", async () => {
+  await inTempDir(async (dir) => {
+    const file = write(dir, "dup.aseprite", encodeAse(aseFile([aseLayer("Ink"), aseLayer("Ink"), aseLayer("Paint"), aseLayer("Ink")])));
+    const studio = createStudio();
+    const reply = await manage(studio, { op: "open", path: file });
+    assert.deepEqual(reply.renamedLayers, [{ from: "Ink", to: "Ink 2" }, { from: "Ink", to: "Ink 3" }]);
+    assert.deepEqual(studio.activeSprite()!.layers.map((l) => l.name), ["Ink", "Ink 2", "Paint", "Ink 3"]);
+    assert.equal(studio.activeSprite()!.modified, false);
+  });
+});
+
+test("a rename skips a number another layer in the file already uses", async () => {
+  await inTempDir(async (dir) => {
+    const file = write(dir, "taken.aseprite", encodeAse(aseFile([aseLayer("Ink"), aseLayer("Ink"), aseLayer("Ink 2")])));
+    const studio = createStudio();
+    const reply = await manage(studio, { op: "open", path: file });
+    assert.deepEqual(reply.renamedLayers, [{ from: "Ink", to: "Ink 3" }]);
+    assert.deepEqual(studio.activeSprite()!.layers.map((l) => l.name), ["Ink", "Ink 3", "Ink 2"]);
+  });
+});
+
+test("open of a file whose layer names are all different reports no renames", async () => {
+  await inTempDir(async (dir) => {
+    const file = write(dir, "fine.aseprite", encodeAse(aseFile([aseLayer("A"), aseLayer("B")])));
+    const reply = await manage(createStudio(), { op: "open", path: file });
+    assert.equal(reply.renamedLayers, undefined);
   });
 });
