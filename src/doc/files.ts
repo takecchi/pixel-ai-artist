@@ -5,11 +5,13 @@
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { decodeImage } from "../lib/decode.js";
+import { decodeAse, encodeAse } from "../lib/ase.js";
 import { encodeGif } from "../lib/gif.js";
-import { distinctColors, type AnimationFrame } from "../lib/image.js";
+import type { AnimationFrame } from "../lib/image.js";
+import { readImageDocument, type ImageDocument } from "../lib/image-document.js";
 import { encodePng } from "../lib/png.js";
 import { frameFileNames } from "../lib/spritesheet.js";
+import { aseFromSprite, spriteFromAse } from "./aseprite.js";
 import { ToolError } from "./errors.js";
 import { defaultPalette, rgbaToHex, type Rgba, type Sprite } from "./model.js";
 import type { Studio } from "./studio.js";
@@ -20,13 +22,7 @@ function isAseprite(bytes: Uint8Array): boolean {
   return bytes.length >= 6 && (bytes[4]! | (bytes[5]! << 8)) === ASE_MAGIC;
 }
 
-/** The image's own colours when they fit a palette, else the default a new sprite gets. */
-function openedPalette(frames: AnimationFrame[]): Rgba[] {
-  const colors = distinctColors(frames.map((f) => f.image));
-  return colors && colors.length > 0 ? colors : defaultPalette();
-}
-
-/** Opens a PNG, GIF or JPEG as an RGB sprite with one layer, and makes it active. */
+/** Opens an .aseprite, PNG, GIF or JPEG file as a sprite and makes it active. */
 export function openSprite(studio: Studio, file: string): Sprite {
   const full = path.resolve(file);
   let bytes: Uint8Array;
@@ -36,27 +32,42 @@ export function openSprite(studio: Studio, file: string): Sprite {
     throw new ToolError("io_error", `Cannot read '${file}': ${(err as Error).message}`, { path: full });
   }
   if (isAseprite(bytes)) {
-    throw new ToolError("unsupported_command", "Opening .aseprite files is not supported yet; open a PNG, GIF or JPEG.", {
-      path: full,
-    });
+    let ase: ReturnType<typeof decodeAse>;
+    try {
+      ase = decodeAse(bytes);
+    } catch (err) {
+      throw new ToolError("io_error", `Cannot open '${file}': ${(err as Error).message}`, { path: full });
+    }
+    return spriteFromAse(studio, ase, full);
   }
-  let decoded: ReturnType<typeof decodeImage>;
+  let doc: ImageDocument;
   try {
-    decoded = decodeImage(bytes);
+    doc = readImageDocument(bytes);
   } catch (err) {
     throw new ToolError("io_error", `Cannot open '${file}': ${(err as Error).message}`, { path: full });
   }
-  // GIF readers show a zero delay at their own pace; 100 ms is what a new frame gets here.
-  const frames = Array.isArray(decoded)
-    ? decoded.map((f) => ({ image: f.image, durationMs: f.durationMs > 0 ? f.durationMs : 100 }))
-    : [{ image: decoded, durationMs: 100 }];
-  const { width, height } = frames[0]!.image;
-  const sprite = studio.addSprite({ width, height, colorMode: "rgb", filename: full, palette: openedPalette(frames) });
+  const { width, height } = doc.frames[0]!.image;
+  const palette = doc.palette && doc.palette.length > 0 ? doc.palette : defaultPalette();
+  const sprite = studio.addSprite({ width, height, colorMode: doc.colorMode, filename: full, palette });
+  sprite.transparentIndex = doc.transparentIndex;
   const layer = sprite.layers[0]!;
-  sprite.frames = frames.map((f) => ({ durationMs: f.durationMs }));
-  frames.forEach((f, i) => layer.cels.set(i + 1, { x: 0, y: 0, image: f.image, opacity: 255 }));
+  // Aseprite names an opened image's layer after whether it became a Background.
+  layer.name = doc.background ? "Background" : "Layer";
+  sprite.frames = doc.frames.map((f) => ({ durationMs: f.durationMs }));
+  doc.frames.forEach((f, i) => layer.cels.set(i + 1, { x: 0, y: 0, image: f.image, opacity: 255 }));
   sprite.modified = false;
   return sprite;
+}
+
+export function isAsepritePath(file: string): boolean {
+  return [".ase", ".aseprite"].includes(path.extname(file).toLowerCase());
+}
+
+/** The whole document, layers and all, as an .aseprite file. */
+export function writeAseprite(sprite: Sprite, file: string): string[] {
+  const full = path.resolve(file);
+  writeBytes(full, encodeAse(aseFromSprite(sprite)));
+  return [full];
 }
 
 function rendered(studio: Studio, sprite: Sprite): AnimationFrame[] {
@@ -109,7 +120,16 @@ export function writeFrames(frames: AnimationFrame[], palette: readonly Rgba[], 
  * written in its palette.
  */
 export function saveSprite(studio: Studio, sprite: Sprite, file: string): string[] {
-  const files = writeFrames(rendered(studio, sprite), sprite.colorMode === "indexed" ? sprite.palette : [], file);
+  const ext = path.extname(file).toLowerCase();
+  if (![".png", ".gif", ".ase", ".aseprite"].includes(ext)) {
+    throw new ToolError("unsupported_command", `Saving '${ext || file}' files is not supported yet; save as .aseprite, .png or .gif.`, {
+      path: path.resolve(file),
+      supported: [".aseprite", ".ase", ".png", ".gif"],
+    });
+  }
+  const files = isAsepritePath(file)
+    ? writeAseprite(sprite, file)
+    : writeFrames(rendered(studio, sprite), sprite.colorMode === "indexed" ? sprite.palette : [], file);
   sprite.filename = path.resolve(file);
   sprite.modified = false;
   return files;

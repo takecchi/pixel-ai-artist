@@ -94,7 +94,7 @@ test("open resolves a relative path against the working directory and reports it
   });
 });
 
-test("open keeps an animated GIF's frame count and durations, and gives a zero delay 100 ms", async () => {
+test("open keeps an animated GIF's frame count and durations, and gives a zero delay 1 ms, as Aseprite does", async () => {
   await inTempDir(async (dir) => {
     const file = path.join(dir, "walk.gif");
     const bytes = encodeGif([
@@ -112,11 +112,13 @@ test("open keeps an animated GIF's frame count and durations, and gives a zero d
     const opened = await manage(studio, { op: "open", path: file });
     assert.equal(opened.sprite, "walk.gif");
     const sprite = studio.activeSprite()!;
-    assert.deepEqual(sprite.frames.map((f) => f.durationMs), [40, 100, 250]);
+    assert.deepEqual(sprite.frames.map((f) => f.durationMs), [40, 1, 250]);
     const cels = sprite.layers[0]!.cels;
     assert.deepEqual([...cels.keys()], [1, 2, 3]);
-    assert.deepEqual([...cels.get(2)!.image.pixels], [BLUE, RED]);
-    assert.deepEqual((await studio.call<Reply>("sprite.info")).frames.map((f: Reply) => f.durationMs), [40, 100, 250]);
+    // A GIF with only a global colour table opens indexed, so the cel holds palette indices.
+    assert.equal(sprite.colorMode, "indexed");
+    assert.deepEqual([...cels.get(2)!.image.pixels].map((i) => sprite.palette[i]), [BLUE, RED]);
+    assert.deepEqual((await studio.call<Reply>("sprite.info")).frames.map((f: Reply) => f.durationMs), [40, 1, 250]);
   });
 });
 
@@ -196,16 +198,37 @@ test("open answers io_error for a missing file or one that is not an image, and 
   });
 });
 
-test("open answers unsupported_command for an .aseprite file, whatever its name, and opens nothing", async () => {
+test("open reads an .aseprite file, whatever its name, and a header with nothing after it is io_error", async () => {
   await inTempDir(async (dir) => {
-    const file = path.join(dir, "art.png");
+    const source = await drawn([RED, GREEN]);
+    const real = path.join(dir, "art.aseprite");
+    await manage(source.studio, { op: "save_as", path: real });
+    const disguised = path.join(dir, "art.png");
+    writeFileSync(disguised, readFileSync(real));
+    const studio = createStudio();
+    const opened = await manage(studio, { op: "open", path: disguised });
+    assert.deepEqual([opened.sprite, opened.width, opened.height], ["art.png", 2, 1]);
+    assert.deepEqual([...studio.activeSprite()!.layers[0]!.cels.get(1)!.image.pixels], [RED, GREEN]);
+
     const header = new Uint8Array(128);
     header[4] = 0xe0;
     header[5] = 0xa5;
-    writeFileSync(file, header);
+    const empty = path.join(dir, "empty.aseprite");
+    writeFileSync(empty, header);
+    await rejectsWith(manage(studio, { op: "open", path: empty }), "io_error");
+    assert.equal(studio.sprites().length, 1);
+  });
+});
+
+test("open names an opened image's layer Background when it has no transparency, and Layer when it has", async () => {
+  await inTempDir(async (dir) => {
+    const opaque = fileURLPath("./fixtures/jpeg/baseline-444.jpg");
+    const clear = writePng(path.join(dir, "clear.png"), img(2, 1, [RED, 0]));
     const studio = createStudio();
-    await rejectsWith(manage(studio, { op: "open", path: file }), "unsupported_command", /aseprite/i);
-    assert.equal(studio.sprites().length, 0);
+    await manage(studio, { op: "open", path: opaque });
+    assert.equal(studio.activeSprite()!.layers[0]!.name, "Background");
+    await manage(studio, { op: "open", path: clear });
+    assert.equal(studio.activeSprite()!.layers[0]!.name, "Layer");
   });
 });
 
@@ -335,10 +358,10 @@ test("save_as creates the missing directories of the path", async () => {
   });
 });
 
-test("save_as of .jpg, .aseprite or no extension answers unsupported_command, writes nothing and keeps the filename", async () => {
+test("save_as of .jpg or no extension answers unsupported_command, writes nothing and keeps the filename", async () => {
   await inTempDir(async (dir) => {
     const { studio, sprite } = await drawn([RED, GREEN]);
-    for (const name of ["x.jpg", "x.aseprite", "x"]) {
+    for (const name of ["x.jpg", "x"]) {
       await rejectsWith(manage(studio, { op: "save_as", path: path.join(dir, name) }), "unsupported_command");
       assert.equal(existsSync(path.join(dir, name)), false, name);
       assert.equal(sprite.filename, null, name);

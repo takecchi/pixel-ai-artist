@@ -5,7 +5,7 @@ import { encodePng } from "../../lib/png.js";
 import { buildSpriteSheet, type SheetTag, type SheetType } from "../../lib/spritesheet.js";
 import { packageVersion } from "../../lib/version.js";
 import { ToolError, need } from "../errors.js";
-import { writeBytes, writeFrames } from "../files.js";
+import { isAsepritePath, writeAseprite, writeBytes, writeFrames } from "../files.js";
 import { Image, channels, displayName, type Layer, type Rgba, type Sprite } from "../model.js";
 import type { HandlerTable, Studio } from "../studio.js";
 
@@ -160,7 +160,10 @@ function exportRun(studio: Studio, args: Record<string, unknown>) {
     if (filtered) {
       throw new ToolError("invalid_args", "'aseprite' saves the whole document; `layers` and `tags` apply to png, gif, frames and spritesheet.");
     }
-    throw new ToolError("unsupported_command", "Writing .aseprite files is not supported yet; export png, gif, frames or spritesheet.");
+    if (!isAsepritePath(file)) {
+      throw new ToolError("invalid_args", "'aseprite' writes an .aseprite or .ase file; give the path one of those extensions.");
+    }
+    files = writeAseprite(s, file);
   } else if (op === "gif") {
     const frames = exportView(studio, s, args, scale).frames;
     const opaque = s.palette.map((c) => (c | 255) >>> 0);

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { decodeImage } from "../dist/lib/decode.js";
 import type { Image } from "../dist/lib/image.js";
-import { decodeJpeg } from "../dist/lib/jpeg.js";
+import { decodeJpeg, isGrayscaleJpeg } from "../dist/lib/jpeg.js";
 import { decodePng } from "../dist/lib/png.js";
 
 const jpg = (name: string): Uint8Array => new Uint8Array(readFileSync(new URL(`./fixtures/jpeg/${name}.jpg`, import.meta.url)));
@@ -181,6 +181,26 @@ test("decodeJpeg rejects a scan before the frame header", () => {
   const base = jpg("baseline-444");
   const sos = markerOffset(base, 0xda);
   assert.throws(() => decodeJpeg(Uint8Array.from([0xff, 0xd8, ...base.subarray(sos)])), /frame header/);
+});
+
+for (const name of ["gray", "progressive-gray"]) {
+  test(`isGrayscaleJpeg is true for the ${name} fixture`, () => {
+    assert.equal(isGrayscaleJpeg(jpg(name)), true);
+  });
+}
+
+for (const name of ["baseline-444", "baseline-420", "progressive-444", "adobe-rgb", "restart-420"]) {
+  test(`isGrayscaleJpeg is false for the colour fixture ${name}`, () => {
+    assert.equal(isGrayscaleJpeg(jpg(name)), false);
+  });
+}
+
+test("isGrayscaleJpeg is false for broken input", () => {
+  assert.equal(isGrayscaleJpeg(new Uint8Array(0)), false);
+  assert.equal(isGrayscaleJpeg(Uint8Array.from([0xff, 0xd8])), false);
+  assert.equal(isGrayscaleJpeg(Uint8Array.from([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0, 0x11, 0x22, 0x33])), false);
+  const gray = jpg("gray");
+  assert.equal(isGrayscaleJpeg(gray.subarray(0, markerOffset(gray, 0xc0) + 4)), false);
 });
 
 test("decodeImage reads a JPEG by its leading bytes", () => {

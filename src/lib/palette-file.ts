@@ -6,11 +6,10 @@
 
 import { ToolError } from "../doc/errors.js";
 import { rgba, type Rgba } from "../doc/model.js";
-import { decodeImage } from "./decode.js";
-import { distinctColors } from "./image.js";
-import { decodePngPalette } from "./png.js";
+import { decodeAse } from "./ase.js";
+import { readImageDocument } from "./image-document.js";
 
-export const PALETTE_EXTENSIONS = [".gpl", ".hex", ".pal", ".act", ".col", ".png", ".gif", ".jpg", ".jpeg"] as const;
+export const PALETTE_EXTENSIONS = [".gpl", ".hex", ".pal", ".act", ".col", ".png", ".gif", ".jpg", ".jpeg", ".ase", ".aseprite"] as const;
 
 const MAX_ACT_COLORS = 256;
 const COL_PRO_MAGIC = 0xb123;
@@ -164,29 +163,29 @@ function decodeCol(bytes: Uint8Array): Rgba[] {
 }
 
 /**
- * An image file's palette: an indexed PNG's own PLTE, a grayscale PNG's
- * 256-step ramp (a new grayscale sprite's palette), and for anything RGB the
- * colours it uses when they fit in 256. Aseprite quantises more than that with
- * an octree; rather than invent a different reduction, such an image is not
- * read as a palette.
+ * An image file's palette: the palette of the document Aseprite would open it
+ * as. An RGB image of more than 256 colours, which Aseprite quantises with an
+ * octree, is not read as a palette rather than reduced some other way.
  */
 function decodeImagePalette(bytes: Uint8Array): Rgba[] {
-  let decoded: ReturnType<typeof decodeImage>;
   try {
-    decoded = decodeImage(bytes);
+    return readImageDocument(bytes).palette ?? [];
   } catch {
     return [];
   }
-  const isPng = bytes[0] === 0x89;
-  const colorType = isPng ? bytes[25] : -1;
-  if (colorType === 3) return decodePngPalette(bytes) ?? [];
-  if (colorType === 0 || colorType === 4) {
-    return Array.from({ length: 256 }, (_, c) => rgba(c, c, c));
+}
+
+/** The first frame's palette, as Aseprite's load_palette reads an .aseprite document; empty when unreadable. */
+function decodeAsePalette(bytes: Uint8Array): Rgba[] {
+  let palette: Uint8Array;
+  try {
+    palette = decodeAse(bytes).palette;
+  } catch {
+    return [];
   }
-  // Aseprite reads one frame of a GIF.
-  const image = Array.isArray(decoded) ? decoded[0]?.image : decoded;
-  if (!image) return [];
-  return distinctColors([image]) ?? [];
+  const out: Rgba[] = [];
+  for (let i = 0; i < palette.length; i += 4) out.push(rgba(palette[i]!, palette[i + 1]!, palette[i + 2]!, palette[i + 3]!));
+  return out;
 }
 
 function sniff(bytes: Uint8Array): "png" | "gif" | "jpeg" | "ase" | null {
@@ -217,9 +216,7 @@ export function decodePaletteFile(bytes: Uint8Array, ext: string): Rgba[] {
     case "jpeg": return decodeImagePalette(bytes);
     case "ase":
     case "aseprite":
-      throw new ToolError("unsupported_command", "Reading a palette from an .ase or .aseprite file is not supported yet.", {
-        supported: PALETTE_EXTENSIONS,
-      });
+      return decodeAsePalette(bytes);
     default:
       throw new ToolError("unsupported_command", `Cannot read a palette from '${ext || "a file with no extension"}'.`, {
         supported: PALETTE_EXTENSIONS,

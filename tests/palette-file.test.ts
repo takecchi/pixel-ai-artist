@@ -1,7 +1,12 @@
 import { strict as assert } from "node:assert";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 import { deflateSync } from "node:zlib";
 import { Image, ToolError, rgba } from "../dist/doc/index.js";
+import { decodeAse } from "../dist/lib/ase.js";
+import { encodeGif } from "../dist/lib/gif.js";
+import { readImageDocument } from "../dist/lib/image-document.js";
 import { decodePaletteFile } from "../dist/lib/palette-file.js";
 import { encodePng } from "../dist/lib/png.js";
 
@@ -157,11 +162,38 @@ test("an indexed png gives its PLTE in order, with tRNS alphas, even for entries
   assert.deepEqual(decodePaletteFile(bytes, ".png"), [rgba(1, 2, 3, 0), rgba(4, 5, 6, 128), rgba(7, 8, 9)]);
 });
 
-test("a grayscale png gives the 256-step gray ramp", () => {
-  const png = grayPng();
-  const colors = decodePaletteFile(png, ".png");
+test("a grayscale png gives 256 black entries, as Aseprite's sequence loader replaces the gray ramp", () => {
+  const colors = decodePaletteFile(grayPng(), ".png");
   assert.equal(colors.length, 256);
-  assert.deepEqual([colors[0], colors[128], colors[255]], [rgba(0, 0, 0), rgba(128, 128, 128), rgba(255, 255, 255)]);
+  assert.ok(colors.every((c) => c === rgba(0, 0, 0)));
+});
+
+test("an image's palette is the palette of the document readImageDocument builds", () => {
+  const rgbPng = encodePng(img(2, 1, [RED, BLUE]));
+  const indexed = indexedPng([[1, 2, 3], [4, 5, 6]], [0], [0, 1, 1, 0]);
+  const frame = img(2, 1, [RED, BLUE]);
+  const gifGlobal = encodeGif([{ image: frame, durationMs: 100 }], { palette: ["#ff0000", "#00ff00", "#0000ff"] });
+  for (const bytes of [rgbPng, indexed, grayPng(), gifGlobal, gifLocal(), jpg("gray"), jpg("baseline-444")]) {
+    const want = readImageDocument(bytes).palette ?? [];
+    assert.deepEqual(decodePaletteFile(bytes, ".png"), want);
+  }
+});
+
+test("a gif with only a global colour table gives that table", () => {
+  const frame = img(2, 1, [RED, BLUE]);
+  const bytes = encodeGif([{ image: frame, durationMs: 100 }], { palette: ["#ff0000", "#00ff00", "#0000ff"] });
+  assert.deepEqual(decodePaletteFile(bytes, ".gif"), [RED, GREEN, BLUE, rgba(0, 0, 0)]);
+});
+
+test("a gif with a local colour table gives the colours its frames use", () => {
+  assert.deepEqual(decodePaletteFile(gifLocal(), ".gif"), [RED, GREEN, BLUE]);
+});
+
+test("a grayscale jpeg gives the 256-step gray ramp and a colour jpeg its distinct colours", () => {
+  const gray = decodePaletteFile(jpg("gray"), ".jpg");
+  assert.deepEqual([gray.length, gray[0], gray[128], gray[255]], [256, rgba(0, 0, 0), rgba(128, 128, 128), rgba(255, 255, 255)]);
+  const color = decodePaletteFile(jpg("baseline-444"), ".jpeg");
+  assert.deepEqual(color, readImageDocument(jpg("baseline-444")).palette ?? []);
 });
 
 test("a png that is cut short holds no palette", () => {
@@ -182,16 +214,25 @@ function unsupported(bytes: Uint8Array, ext: string) {
   );
 }
 
-test("ase and aseprite files are unsupported_command", () => {
-  unsupported(new Uint8Array(4), ".ase");
-  unsupported(new Uint8Array(4), ".aseprite");
+test("an unreadable ase or aseprite file holds no palette", () => {
+  assert.deepEqual(decodePaletteFile(new Uint8Array(4), ".ase"), []);
+  assert.deepEqual(decodePaletteFile(new Uint8Array(4), ".aseprite"), []);
 });
 
 test("an .aseprite file is recognised by its magic number even under another extension", () => {
   const header = new Uint8Array(128);
   header[4] = 0xe0;
   header[5] = 0xa5;
-  unsupported(header, ".gpl");
+  assert.deepEqual(decodePaletteFile(header, ".gpl"), []);
+});
+
+test("an .aseprite file gives the palette of its first frame", () => {
+  const bytes = new Uint8Array(readFileSync(fileURLToPath(new URL("./fixtures/libresprite-1.3.ase", import.meta.url))));
+  const flat = decodeAse(bytes).palette;
+  const want = Array.from({ length: flat.length / 4 }, (_, i) => rgba(flat[i * 4]!, flat[i * 4 + 1]!, flat[i * 4 + 2]!, flat[i * 4 + 3]!));
+  assert.ok(want.length > 0);
+  assert.deepEqual(decodePaletteFile(bytes, ".aseprite"), want);
+  assert.deepEqual(decodePaletteFile(bytes, ".gpl"), want);
 });
 
 test("an unknown or missing extension is unsupported_command and lists the readable ones", () => {
@@ -247,6 +288,29 @@ function indexedPng(plte: number[][], trns: number[], pixels: number[]): Uint8Ar
     [pixels.slice(0, 2), pixels.slice(2)],
     [chunk("PLTE", Uint8Array.from(plte.flat())), chunk("tRNS", Uint8Array.from(trns))],
   );
+}
+
+const jpg = (name: string): Uint8Array => new Uint8Array(readFileSync(fileURLToPath(new URL(`./fixtures/jpeg/${name}.jpg`, import.meta.url))));
+
+/** A 2x2 GIF with no global colour table and one local table of red, green, blue, blue. */
+function gifLocal(): Uint8Array {
+  const bits: number[] = [];
+  const put = (v: number) => {
+    for (let i = 0; i < 3; i++) bits.push((v >> i) & 1);
+  };
+  for (const p of [[0, 1], [2, 3]]) {
+    put(4);
+    put(p[0]!);
+    put(p[1]!);
+  }
+  put(5);
+  const data: number[] = [];
+  for (let i = 0; i < bits.length; i += 8) data.push(bits.slice(i, i + 8).reduce((v, b, j) => v | (b << j), 0));
+  return Uint8Array.from([
+    ...Array.from("GIF89a", (c) => c.charCodeAt(0)), 2, 0, 2, 0, 0, 0, 0,
+    0x2c, 0, 0, 0, 0, 2, 0, 2, 0, 0x81, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 255,
+    2, data.length, ...data, 0, 0x3b,
+  ]);
 }
 
 function grayPng(): Uint8Array {

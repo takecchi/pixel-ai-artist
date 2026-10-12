@@ -5,6 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { Image, ToolError, createStudio, rgba } from "../dist/doc/index.js";
+import { decodeAse } from "../dist/lib/ase.js";
 import { decodeGif } from "../dist/lib/gif.js";
 import { decodePng } from "../dist/lib/png.js";
 
@@ -248,15 +249,35 @@ test("png with a frame outside 1..frameCount is invalid_args and writes nothing"
 
 // ── aseprite ────────────────────────────────────────────────────────────
 
-test("aseprite with layers or tags is invalid_args, and otherwise unsupported_command", async () => {
+test("aseprite with layers or tags is invalid_args, and so is a path that is not .aseprite or .ase", async () => {
   await inTempDir(async (dir) => {
     const { studio } = await fixture();
     const file = path.join(dir, "x.aseprite");
     const whole = /'aseprite' saves the whole document; `layers` and `tags` apply to png, gif, frames and spritesheet\./;
     await rejectsWith(run(studio, { op: "aseprite", path: file, layers: ["Back"] }), "invalid_args", whole);
     await rejectsWith(run(studio, { op: "aseprite", path: file, tags: ["walk"] }), "invalid_args", whole);
-    await rejectsWith(run(studio, { op: "aseprite", path: file }), "unsupported_command");
+    await rejectsWith(run(studio, { op: "aseprite", path: path.join(dir, "x.png") }), "invalid_args", /\.aseprite or \.ase/);
+    await rejectsWith(run(studio, { op: "aseprite", path: path.join(dir, "x") }), "invalid_args");
     assert.deepEqual(readdirSync(dir), []);
+  });
+});
+
+test("aseprite writes every layer, hidden ones too, with frames and tags, to an .aseprite or .ase path", async () => {
+  await inTempDir(async (dir) => {
+    const { studio, sprite } = await fixture();
+    const modified = sprite.modified;
+    for (const name of ["a.aseprite", "b.ase"]) {
+      const file = path.join(dir, name);
+      const reply = await run(studio, { op: "aseprite", path: file });
+      assert.deepEqual(reply.files, [file]);
+      assert.equal(reply.op, "aseprite");
+      const written = decodeAse(new Uint8Array(readFileSync(file)));
+      assert.deepEqual(written.layers.map((l) => [l.name, l.visible, l.opacity]), [["Back", true, 255], ["Front", true, 128], ["Ghost", false, 255]]);
+      assert.deepEqual(written.frames.map((f) => f.durationMs), [100, 200, 300]);
+      assert.deepEqual(written.tags.map((t) => [t.name, t.from, t.to]), [["walk", 0, 1], ["idle", 2, 2], ["late", 1, 2]]);
+    }
+    assert.equal(sprite.filename, null);
+    assert.equal(sprite.modified, modified);
   });
 });
 

@@ -139,11 +139,44 @@ test("palette.load of a file with no readable colours is io_error with Aseprite'
   });
 });
 
-test("palette.load of an .aseprite file or an unknown extension is unsupported_command and leaves the palette", async () => {
+test("palette.load of an .aseprite file takes the first frame's palette, alpha included, and ignores later palette changes", async () => {
+  await inTempDir(async (dir) => {
+    const chunk = (type: number, body: number[]) => [...u32(body.length + 6), type & 255, type >> 8, ...body];
+    const u32 = (v: number) => [v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >>> 24) & 255];
+    const palette = (colors: number[][]) =>
+      chunk(0x2019, [...u32(colors.length), ...u32(0), ...u32(colors.length - 1), ...new Array(8).fill(0), ...colors.flatMap((c) => [0, 0, ...c])]);
+    const frame = (chunks: number[][]) => {
+      const body = chunks.flat();
+      return [...u32(16 + body.length), 0xfa, 0xf1, chunks.length, 0, 100, 0, 0, 0, ...u32(chunks.length), ...body];
+    };
+    const frames = [frame([palette([[255, 0, 0, 255], [0, 255, 0, 128]])]), frame([palette([[1, 2, 3, 255]])])].flat();
+    const header = [...u32(128 + frames.length), 0xe0, 0xa5, 2, 0, 1, 0, 1, 0, 32, 0, 1, 0, 0, 0, 100, 0, ...new Array(128 - 20).fill(0)];
+    const file = path.join(dir, "p.aseprite");
+    writeFileSync(file, Uint8Array.from([...header, ...frames]));
+    const { studio, sprite } = await newSprite();
+    const reply = await load(studio, { path: file });
+    assert.deepEqual(reply.colors, ["#ff0000", "#00ff0080"]);
+    assert.deepEqual(sprite.palette, [RED, rgba(0, 255, 0, 128)]);
+  });
+});
+
+test("palette.load of a sprite saved as .aseprite gives back its palette", async () => {
+  await inTempDir(async (dir) => {
+    const { studio, sprite } = await newSprite();
+    sprite.palette = [RED, rgba(0, 255, 0, 128), BLUE];
+    const file = path.join(dir, "saved.aseprite");
+    await studio.call("sprite.manage", { op: "save_as", path: file });
+    const other = await newSprite();
+    await load(other.studio, { path: file });
+    assert.deepEqual(other.sprite.palette, [RED, rgba(0, 255, 0, 128), BLUE]);
+  });
+});
+
+test("palette.load of an unknown extension is unsupported_command and leaves the palette", async () => {
   await inTempDir(async (dir) => {
     const { studio, sprite } = await newSprite();
     const before = [...sprite.palette];
-    for (const name of ["a.aseprite", "a.ase", "a.txt", "a"]) {
+    for (const name of ["a.txt", "a"]) {
       const file = path.join(dir, name);
       writeFileSync(file, "ff0000\n");
       await rejectsWith(load(studio, { path: file }), "unsupported_command");
