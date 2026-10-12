@@ -2,7 +2,7 @@ import { encodePng } from "../../lib/png.js";
 import { ToolError } from "../errors.js";
 import { Image, TRANSPARENT, displayName, pixelToRgba, rgba, type Layer, type Rect, type Sprite } from "../model.js";
 import { over, type HandlerTable, type Studio } from "../studio.js";
-import { clampRegion } from "./pixels.js";
+import { clampRegion } from "../selection.js";
 
 const PREVIEW_TARGET_EDGE = 1024;
 const PREVIEW_MAX_EDGE = 2048;

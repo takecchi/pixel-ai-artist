@@ -195,11 +195,11 @@ test("the server instructions carry the rules an agent gets wrong catastrophical
   await close();
 });
 
-test("a tool whose command is not ported yet returns a structured unsupported_command error", async () => {
+test("a tool whose command is not ported returns a structured unsupported_command error", async () => {
   const { client, close } = await connected();
   const result = await client.callTool({
-    name: "draw",
-    arguments: { ops: [{ kind: "pixels", color: "#ffffff", points: [{ x: 0, y: 0 }] }] },
+    name: "tileset",
+    arguments: { op: "list" },
   });
   assert.equal(result.isError, true);
   const structured = result.structuredContent as { code?: string };
@@ -216,8 +216,8 @@ test("draw measureOnly with a text op returns textBounds and never calls the stu
       ops: [{ kind: "text", text: "Hi", x: 10, y: 10, color: "#ffffff" }],
     },
   });
-  // draw.batch has no handler yet: if measureOnly reached studio.call anyway
-  // this would fail with unsupported_command instead of answering.
+  // No sprite is open: if measureOnly reached studio.call anyway this would
+  // fail with no_active_sprite instead of answering.
   assert.notEqual(result.isError, true, "measureOnly must not touch the studio");
   const structured = result.structuredContent as {
     measureOnly: boolean;

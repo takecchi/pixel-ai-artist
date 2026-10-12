@@ -30,7 +30,7 @@ function throwsWith(fn: () => unknown, code: string, message?: RegExp) {
 }
 
 test("a command with no handler answers unsupported_command naming it, unknown names included", async () => {
-  const studio = createStudio();
+  const studio = new Studio({});
   await rejectsWith(studio.call("export.run"), "unsupported_command", /'export\.run'/);
   await rejectsWith(studio.call("lua.run"), "unsupported_command", /'lua\.run'/);
 });
