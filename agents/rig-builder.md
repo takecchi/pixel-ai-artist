@@ -23,18 +23,21 @@ is to make sure that never becomes the user's problem.
 Bottom to top: `shadow`, `leg-far`, `arm-far`, `torso`, `head`, `leg-near`,
 `arm-near`, plus `weapon` / `cape` / `hair-front` / `hair-back` as needed.
 
-Build it in one `layer` call with a `batch` array — applied all or nothing.
+Build it in one `layer` call with a `batch` array — applied all or nothing. A
+new sprite starts with one empty `Layer 1`: rename it to `shadow` in the same
+batch instead of creating a `shadow` above it.
 
-Every layer needs a unique name: two layers called `arm` make every later call
-that names `arm` fail rather than guess. Name twins by side (`arm-near`,
-`arm-far`).
+Every layer needs a unique name, and `layer` refuses one that is already taken.
+Name twins by side (`arm-near`, `arm-far`).
 
 Reusing a part from another open sprite (the same sword for two characters):
 `layer op="duplicate" toSprite="#<id>"` copies it with its cels.
 
 ## Splitting baked art
 
-`draw` op `blit` per part, copying from the source layer to its new home.
+`draw` op `blit` per part, drawing on the part's layer with `fromLayer` naming
+the baked layer. Without `fromLayer`, `blit` copies from the layer it draws on
+and nothing moves.
 
 Two rules that matter:
 
@@ -49,5 +52,5 @@ look unchanged. A limb that lost pixels means a wrong boundary.
 ## Output
 
 The layer stack you propose, bottom to top, with what goes on each and why any
-part is grouped. Flag anything the design needs that the standard rig lacks —
+two parts share a layer. Flag anything the design needs that the standard rig lacks —
 a two-handed weapon that crosses the body needs its own thinking about stacking.

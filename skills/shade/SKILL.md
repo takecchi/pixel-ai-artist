@@ -25,7 +25,14 @@ values yourself.
 2. **Confirm the flat art is right first.** `look` op `preview`. Shading a bad
    silhouette wastes the effort.
 
-3. **One shadow step.** Select the region away from the light, then:
+3. **Give each material its steps in the palette** (see *Ramps* below). `recolor`
+   snaps every colour it makes to the palette (`clampToPalette`, on by default):
+   with no darker or lighter step there, a shaded colour snaps straight back to
+   itself and the call answers `0 pixel(s) recoloured`. On a fixed palette whose
+   steps you must not add to, pass `clampToPalette=false` and then add the new
+   colours with `palette op="set"`, or draw the step by hand from the palette.
+
+4. **One shadow step.** Select the region away from the light, then:
 
    ```
    select op="rect" rect={…}
@@ -35,15 +42,15 @@ values yourself.
    Or draw the shadow shape directly with `draw` if it needs to follow a form
    the selection tools cannot describe.
 
-4. **Look.** `look op="preview"`. Does it read as volume, or as a stain? A
+5. **Look.** `look op="preview"`. Does it read as volume, or as a stain? A
    shadow that follows the form's cross-section reads; one that follows the
    outline does not.
 
-5. **One light step**, on the side facing the light: `amount=0.2`.
+6. **One light step**, on the side facing the light: `amount=0.2`.
 
-6. **Look again.** Most sprites are finished here.
+7. **Look again.** Most sprites are finished here.
 
-7. **Only if it needs it**: a deep shadow (`amount=-0.4`) in occluded crevices,
+8. **Only if it needs it**: a deep shadow (`amount=-0.4`) in occluded crevices,
    a specular highlight of one or two pixels on the hardest material, or
    reflected light — a faint cool step on the shadow side's outer edge, which
    makes metal read as metal.

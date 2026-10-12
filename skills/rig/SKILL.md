@@ -11,7 +11,8 @@ first; separating a finished sprite later is more work than building it split.
 
 ## The standard rig
 
-Bottom to top, so nearer parts draw over farther ones:
+Top of the stack first, so nearer parts draw over farther ones (`sprite_info`
+and `layer op="list"` list the same stack the other way up, bottom first):
 
 ```
 arm-near     ← camera-side arm
@@ -26,17 +27,19 @@ shadow       ← ground contact, if the style has one
 Add `weapon`, `cape`, `hair-front`, `hair-back` as the design needs. Keep names
 stable — every later call refers to them by name.
 
-Two layers with the same name make later calls ambiguous: passing the name
-fails rather than guessing. Give every limb a unique name (`arm-near`,
-`arm-far`), never two `arm`s.
+Every layer has its own name: `layer` refuses to create or rename a layer to a
+name another layer already has. Name twins by side (`arm-near`, `arm-far`),
+never two `arm`s.
 
 ## Building it fresh
 
-One batch, applied all or nothing:
+A new sprite starts with one empty layer, `Layer 1`. Rename it to the bottom
+part rather than leaving it empty under the rig — `validate` flags an empty
+layer on every run. One batch, applied all or nothing:
 
 ```
 layer batch=[
-  {op:"create", name:"shadow"},
+  {op:"rename", name:"Layer 1", newName:"shadow"},
   {op:"create", name:"leg-far"},
   {op:"create", name:"arm-far"},
   {op:"create", name:"torso"},
@@ -57,9 +60,11 @@ When the art is already baked into one layer:
 2. Create the rig layers (above).
 3. For each part, in one `draw` call per target layer:
    ```
-   draw layer="head" ops=[{ kind:"blit", from:{x:12,y:4,width:8,height:8}, to:{x:12,y:4} }]
+   draw layer="head" ops=[{ kind:"blit", fromLayer:"Layer 1", from:{x:12,y:4,width:8,height:8}, to:{x:12,y:4} }]
    ```
-   `blit` copies from the source layer; `skipTransparent` keeps the copy clean.
+   `fromLayer` names the baked layer to copy from. Leave it out and `blit`
+   reads the layer it is drawing on — an empty new layer — and copies nothing.
+   `skipTransparent` keeps the copy clean.
 4. Clear the copied region from the original layer, or rename the original to
    `flat-original` and hide it. **Prefer hiding** — if a boundary was wrong you
    want the original still there.

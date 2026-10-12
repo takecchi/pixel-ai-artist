@@ -21,7 +21,8 @@ character is a different size. Keys first, always.
    `rules://51-animal-gaits` / `rules://52-birds-and-flight`. Plan frame counts
    and durations from their tables, not from feel.
 3. Plan the cycle in writing. Get agreement. Then build. If a storyboard is
-   imported (`reference op="list"`, one cel per frame), its panels are the key
+   imported (`reference op="list"` names the layer; `cel op="list" layer=…`
+   shows which frames hold a panel, one cel per frame), its panels are the key
    poses — plan from them rather than inventing new ones, and say where the
    timing or the pixel size forces a departure. Asked for storyboard panels
    for an image-model prompt instead, write one line per frame, specific enough

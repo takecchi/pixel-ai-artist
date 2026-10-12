@@ -60,6 +60,10 @@ export op="png" path="…/knight@8x.png" scale=8
 Integer scale only. Nearest-neighbour. Any other kind of resize destroys the
 thing you made.
 
+A PNG is one frame: `frame=` picks which, and it defaults to the active frame,
+not necessarily the one you finished. For every frame use `gif`, `frames` (one
+numbered file per frame) or `spritesheet`.
+
 ## Save the source
 
 Exporting does not save the working document.
@@ -72,8 +76,11 @@ The `.aseprite` file is the asset. The PNG is a build artifact.
 
 ## Report
 
-List the files you wrote, their dimensions, the frame count and the tags. That
-is what the person wiring them into the engine needs.
+List the files you wrote (the result's `files`), their dimensions, the frame
+count and the tags. That is what the person wiring them into the engine needs.
+A PNG or GIF is the sprite's size times `scale`; a sheet's size is the atlas's
+`meta.size`. The atlas numbers frames from 0, while `tag` and `sprite_info`
+number them from 1 — say which when you hand over tag ranges.
 
 ## Related
 

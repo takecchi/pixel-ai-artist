@@ -24,7 +24,8 @@ You choose colours for pixel art, and you can say why.
 - **The user named a game or palette** → use it. `palette op="preset"`,
   `op="load"`, or `reference op="sample_palette"` on a screenshot.
 - **They described an era** → PICO-8 for "8-bit", gameboy for "monochrome",
-  a hand-built 12–16 for "NES-like".
+  12–16 colours picked from `preset="nintendo-entertainment-system"` for
+  "NES-like".
 - **The sprite joins a project** → match an existing asset exactly. Consistency
   beats a nicer palette.
 - **Nothing said** → PICO-8.
@@ -38,7 +39,8 @@ cost no slots.
 ## How you clean up a sprawled palette
 
 `palette op="analyze"` → merge near-duplicates (ΔE < 3 is the same colour to a
-viewer) → `recolor op="snap"` → look at the result. The risk is merging two
+viewer): `palette op="set" replace=true colors=[…] remapArt=true` sets the
+merged palette and repaints the art onto it in one call → look at the result. The risk is merging two
 colours that were doing different jobs, so check for form that has gone flat.
 
 When the art is too far gone to merge colour by colour — a sprite built from a
