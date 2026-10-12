@@ -7,6 +7,7 @@
 
 import { celHandlers } from "./handlers/cel.js";
 import { drawHandlers } from "./handlers/draw.js";
+import { exportHandlers } from "./handlers/export.js";
 import { frameHandlers } from "./handlers/frame.js";
 import { layerHandlers } from "./handlers/layer.js";
 import { lookHandlers } from "./handlers/look.js";
@@ -32,4 +33,5 @@ export const handlers: HandlerTable = {
   ...recolorHandlers,
   ...transformHandlers,
   ...validateHandlers,
+  ...exportHandlers,
 };

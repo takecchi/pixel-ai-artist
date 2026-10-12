@@ -70,7 +70,7 @@ function rendered(studio: Studio, sprite: Sprite): AnimationFrame[] {
   return sprite.frames.map((f, i) => ({ image: studio.composite(sprite, i + 1), durationMs: f.durationMs }));
 }
 
-function write(file: string, bytes: Uint8Array): void {
+export function writeBytes(file: string, bytes: Uint8Array): void {
   try {
     mkdirSync(path.dirname(file), { recursive: true });
     writeFileSync(file, bytes);
@@ -80,36 +80,39 @@ function write(file: string, bytes: Uint8Array): void {
 }
 
 /**
- * Writes the sprite as its visible layers look, chosen by the extension: PNG
- * (one file per frame, named as Aseprite names them, when there is more than
- * one) or GIF (the sprite's palette, as Aseprite's GIF export converts to it).
- * The sprite then belongs to that file. Returns the files written.
+ * Writes frames as a file chosen by its extension, as Aseprite's savers do:
+ * PNG (one file per frame, named as Aseprite names them, when there is more
+ * than one) or GIF (snapped to `palette`, as Aseprite's GIF export converts to
+ * the sprite's palette). Returns the files written.
  */
-export function saveSprite(studio: Studio, sprite: Sprite, file: string): string[] {
+export function writeFrames(frames: AnimationFrame[], palette: readonly Rgba[], file: string): string[] {
   const full = path.resolve(file);
   const ext = path.extname(full).toLowerCase();
-  const frames = rendered(studio, sprite);
-  let files: string[];
   if (ext === ".png") {
-    files = frameFileNames(full, frames.length);
-    files.forEach((f, i) => write(f, encodePng(frames[i]!.image)));
-  } else if (ext === ".gif") {
+    const files = frameFileNames(full, frames.length);
+    files.forEach((f, i) => writeBytes(f, encodePng(frames[i]!.image)));
+    return files;
+  }
+  if (ext === ".gif") {
     let bytes: Uint8Array;
     try {
-      bytes = encodeGif(frames, sprite.palette.length > 0 ? { palette: sprite.palette.map((c) => rgbaToHex(c)) } : {});
+      bytes = encodeGif(frames, palette.length > 0 ? { palette: palette.map((c) => rgbaToHex(c)) } : {});
     } catch (err) {
       throw new ToolError("invalid_args", `Cannot write '${file}' as GIF: ${(err as Error).message}`, { path: full });
     }
-    write(full, bytes);
-    files = [full];
-  } else {
-    throw new ToolError(
-      "unsupported_command",
-      `Saving '${ext || file}' files is not supported yet; save as .png or .gif.`,
-      { path: full, supported: [".png", ".gif"] },
-    );
+    writeBytes(full, bytes);
+    return [full];
   }
-  sprite.filename = full;
+  throw new ToolError("unsupported_command", `Writing '${ext || file}' files is not supported yet; use .png or .gif.`, {
+    path: full,
+    supported: [".png", ".gif"],
+  });
+}
+
+/** Writes the sprite as its visible layers look, and the sprite then belongs to that file. */
+export function saveSprite(studio: Studio, sprite: Sprite, file: string): string[] {
+  const files = writeFrames(rendered(studio, sprite), sprite.palette, file);
+  sprite.filename = path.resolve(file);
   sprite.modified = false;
   return files;
 }
