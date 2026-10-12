@@ -17,7 +17,7 @@ import type { HandlerTable, Studio } from "../studio.js";
 import { spriteSummary } from "./session.js";
 
 /** The extension's flatten_layers, for a model with no groups, blend modes or tilemaps. */
-function layerInfo(layer: Layer, index: number) {
+export function layerInfo(layer: Layer, index: number) {
   return {
     name: layer.name,
     index: index + 1,

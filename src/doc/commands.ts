@@ -5,6 +5,7 @@
  * rather than pretending to succeed.
  */
 
+import { layerHandlers } from "./handlers/layer.js";
 import { lookHandlers } from "./handlers/look.js";
 import { pixelHandlers } from "./handlers/pixels.js";
 import { sessionHandlers } from "./handlers/session.js";
@@ -16,4 +17,5 @@ export const handlers: HandlerTable = {
   ...spriteHandlers,
   ...pixelHandlers,
   ...lookHandlers,
+  ...layerHandlers,
 };
