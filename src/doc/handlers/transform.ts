@@ -199,8 +199,8 @@ function transformApply(studio: Studio, args: Record<string, unknown>) {
     } else if (angle !== 0) {
       throw new ToolError(
         "invalid_args",
-        "Only 90/180/270 rotations are lossless. " +
-          "The server should have blocked this; pass allowLossy there if the user accepted the quality loss.",
+        `Only 90/180/270 rotations keep pixel art intact; ${String(args.angle)}° is refused. ` +
+          "Rotate by a multiple of 90, or redraw the pose at the new angle.",
       );
     }
     // angle 0 leaves changed at 0: reporting a full-canvas change for an

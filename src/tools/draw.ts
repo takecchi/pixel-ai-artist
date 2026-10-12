@@ -346,7 +346,7 @@ export function registerDrawTools(server: McpServer, studio: Studio): void {
       description:
         "Move, flip, rotate or scale pixels on ONE cel — the target layer's image on the target frame. Ops: 'translate', 'flip', 'rotate', 'scale', 'outline', 'crop_to_content' (the exception: it trims the whole canvas to the content of every visible layer on every frame). " +
         "To transform part of a cel, crop the region out with `draw` op 'blit' first; there is no selection-scoped transform. " +
-        "Rotation is only clean at 90° multiples — arbitrary angles destroy pixel art, so anything else needs `allowLossy`. " +
+        "Rotation is by 90° multiples only — any other angle resamples every pixel and destroys pixel art, so it is refused; redraw the pose at the new angle instead. " +
         "Scaling is nearest-neighbour and integer-only for the same reason.",
       inputSchema: {
         op: z.enum(["translate", "flip", "rotate", "scale", "outline", "crop_to_content"]),
@@ -354,7 +354,7 @@ export function registerDrawTools(server: McpServer, studio: Studio): void {
         dx: z.number().int().default(0),
         dy: z.number().int().default(0),
         axis: z.enum(["horizontal", "vertical"]).optional().describe("For 'flip'."),
-        angle: z.number().default(90).describe("Degrees, clockwise. For 'rotate'."),
+        angle: z.number().default(90).describe("Degrees, clockwise, a multiple of 90. For 'rotate'."),
         factor: z.number().int().min(1).max(16).default(2).describe("For 'scale'."),
         color: hexColor.optional().describe("Outline colour, for 'outline'."),
         side: z
@@ -368,10 +368,6 @@ export function registerDrawTools(server: McpServer, studio: Studio): void {
           .default(false)
           .describe("For 'outline'. Treat diagonal neighbours as touching too (8-neighbour instead of 4)."),
         thickness: z.number().int().positive().max(8).default(1),
-        allowLossy: z
-          .boolean()
-          .default(false)
-          .describe("Permit a non-90° rotation or non-integer scale. Ask the user first."),
       },
       outputSchema: {
         sprite: z.string(),
@@ -385,14 +381,6 @@ export function registerDrawTools(server: McpServer, studio: Studio): void {
     },
     async (args) => {
       try {
-        if (args.op === "rotate" && args.angle % 90 !== 0 && !args.allowLossy) {
-          return fail(
-            new ToolError(
-              "refused",
-              `A ${args.angle}° rotation resamples every pixel and will destroy the sprite's crispness. Use a multiple of 90, or confirm with the user and pass allowLossy: true.`,
-            ),
-          );
-        }
         const data = await studio.call<Record<string, unknown>>("transform.apply", args);
         return ok(data);
       } catch (err) {

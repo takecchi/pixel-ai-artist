@@ -29,9 +29,10 @@ dependency bump rather than a rewrite:
   An error result carries no structured content, because clients validate it
   against the success schema; its code leads the text instead.)*
 - **No reliance on server→client requests.** No sampling, no roots, no
-  elicitation. Confirmation that needs a human — closing an unsaved sprite, a
-  lossy rotation — is handled by refusing with an explanation and requiring an
-  explicit flag on the retry. That pattern is exactly what MRTR formalises, so
+  elicitation. Confirmation that needs a human — closing an unsaved sprite — is
+  handled by refusing with an explanation and requiring an explicit flag on the
+  retry. (aseprite-ai-artist also gated lossy rotation this way; nothing behind
+  the flag ever succeeded, so the port refuses those angles outright.) That pattern is exactly what MRTR formalises, so
   it converts cleanly.
 - **Immutable tool list.** `tools/list` does not vary per connection, which is
   what 2026-07-28 requires and what makes the list cacheable.

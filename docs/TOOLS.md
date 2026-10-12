@@ -60,7 +60,7 @@ content, and text whose first line is `<code>: <message>` (`invalid_args`,
 |------|-------------|-------|
 | `draw` | `pixels` `line` `polyline` `rect` `ellipse` `fill` `replace` `dither` `gradient` `clear` `blit` `text` `grid` | Batch, all or nothing: if any op fails, the cel is left as it was. |
 | `select` | `get` `none` `all` `rect` `ellipse` `color` `invert` `grow` `shrink` | Scopes `draw`, `transform` and `recolor`. `color` is a magic wand: `tolerance`, and `contiguous` from a start point `x`/`y`. |
-| `transform` | `translate` `flip` `rotate` `scale` `outline` `crop_to_content` | Acts on ONE cel; there is no scope parameter. Non-90° rotation needs `allowLossy`. `outline`'s `side` (`outside` default, `inside`) picks which pixels get painted; `diagonals` (default `false`) switches 4- to 8-neighbour. |
+| `transform` | `translate` `flip` `rotate` `scale` `outline` `crop_to_content` | Acts on ONE cel; there is no scope parameter. Rotation is by 90° steps only; other angles are refused. `outline`'s `side` (`outside` default, `inside`) picks which pixels get painted; `diagonals` (default `false`) switches 4- to 8-neighbour. |
 | `recolor` | `shade` `snap` `replace` `hue_shift` `desaturate` | Operates on distinct colours, not pixels, in one pass. |
 
 `draw` op kind `text` lays out a string from a bitmap font and expands it to

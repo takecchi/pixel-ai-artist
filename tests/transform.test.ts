@@ -94,14 +94,16 @@ test("rotating by 180 sends each pixel to the opposite corner, and by 0 changes 
   assert.deepEqual(rows(sprite, cel), ["B..", "..R"]);
 });
 
-test("an angle that is not a multiple of 90 is refused with the extension's wording", async () => {
+test("an angle that is not a multiple of 90 is always refused, naming the angle and what to do instead", async () => {
   const studio = createStudio();
   sketch(studio, 3, 3, [[0, 0, RED]]);
   await rejectsWith(
     studio.call("transform.apply", { op: "rotate", angle: 45 }),
     "invalid_args",
-    /^Only 90\/180\/270 rotations are lossless\. The server should have blocked this; pass allowLossy there if the user accepted the quality loss\.$/,
+    /^Only 90\/180\/270 rotations keep pixel art intact; 45° is refused\. Rotate by a multiple of 90, or redraw the pose at the new angle\.$/,
   );
+  // allowLossy is gone from the tool; a caller still sending it changes nothing.
+  await rejectsWith(studio.call("transform.apply", { op: "rotate", angle: 45, allowLossy: true }), "invalid_args");
 });
 
 test("scale repeats each pixel factor times in both directions", async () => {

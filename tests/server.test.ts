@@ -208,14 +208,14 @@ function errorCode(result: { content?: unknown }): string | undefined {
   return first?.text?.split("\n")[0]?.split(":")[0];
 }
 
-test("a refused call comes back as an error result whose text leads with its code, not a protocol error", async () => {
+test("a failed call comes back as an error result whose text leads with its code, not a protocol error", async () => {
   const { client, close } = await connected();
   const result = await client.callTool({
     name: "transform",
     arguments: { op: "rotate", angle: 45 },
   });
   assert.equal(result.isError, true);
-  assert.equal(errorCode(result), "refused");
+  assert.equal(errorCode(result), "no_active_sprite");
   await close();
 });
 
