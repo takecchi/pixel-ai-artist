@@ -287,6 +287,34 @@ test("gif moves a colour outside the sprite's palette to the nearest palette col
   });
 });
 
+test("gif picks the palette colour Aseprite's bestfit picks, not the perceptually nearest one", async () => {
+  await inTempDir(async (dir) => {
+    const { studio, sprite } = await fixture();
+    const gray = rgba(0x3c, 0x3c, 0x3c);
+    sprite.palette = [gray, rgba(0xff, 0x6a, 0x00)];
+    sprite.layers[0]!.cels.get(1)!.image = img(2, 1, [rgba(0x78, 0, 0), 0]);
+    sprite.layers[1]!.visible = false;
+    const file = path.join(dir, "bestfit.gif");
+    await run(studio, { op: "gif", path: file, tags: ["walk"] });
+    assert.deepEqual([...readGif(file).frames[0]!.image.pixels], [gray, 0]);
+  });
+});
+
+test("frames and png written as .gif keep an RGB sprite's colours, as saveCopyAs did", async () => {
+  await inTempDir(async (dir) => {
+    const { studio, sprite } = await fixture();
+    const off = rgba(0xff, 0xf1, 0xe8);
+    sprite.layers[0]!.cels.get(1)!.image = img(2, 1, [off, off]);
+    sprite.layers[1]!.visible = false;
+    const framesFile = path.join(dir, "frames.gif");
+    await run(studio, { op: "frames", path: framesFile, tags: ["walk"] });
+    assert.deepEqual([...readGif(framesFile).frames[0]!.image.pixels], [off, off]);
+    const pngFile = path.join(dir, "still.gif");
+    await run(studio, { op: "png", path: pngFile, frame: 1 });
+    assert.deepEqual([...readGif(pngFile).frames[0]!.image.pixels], [off, off]);
+  });
+});
+
 // ── frames ──────────────────────────────────────────────────────────────
 
 test("frames writes one file per frame from {frame} counted from 0, and lists the files it wrote", async () => {

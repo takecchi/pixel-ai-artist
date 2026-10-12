@@ -1,6 +1,7 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
 import {
+  asepriteBestFit,
   buildRamp,
   contrastRatio,
   deltaE,
@@ -11,6 +12,7 @@ import {
   snapToPalette,
   toHex,
 } from "../dist/lib/color.js";
+import { presets } from "../dist/lib/palettes.js";
 
 test("parseHex accepts both lengths and rejects junk", () => {
   assert.deepEqual(parseHex("#ff004d"), { r: 255, g: 0, b: 77, a: 255 });
@@ -92,4 +94,31 @@ test("buildRamp centres on the base colour and returns the requested length", ()
 test("contrastRatio matches the WCAG extremes", () => {
   assert.ok(Math.abs(contrastRatio(parseHex("#ffffff"), parseHex("#000000")) - 21) < 0.01);
   assert.equal(contrastRatio(parseHex("#777777"), parseHex("#777777")), 1);
+});
+
+test("asepriteBestFit weighs 5-bit channels as Aseprite does, which can differ from the perceptual pick", () => {
+  const palette = ["#3c3c3c", "#ff6a00"];
+  assert.equal(asepriteBestFit(parseHex("#780000"), palette.map(parseHex)), 0);
+  assert.equal(snapToPalette(parseHex("#780000"), palette).index, 1);
+});
+
+test("asepriteBestFit sends an off-palette near-white to DawnBringer 32's white", () => {
+  const db32 = presets()["dawnbringer-32"]!.colors;
+  const index = asepriteBestFit(parseHex("#fff1e8"), db32.map(parseHex));
+  assert.equal(db32[index], "#ffffff");
+});
+
+test("asepriteBestFit takes the first entry equal at 5 bits, and the first of equally near ones", () => {
+  assert.equal(asepriteBestFit(parseHex("#ff0000"), ["#000000", "#f80000", "#ff0000"].map(parseHex)), 1);
+  assert.equal(asepriteBestFit(parseHex("#808080"), ["#707070", "#707070"].map(parseHex)), 0);
+});
+
+test("asepriteBestFit compares alpha too, and looks at no more than 256 entries", () => {
+  assert.equal(asepriteBestFit(parseHex("#ff000080"), ["#ff0000ff", "#ff000080"].map(parseHex)), 1);
+  const palette = [...Array.from({ length: 256 }, () => parseHex("#000000")), parseHex("#ffffff")];
+  assert.equal(asepriteBestFit(parseHex("#ffffff"), palette), 0);
+});
+
+test("asepriteBestFit refuses an empty palette", () => {
+  assert.throws(() => asepriteBestFit(parseHex("#ffffff"), []), /empty/);
 });

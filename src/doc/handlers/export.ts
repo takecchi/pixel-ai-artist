@@ -1,11 +1,12 @@
 import path from "node:path";
+import { asepriteBestFit } from "../../lib/color.js";
 import { scaleNearest, type AnimationFrame } from "../../lib/image.js";
 import { encodePng } from "../../lib/png.js";
 import { buildSpriteSheet, type SheetTag, type SheetType } from "../../lib/spritesheet.js";
 import { packageVersion } from "../../lib/version.js";
 import { ToolError, need } from "../errors.js";
 import { writeBytes, writeFrames } from "../files.js";
-import { displayName, type Layer, type Sprite } from "../model.js";
+import { Image, channels, displayName, type Layer, type Rgba, type Sprite } from "../model.js";
 import type { HandlerTable, Studio } from "../studio.js";
 
 const ATLAS_APP = "https://github.com/takecchi/pixel-ai-artist";
@@ -71,6 +72,34 @@ function exportView(studio: Studio, s: Sprite, args: Record<string, unknown>, sc
   return { frames, tags, layers };
 }
 
+/**
+ * What the Lua handler's ChangePixelFormat to indexed did before the GIF was
+ * saved: every painted pixel takes the palette entry Aseprite's bestfit picks,
+ * opaque, and clear pixels stay clear. Aseprite also gives up palette entry 0
+ * to transparency, which repaints anything drawn in it; that is not copied.
+ */
+function inPalette(frames: AnimationFrame[], palette: readonly Rgba[]): AnimationFrame[] {
+  const entries = palette.map((c) => {
+    const [r, g, b, a] = channels(c);
+    return { r, g, b, a };
+  });
+  const cache = new Map<number, number>();
+  return frames.map((f) => {
+    const out = new Image(f.image.width, f.image.height);
+    f.image.pixels.forEach((v, i) => {
+      if ((v & 255) === 0) return;
+      let mapped = cache.get(v);
+      if (mapped === undefined) {
+        const [r, g, b, a] = channels(v);
+        mapped = ((palette[asepriteBestFit({ r, g, b, a }, entries)]! | 255) >>> 0);
+        cache.set(v, mapped);
+      }
+      out.pixels[i] = mapped;
+    });
+    return { image: out, durationMs: f.durationMs };
+  });
+}
+
 function writeSheet(view: ExportView, s: Sprite, file: string, args: Record<string, unknown>): string[] {
   const full = path.resolve(file);
   if (path.extname(full).toLowerCase() !== ".png") {
@@ -105,6 +134,11 @@ function writeSheet(view: ExportView, s: Sprite, file: string, args: Record<stri
   return files;
 }
 
+/** png and frames were saveCopyAs in the Lua handler: a GIF there keeps an RGB sprite's colours. */
+function ownPalette(s: Sprite): readonly Rgba[] {
+  return s.colorMode === "indexed" ? s.palette : [];
+}
+
 function exportRun(studio: Studio, args: Record<string, unknown>) {
   const s = studio.resolveSprite(args.sprite);
   const op = need(args.op, "op");
@@ -121,14 +155,18 @@ function exportRun(studio: Studio, args: Record<string, unknown>) {
     }
     frame = studio.resolveFrame(s, args.frame);
     const view = exportView(studio, s, args, scale);
-    files = writeFrames([view.frames[frame - 1]!], s.palette, file);
+    files = writeFrames([view.frames[frame - 1]!], ownPalette(s), file);
   } else if (op === "aseprite") {
     if (filtered) {
       throw new ToolError("invalid_args", "'aseprite' saves the whole document; `layers` and `tags` apply to png, gif, frames and spritesheet.");
     }
     throw new ToolError("unsupported_command", "Writing .aseprite files is not supported yet; export png, gif, frames or spritesheet.");
-  } else if (op === "gif" || op === "frames") {
-    files = writeFrames(exportView(studio, s, args, scale).frames, s.palette, file);
+  } else if (op === "gif") {
+    const frames = exportView(studio, s, args, scale).frames;
+    const opaque = s.palette.map((c) => (c | 255) >>> 0);
+    files = writeFrames(s.palette.length > 0 ? inPalette(frames, s.palette) : frames, opaque, file);
+  } else if (op === "frames") {
+    files = writeFrames(exportView(studio, s, args, scale).frames, ownPalette(s), file);
   } else if (op === "spritesheet") {
     files = writeSheet(exportView(studio, s, args, scale), s, file, args);
     if (args.includeJson !== false) atlas = files[0];
