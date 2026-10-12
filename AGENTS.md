@@ -73,6 +73,13 @@ Every workflow under `.github/workflows/`:
 
 Copy both blocks into any new workflow.
 
+## Releasing
+
+Set the same version in `package.json` and `opencode/package.json`, merge, then
+push a tag `v<version>` on that commit. `.github/workflows/release.yml`
+publishes it to npm through Trusted Publishing, with provenance, and refuses a
+tag that does not match both versions. Nothing else publishes.
+
 ## Testing
 
 ```bash
