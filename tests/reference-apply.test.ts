@@ -151,9 +151,9 @@ test("an unreadable file is io_error, and import and sample_palette need a path"
   await rejectsWith(apply(studio, { op: "sample_palette" }), "invalid_args", /'path'/);
 });
 
-test("an op other than list, remove and sample_palette imports, as the extension did", async () => {
+test("an unknown op answers unsupported_command and imports nothing", async () => {
   const { studio, sprite } = setup();
-  const reply = await apply(studio, { op: "trace", path: png("q.png", [[RED]]) });
-  assert.equal(reply.op, "import");
-  assert.equal(sprite.layers.length, 2);
+  await rejectsWith(apply(studio, { op: "trace", path: png("q.png", [[RED]]) }), "unsupported_command", /'trace'/);
+  assert.equal(sprite.layers.length, 1);
+  assert.equal(sprite.modified, false);
 });
