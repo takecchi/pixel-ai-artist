@@ -403,10 +403,46 @@ function selectApply(studio: Studio, args: Record<string, unknown>) {
     } else if (op === "color") {
       const frame = studio.resolveFrame(s, args.frame);
       const flat = studio.composite(s, frame);
-      const wanted = rgbaToHex(hexToRgba(need(args.color, "color") as string), false);
-      for (let i = 0; i < size; i++) {
-        const c = flat.pixels[i]!;
-        if ((c & 255) !== 0 && rgbaToHex(c, false) === wanted) built[i] = 1;
+      const reference = hexToRgba(need(args.color, "color") as string);
+      const wanted = rgbaToHex(reference, false);
+      const tolerance = args.tolerance === undefined || args.tolerance === null ? 0 : num(args.tolerance, "tolerance");
+      const contiguous = args.contiguous === true;
+      // Without a tolerance this stays the exact-RGB, alpha-ignoring match it
+      // always was; with one it is the very comparison fill uses.
+      // The composite is always RGBA, so the sprite's own mode decides whether a
+      // tolerance applies at all.
+      const [rr, rg, rb] = channels(reference);
+      const near = tolerance > 0 && s.colorMode === "rgb" ? Draw.colorMatcher("rgb", rgba(rr, rg, rb, 255), tolerance) : undefined;
+      const matches = (c: number): boolean => (c & 255) !== 0 && (near ? near(c) : rgbaToHex(c, false) === wanted);
+
+      if (!contiguous) {
+        for (let i = 0; i < size; i++) if (matches(flat.pixels[i]!)) built[i] = 1;
+      } else {
+        if (args.x === undefined || args.y === undefined || args.x === null || args.y === null) {
+          throw new ToolError(
+            "invalid_args",
+            "select op 'color' with contiguous needs a starting point: pass 'x' and 'y'.",
+          );
+        }
+        const sx = num(args.x, "x");
+        const sy = num(args.y, "y");
+        if (sx < 0 || sy < 0 || sx >= s.width || sy >= s.height) {
+          throw new ToolError("invalid_args", `Starting point (${sx}, ${sy}) is outside the ${s.width}x${s.height} canvas.`);
+        }
+        // 4-neighbour, like fill.
+        const stack = [sx, sy];
+        const seen = new Uint8Array(size);
+        while (stack.length > 0) {
+          const y = stack.pop()!;
+          const x = stack.pop()!;
+          if (x < 0 || y < 0 || x >= s.width || y >= s.height) continue;
+          const key = y * s.width + x;
+          if (seen[key]) continue;
+          seen[key] = 1;
+          if (!matches(flat.pixels[key]!)) continue;
+          built[key] = 1;
+          stack.push(x + 1, y, x - 1, y, x, y + 1, x, y - 1);
+        }
       }
     } else if (op === "invert") {
       for (let i = 0; i < size; i++) built[i] = current[i] === 0 ? 1 : 0;

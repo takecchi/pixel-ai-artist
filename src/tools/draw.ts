@@ -308,14 +308,16 @@ export function registerDrawTools(server: McpServer, studio: Studio): void {
     {
       title: "Selection",
       description:
-        "Read or change the active selection. Ops: 'get', 'none', 'all', 'rect', 'ellipse', 'color' (select every pixel matching a colour), 'invert', 'grow', 'shrink'. A selection scopes draw, transform and recolor, which is usually cheaper and safer than masking by hand.",
+        "Read or change the active selection. Ops: 'get', 'none', 'all', 'rect', 'ellipse', 'color' (a magic wand: select the pixels of the composited frame matching a colour, within `tolerance`, either all of them or only those connected to a start point x,y), 'invert', 'grow', 'shrink'. A selection scopes draw, transform and recolor, which is usually cheaper and safer than masking by hand.",
       inputSchema: {
         op: z.enum(["get", "none", "all", "rect", "ellipse", "color", "invert", "grow", "shrink"]),
         ...targetShape,
         rect: rectShape.optional(),
         color: hexColor.optional().describe("For op 'color'."),
-        tolerance: z.number().int().min(0).max(255).default(0).describe("Largest per-channel difference (0–255) still counted as the clicked colour. RGB sprites only; indexed and grayscale fills stay exact."),
-        contiguous: z.boolean().default(false).describe("For op 'color'."),
+        tolerance: z.number().int().min(0).max(255).default(0).describe("For op 'color'. Largest per-channel difference (0–255, alpha included) still counted as `color`, the same comparison as draw's fill. 0 matches the exact RGB, ignoring alpha. RGB sprites only; indexed and grayscale sprites stay exact."),
+        contiguous: z.boolean().default(false).describe("For op 'color'. true selects only the region connected (4-neighbour) to the point x,y; false selects every match on the canvas. Needs x and y."),
+        x: z.number().int().optional().describe("For op 'color' with contiguous: starting pixel's x. It must match `color` or nothing is selected."),
+        y: z.number().int().optional().describe("For op 'color' with contiguous: starting pixel's y."),
         amount: z.number().int().positive().default(1).describe("Pixels, for grow/shrink."),
         mode: z
           .enum(["replace", "add", "subtract", "intersect"])
