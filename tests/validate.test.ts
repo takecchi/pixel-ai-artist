@@ -363,6 +363,18 @@ test("hidden layers are left out of the per-pixel scans and counted in a closing
   ]);
 });
 
+test("the hidden-layer note appears only when a check that skips hidden layers runs", async () => {
+  const studio = createStudio();
+  const sprite = studio.addSprite({ width: 2, height: 2, filename: "/tmp/hero.aseprite" });
+  const draft = studio.addLayer(sprite, "draft");
+  draft.visible = false;
+  studio.ensureCel(sprite, draft, 1).image.set(0, 0, rgba(255, 0, 0));
+  const note = (findings: Awaited<ReturnType<typeof run>>) => findings.filter((f) => /hidden layer/.test(f.message));
+  assert.deepEqual(note(await run(studio, { checks: ["palette"] })), []);
+  assert.equal(note(await run(studio, { checks: ["strays"] })).length, 1);
+  assert.equal(note(await run(studio, {})).length, 1);
+});
+
 test("checks limits what runs", async () => {
   const studio = createStudio();
   studio.addSprite({ width: 2, height: 2 });

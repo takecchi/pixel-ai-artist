@@ -200,6 +200,7 @@ export function registerStructureTools(server: McpServer, studio: Studio): void 
       description:
         "Manage cels — one layer's image on one frame. Ops: 'list', 'create', 'clear', 'delete', 'move', 'copy', 'set' (position/opacity), 'tween', 'oscillate'. " +
         "'move' is how you shift a whole limb between frames without redrawing it. " +
+        "'copy' always makes the new cel fully opaque (opacity 255) — it does not carry over the source cel's opacity; set it afterwards with 'set' if it matters. " +
         "'tween' interpolates position or opacity between two frames with an easing curve; 'oscillate' adds a sinusoidal position offset over a frame range — both fill in any missing in-between cels from the start cel.",
       inputSchema: {
         op: z.enum([

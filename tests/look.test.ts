@@ -120,7 +120,9 @@ test("compare shows the reference at full opacity on the left and the art withou
   const ref = studio.addLayer(sprite, "reference");
   ref.opacity = 60;
   studio.ensureCel(sprite, ref, 1).image.set(1, 0, BLUE);
-  studio.ensureCel(sprite, studio.addLayer(sprite, "reference 2"), 1).image.set(1, 0, BLUE);
+  const imported = studio.addLayer(sprite, "concept sheet");
+  imported.reference = true;
+  studio.ensureCel(sprite, imported, 1).image.set(1, 0, BLUE);
   const reply = await studio.call<Reply>("look.compare", { scale: 1 });
   assert.deepEqual([reply.frame, reply.reference, reply.sourceWidth, reply.width], [1, "reference", 2, 5]);
   const img = png(reply);

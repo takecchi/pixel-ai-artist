@@ -58,6 +58,7 @@ function duplicateHere(studio: Studio, sprite: Sprite, layer: Layer): void {
   const active = sprite.activeLayerId;
   const copy = studio.addLayer(sprite, `${layer.name} Copy`);
   Object.assign(copy, { visible: layer.visible, editable: layer.editable, opacity: layer.opacity });
+  if (layer.reference) copy.reference = true;
   for (const [frame, cel] of layer.cels) copy.cels.set(frame, cloneCel(cel));
   sprite.layers.pop();
   sprite.layers.splice(sprite.layers.indexOf(layer) + 1, 0, copy);
@@ -73,6 +74,7 @@ function duplicateInto(studio: Studio, source: Sprite, layer: Layer, target: Spr
   target.activeLayerId = active;
   copy.opacity = layer.opacity;
   copy.visible = layer.visible;
+  if (layer.reference) copy.reference = true;
   let framesDropped = 0;
   for (const [frame, cel] of layer.cels) {
     if (frame > target.frames.length) {
