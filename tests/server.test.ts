@@ -192,15 +192,30 @@ test("the server instructions carry the rules an agent gets wrong catastrophical
   await close();
 });
 
-test("a refused call comes back as an error result carrying its code, not a protocol error", async () => {
+/** The code a tool error leads its text with. */
+function errorCode(result: { content?: unknown }): string | undefined {
+  const first = (result.content as { type: string; text?: string }[] | undefined)?.find((c) => c.type === "text");
+  return first?.text?.split("\n")[0]?.split(":")[0];
+}
+
+test("a refused call comes back as an error result whose text leads with its code, not a protocol error", async () => {
   const { client, close } = await connected();
   const result = await client.callTool({
     name: "transform",
     arguments: { op: "rotate", angle: 45 },
   });
   assert.equal(result.isError, true);
-  const structured = result.structuredContent as { ok?: boolean; code?: string };
-  assert.deepEqual([structured.ok, structured.code], [false, "refused"]);
+  assert.equal(errorCode(result), "refused");
+  await close();
+});
+
+test("an error from a tool whose output schema has required fields reaches an SDK client as a tool error", async () => {
+  const { client, close } = await connected();
+  // sprite_info's schema requires id, name, width…; with nothing open it errors.
+  const result = await client.callTool({ name: "sprite_info", arguments: {} });
+  assert.equal(result.isError, true);
+  assert.equal(result.structuredContent, undefined);
+  assert.equal(errorCode(result), "no_active_sprite");
   await close();
 });
 
@@ -241,8 +256,7 @@ test("draw measureOnly rejects a batch that mixes a non-text op", async () => {
     },
   });
   assert.equal(result.isError, true);
-  const structured = result.structuredContent as { code?: string };
-  assert.equal(structured.code, "invalid_args");
+  assert.equal(errorCode(result), "invalid_args");
   await close();
 });
 
