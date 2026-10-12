@@ -43,6 +43,19 @@ test("list reports every cel's layer, frame, bounds and opacity", async () => {
   assert.equal(sprite.modified, false);
 });
 
+test("list with a layer or a frame reports only the cels there, and refuses an unknown layer", async () => {
+  const { studio, sprite } = setup();
+  const top = studio.addLayer(sprite, "top");
+  studio.ensureCel(sprite, top, 1);
+  studio.ensureCel(sprite, top, 2);
+  const cels = async (args: Record<string, unknown>) =>
+    (await apply(studio, { op: "list", ...args })).cels.map((c: Reply) => [c.layer, c.frame]);
+  assert.deepEqual(await cels({ layer: "top" }), [["top", 1], ["top", 2]]);
+  assert.deepEqual(await cels({ frame: 1 }), [["Layer 1", 1], ["top", 1]]);
+  assert.deepEqual(await cels({ layer: "top", frame: 2 }), [["top", 2]]);
+  await rejectsWith(apply(studio, { op: "list", layer: "nope" }), "invalid_args", /No layer named 'nope'/);
+});
+
 test("create makes an empty canvas-sized cel where there is none and keeps one that exists", async () => {
   const { studio, sprite, layer } = setup();
   const reply = await apply(studio, { op: "create", frame: 2 });
