@@ -1,10 +1,10 @@
-import { presets } from "../../lib/palettes.js";
 import { ToolError, need } from "../errors.js";
+import { openSprite, saveSprite } from "../files.js";
 import {
   Image,
   channels,
+  defaultPalette,
   displayName,
-  hexToRgba,
   pixelToRgba,
   rgbaToHex,
   rgbaToPixel,
@@ -77,11 +77,6 @@ function sizeArg(value: unknown, name: string): number {
     throw new ToolError("invalid_args", `${name} must be a positive integer, got ${String(n)}.`);
   }
   return n;
-}
-
-/** Aseprite gives every new sprite its default palette, DawnBringer 32. */
-function defaultPalette(): Rgba[] {
-  return presets()["dawnbringer-32"]!.colors.map(hexToRgba);
 }
 
 const ANCHORS: Record<string, [number, number]> = {
@@ -202,11 +197,9 @@ function spriteManage(studio: Studio, args: Record<string, unknown>) {
     return { sprite: displayName(s), id: s.id, width: s.width, height: s.height };
   }
 
-  if (op === "open" || op === "save" || op === "save_as") {
-    throw new ToolError("unsupported_command", `sprite.manage op '${op}' is not available yet.`, {
-      command: "sprite.manage",
-      op,
-    });
+  if (op === "open") {
+    const s = openSprite(studio, String(need(args.path, "path")));
+    return { sprite: displayName(s), id: s.id, width: s.width, height: s.height };
   }
 
   if (typeof op === "string" && op.startsWith("slice_")) {
@@ -218,6 +211,19 @@ function spriteManage(studio: Studio, args: Record<string, unknown>) {
   if (op === "activate") {
     studio.activate(s);
     return { sprite: displayName(s), id: s.id };
+  }
+
+  if (op === "save") {
+    if (!s.filename) {
+      throw new ToolError("invalid_args", "This sprite has never been saved. Use op 'save_as' with a path.");
+    }
+    saveSprite(studio, s, s.filename);
+    return { sprite: displayName(s), id: s.id, path: s.filename };
+  }
+
+  if (op === "save_as") {
+    saveSprite(studio, s, String(need(args.path, "path")));
+    return { sprite: displayName(s), id: s.id, path: s.filename };
   }
 
   if (op === "close") {

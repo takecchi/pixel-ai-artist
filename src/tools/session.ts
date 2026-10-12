@@ -159,7 +159,12 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
           "slice_delete",
         ]),
         sprite: targetShape.sprite,
-        path: z.string().optional().describe("File path for 'open' and 'save_as'."),
+        path: z
+          .string()
+          .optional()
+          .describe(
+            "File path for 'open' (a PNG, GIF or JPEG, read by its content) and 'save_as' (.png — one file per frame, numbered as Aseprite numbers them, when there are several — or .gif in the sprite's palette).",
+          ),
         width: z.number().int().positive().optional(),
         height: z.number().int().positive().optional(),
         colorMode: z.enum(["rgb", "grayscale", "indexed"]).optional().describe("For 'new'. Indexed keeps a sprite honest about its palette."),
