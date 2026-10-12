@@ -60,7 +60,7 @@ export function openSprite(studio: Studio, file: string): { sprite: Sprite } & A
   sprite.frames = doc.frames.map((f) => ({ durationMs: f.durationMs }));
   doc.frames.forEach((f, i) => layer.cels.set(i + 1, { x: 0, y: 0, image: f.image, opacity: 255 }));
   sprite.modified = false;
-  return { sprite, renamedLayers: [], lostOnSave: {}, skippedOnOpen: {} };
+  return { sprite, renamedLayers: [], lostOnSave: {}, skippedOnOpen: {}, misplacedBackground: [] };
 }
 
 export function isAsepritePath(file: string): boolean {

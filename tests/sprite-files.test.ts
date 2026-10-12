@@ -281,15 +281,18 @@ test("open of an indexed PNG with no transparency makes a Background layer, and 
   });
 });
 
-test("export png of an indexed PNG opened with no transparency writes its index-0 pixels as opaque", async () => {
+test("an indexed Background's transparent index is clear in export png, as the Lua handler's fresh sprite wrote it, but opaque in save_as", async () => {
   await inTempDir(async (dir) => {
     const file = path.join(dir, "opaque.png");
     writeFileSync(file, indexedPng(2, 1, [[0, 0, 0], [255, 0, 0]], [0, 1]));
     const studio = createStudio();
     await manage(studio, { op: "open", path: file });
-    const out = path.join(dir, "out.png");
-    await studio.call("export.run", { op: "png", path: out });
-    assert.deepEqual([...readPng(out).pixels], [BLACK, RED]);
+    const exported = path.join(dir, "exported.png");
+    await studio.call("export.run", { op: "png", path: exported });
+    assert.deepEqual([...readPng(exported).pixels], [0, RED]);
+    const saved = path.join(dir, "saved.png");
+    await manage(studio, { op: "save_as", path: saved });
+    assert.deepEqual([...readPng(saved).pixels], [BLACK, RED]);
   });
 });
 

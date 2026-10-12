@@ -122,6 +122,11 @@ export interface AseOpenNotes {
   lostOnSave: Record<string, number>;
   /** Left out when the file was read, as Aseprite leaves them out. */
   skippedOnOpen: Record<string, number>;
+  /**
+   * Background layers when one is not the bottom layer or there are several:
+   * Aseprite opens such a file as it is, and they are still drawn first.
+   */
+  misplacedBackground: string[];
 }
 
 function counts(entries: [string, number][]): Record<string, number> {
@@ -229,9 +234,12 @@ export function spriteFromAse(studio: Studio, file: AseDecoded, filename: string
   sprite.activeLayerId = layers.at(-1)?.id ?? null;
   sprite.activeFrame = 1;
   sprite.modified = false;
+  const backgrounds = layers.filter((l) => l.background);
+  const misplaced = backgrounds.length > 1 || (backgrounds.length === 1 && layers[0] !== backgrounds[0]);
   return {
     sprite,
     renamedLayers: renamed,
+    misplacedBackground: misplaced ? backgrounds.map((l) => l.name) : [],
     lostOnSave: counts([
       ["linkedCels", linkedCels],
       ["layerUuids", file.features.layerUuids],
@@ -270,7 +278,9 @@ function layerUserData(l: Layer): AseUserData | undefined {
   const markLine = l.reference && !l.aseprite?.referenceFlag;
   if (!markLine) return kept;
   const eol = kept?.text?.includes("\r\n") ? "\r\n" : "\n";
-  const text = kept?.text ? `${kept.text}${eol}${REFERENCE_MARK}` : REFERENCE_MARK;
+  const before = kept?.text ?? "";
+  // Text that already ends a line takes the mark as its next line, ended the same way, so a CRLF file reads back as it was.
+  const text = before === "" ? REFERENCE_MARK : before.endsWith("\n") ? `${before}${REFERENCE_MARK}${eol}` : `${before}${eol}${REFERENCE_MARK}`;
   return { ...kept, text };
 }
 

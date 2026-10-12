@@ -193,7 +193,7 @@ function spriteManage(studio: Studio, args: Record<string, unknown>) {
   }
 
   if (op === "open") {
-    const { sprite: s, renamedLayers, lostOnSave, skippedOnOpen } = openSprite(studio, String(need(args.path, "path")));
+    const { sprite: s, renamedLayers, lostOnSave, skippedOnOpen, misplacedBackground } = openSprite(studio, String(need(args.path, "path")));
     return {
       sprite: displayName(s),
       id: s.id,
@@ -202,6 +202,7 @@ function spriteManage(studio: Studio, args: Record<string, unknown>) {
       ...(renamedLayers.length > 0 ? { renamedLayers } : {}),
       ...(Object.keys(lostOnSave).length > 0 ? { lostOnSave } : {}),
       ...(Object.keys(skippedOnOpen).length > 0 ? { skippedOnOpen } : {}),
+      ...(misplacedBackground.length > 0 ? { misplacedBackground } : {}),
     };
   }
 

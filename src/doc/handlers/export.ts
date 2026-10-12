@@ -40,7 +40,12 @@ interface ExportView {
   layers: Layer[];
 }
 
-function exportView(studio: Studio, s: Sprite, args: Record<string, unknown>, scale: number): ExportView {
+/**
+ * `intoNewSprite` renders as the Lua handler's png op and Aseprite's sheet
+ * texture did, drawing into a fresh image of the sprite's colour mode: an
+ * indexed sprite's transparent index stays clear even on a Background.
+ */
+function exportView(studio: Studio, s: Sprite, args: Record<string, unknown>, scale: number, intoNewSprite = false): ExportView {
   const tagNames = names(args.tags, "tags");
   const layerNames = names(args.layers, "layers");
   // Resolved before rendering, so an unknown name is refused rather than exporting everything.
@@ -58,7 +63,7 @@ function exportView(studio: Studio, s: Sprite, args: Record<string, unknown>, sc
     : s.layers.filter((l) => l.visible);
   const frames = kept.map((n) => ({
     image: scaleNearest(
-      layerNames ? studio.composite(s, n, { layers, includeHidden: true }) : studio.composite(s, n),
+      studio.composite(s, n, { ...(layerNames ? { layers, includeHidden: true } : {}), clearTransparentIndex: intoNewSprite }),
       scale,
     ),
     durationMs: s.frames[n - 1]!.durationMs,
@@ -136,11 +141,11 @@ function writeSheet(view: ExportView, s: Sprite, file: string, args: Record<stri
 
 /**
  * gif and frames were saved from the sprite, or a copy of it, which keeps a
- * Background; Aseprite writes those with no transparency. png flattened into
- * a fresh sprite in the Lua handler, which would keep a hole in the Background
- * transparent while sprite.manage save writes it opaque; png follows save, so
- * one picture leaves the same way. spritesheet keeps transparency, as
- * Aseprite renders the sheet into a new texture sprite with no Background.
+ * Background; Aseprite writes those with no transparency. png and spritesheet
+ * are not passed through here: the Lua handler flattened png into a fresh
+ * sprite and Aseprite renders a sheet into a new texture, neither with a
+ * Background, so a hole in it stays transparent there even though
+ * sprite.manage save writes it opaque.
  */
 function savedFrames(view: ExportView): AnimationFrame[] {
   return view.layers.some((l) => l.background) ? opaqueFrames(view.frames) : view.frames;
@@ -168,8 +173,8 @@ function exportRun(studio: Studio, args: Record<string, unknown>) {
       throw new ToolError("invalid_args", "'png' writes one frame, picked with `frame`; `tags` applies to gif, frames and spritesheet.");
     }
     frame = studio.resolveFrame(s, args.frame);
-    const view = exportView(studio, s, args, scale);
-    files = writeFrames([savedFrames(view)[frame - 1]!], ownPalette(s), file);
+    const view = exportView(studio, s, args, scale, true);
+    files = writeFrames([view.frames[frame - 1]!], ownPalette(s), file);
   } else if (op === "aseprite") {
     if (filtered) {
       throw new ToolError("invalid_args", "'aseprite' saves the whole document; `layers` and `tags` apply to png, gif, frames and spritesheet.");
@@ -188,7 +193,7 @@ function exportRun(studio: Studio, args: Record<string, unknown>) {
   } else if (op === "frames") {
     files = writeFrames(savedFrames(exportView(studio, s, args, scale)), ownPalette(s), file);
   } else if (op === "spritesheet") {
-    files = writeSheet(exportView(studio, s, args, scale), s, file, args);
+    files = writeSheet(exportView(studio, s, args, scale, true), s, file, args);
     if (args.includeJson !== false) atlas = files[0];
   } else {
     throw new ToolError("unsupported_command", `export op '${String(op)}' is not supported.`);

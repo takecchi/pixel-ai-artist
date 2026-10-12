@@ -1,5 +1,5 @@
 import { ToolError, need } from "../errors.js";
-import { Image, displayName, pixelToRgba, rgbaToPixel, type Cel, type Layer, type Sprite } from "../model.js";
+import { Image, TRANSPARENT, displayName, pixelToRgba, rgbaToPixel, type Cel, type Layer, type Sprite } from "../model.js";
 import { over, type HandlerTable, type Studio } from "../studio.js";
 import { layerInfo } from "./sprite.js";
 
@@ -125,6 +125,8 @@ function mergeDown(studio: Studio, sprite: Sprite, layer: Layer): void {
   const at = sprite.layers.indexOf(layer);
   const below = sprite.layers[at - 1];
   if (!below) throw new ToolError("invalid_args", `'${layer.name}' is the bottom layer; there is nothing to merge it into.`);
+  // A Background above a plain layer is drawn under it, as composite draws Backgrounds first; the merge keeps that picture.
+  const backgroundFirst = layer.background === true && !below.background;
   for (const [frame, upper] of layer.cels) {
     const lower = studio.ensureCel(sprite, below, frame, { x: upper.x, y: upper.y, width: upper.image.width, height: upper.image.height });
     // The batch snapshot shares image buffers; write to a fresh one so a later failure can roll back.
@@ -135,7 +137,9 @@ function mergeDown(studio: Studio, sprite: Sprite, layer: Layer): void {
         const lx = upper.x + x - lower.x;
         const ly = upper.y + y - lower.y;
         if (!lower.image.contains(lx, ly)) continue;
-        const mixed = over(pixelToRgba(sprite, lower.image.get(lx, ly), below), pixelToRgba(sprite, upper.image.get(x, y), layer), opacity);
+        const lowerColor = pixelToRgba(sprite, lower.image.get(lx, ly), below);
+        const upperColor = pixelToRgba(sprite, upper.image.get(x, y), layer);
+        const mixed = backgroundFirst ? over(over(TRANSPARENT, upperColor, opacity), lowerColor) : over(lowerColor, upperColor, opacity);
         lower.image.set(lx, ly, (mixed & 255) === 0 ? lower.image.get(lx, ly) : rgbaToPixel(sprite, mixed));
       }
     }

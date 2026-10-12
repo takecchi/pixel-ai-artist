@@ -129,7 +129,7 @@ test("save_as .png and .gif keep their transparency when the Background is hidde
 
 // ── export ──────────────────────────────────────────────────────────────
 
-test("export gif, frames and png write a Background's sprite opaque, as save does, and spritesheet keeps its transparency", async () => {
+test("export gif and frames write a Background's sprite opaque, as save does, while png and spritesheet keep a hole transparent, as the Lua handler and Aseprite wrote them", async () => {
   await inTempDir(async (dir) => {
     const { studio } = await sprite2x1({ Ink: [RED, 0], Paper: [0, 0] }, ["Paper"]);
     const run = (args: Record<string, unknown>) => studio.call<Reply>("export.run", args);
@@ -139,9 +139,33 @@ test("export gif, frames and png write a Background's sprite opaque, as save doe
     await run({ op: "spritesheet", path: path.join(dir, "sheet.png"), includeJson: false });
     assert.ok(readGif(path.join(dir, "a.gif")).frames[0]!.image.pixels.every((v) => (v & 255) === 255), "gif");
     assert.deepEqual([...readPng(path.join(dir, "frames.png")).pixels], [RED, BLACK], "frames");
-    assert.deepEqual([...readPng(path.join(dir, "still.png")).pixels], [RED, BLACK], "png");
+    assert.deepEqual([...readPng(path.join(dir, "still.png")).pixels], [RED, 0], "png");
     assert.deepEqual([...readPng(path.join(dir, "sheet.png")).pixels], [RED, 0], "spritesheet");
   });
+});
+
+test("an indexed Background's transparent index is clear in an exported spritesheet, as Aseprite renders a sheet, but opaque in save_as png", async () => {
+  await inTempDir(async (dir) => {
+    const studio = createStudio();
+    await manage(studio, { op: "new", width: 2, height: 1, colorMode: "indexed" });
+    const sprite = studio.activeSprite()!;
+    sprite.palette = [BLACK, RED, BLUE];
+    sprite.transparentIndex = 0;
+    sprite.layers[0]!.background = true;
+    studio.ensureCel(sprite, sprite.layers[0]!, 1).image = img(2, 1, [0, 1]);
+    const sheet = path.join(dir, "sheet.png");
+    await studio.call<Reply>("export.run", { op: "spritesheet", path: sheet, includeJson: false });
+    assert.deepEqual([...readPng(sheet).pixels], [0, RED]);
+    const saved = path.join(dir, "saved.png");
+    await manage(studio, { op: "save_as", path: saved });
+    assert.deepEqual([...readPng(saved).pixels], [BLACK, RED]);
+  });
+});
+
+test("a Background below 255 opacity composites faintly, as Aseprite draws it", async () => {
+  const { studio, sprite } = await sprite2x1({ Paper: [RED, RED] }, ["Paper"]);
+  sprite.layers[0]!.opacity = 128;
+  assert.deepEqual([...studio.composite(sprite, 1).pixels], [rgba(255, 0, 0, 128), rgba(255, 0, 0, 128)]);
 });
 
 test("export gif and frames keep transparency when `layers` leaves the Background out", async () => {

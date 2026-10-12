@@ -5,7 +5,10 @@ import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { deflateSync } from "node:zlib";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { Image, ToolError, createStudio, rgba } from "../dist/doc/index.js";
+import { createServer } from "../dist/server.js";
 import { spriteFromAse } from "../dist/doc/aseprite.js";
 import { decodeAse, encodeAse } from "../dist/lib/ase.js";
 import type { AseFile, AseLayer } from "../dist/lib/ase.js";
@@ -952,7 +955,60 @@ test("an object with no user data in the file is saved with none", async () => {
   });
 });
 
+// ── Background layers that are not alone at the bottom ──────────────────
+
+test("open answers misplacedBackground with the name of a Background that is not the bottom layer", async () => {
+  await inTempDir(async (dir) => {
+    const file = aseFile([aseLayer("Ink"), aseLayer("Paper", { background: true })]);
+    const reply = await manage(createStudio(), { op: "open", path: write(dir, "high.aseprite", encodeAse(file)) });
+    assert.deepEqual(reply.misplacedBackground, ["Paper"]);
+  });
+});
+
+test("open answers misplacedBackground with every Background when there are several, even at the bottom", async () => {
+  await inTempDir(async (dir) => {
+    const file = aseFile([aseLayer("Base", { background: true }), aseLayer("Ink"), aseLayer("Paper", { background: true })]);
+    const reply = await manage(createStudio(), { op: "open", path: write(dir, "two.aseprite", encodeAse(file)) });
+    assert.deepEqual(reply.misplacedBackground, ["Base", "Paper"]);
+  });
+});
+
+test("open answers no misplacedBackground for one Background at the bottom, or for none", async () => {
+  await inTempDir(async (dir) => {
+    for (const layers of [[aseLayer("Paper", { background: true }), aseLayer("Ink")], [aseLayer("Ink")]]) {
+      const reply = await manage(createStudio(), { op: "open", path: write(dir, "fine.aseprite", encodeAse(aseFile(layers))) });
+      assert.equal("misplacedBackground" in reply, false);
+    }
+  });
+});
+
+test("the sprite_manage tool's reply text names a misplaced Background layer, and says nothing of it otherwise", async () => {
+  await inTempDir(async (dir) => {
+    const { server } = createServer();
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "test", version: "0" });
+    await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
+    const text = (r: { content?: unknown }) => (r.content as { type: string; text?: string }[]).find((c) => c.type === "text")?.text ?? "";
+    const high = write(dir, "high.aseprite", encodeAse(aseFile([aseLayer("Ink"), aseLayer("Paper", { background: true })])));
+    const res = await client.callTool({ name: "sprite_manage", arguments: { op: "open", path: high } });
+    assert.ok(!res.isError, text(res));
+    assert.deepEqual((res.structuredContent as Reply).misplacedBackground, ["Paper"]);
+    assert.match(text(res), /Background layers not alone at the bottom: 'Paper'/);
+    const fine = write(dir, "fine.aseprite", encodeAse(aseFile([aseLayer("Paper", { background: true })])));
+    assert.doesNotMatch(text(await client.callTool({ name: "sprite_manage", arguments: { op: "open", path: fine } })), /Background layers not alone/);
+    await server.close();
+  });
+});
+
 // ── the reference mark in CRLF text ───────────────────────────────────
+
+test("a CRLF text that already ends its last line is written back as it was, with the mark as that line", async () => {
+  await inTempDir(async (dir) => {
+    const text = `x\r\n${MARK}\r\n`;
+    const { studio } = await opened(write(dir, "tail.aseprite", encodeAse(aseFile([aseLayer("ref", { userData: { text } })]))));
+    assert.equal((await savedAse(studio, dir)).layers[0]!.userData?.text, text);
+  });
+});
 
 test("a mark line ending in CRLF is found, and the rest of the text keeps its CRLF", async () => {
   await inTempDir(async (dir) => {

@@ -38,7 +38,7 @@ function remapArt(sprite: Sprite): void {
       const cache = new Map<number, number>();
       const img = cel.image.clone();
       img.pixels.forEach((value, i) => {
-        const c = pixelToRgba(sprite, value, layer);
+        const c = pixelToRgba(sprite, value);
         if ((c & 255) === 0) return;
         let mapped = cache.get(value);
         if (mapped === undefined) {

@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { Image, createStudio, rgba } from "../dist/doc/index.js";
+import { decodePng } from "../dist/lib/png.js";
 import { createServer } from "../dist/server.js";
 
 type Reply = Record<string, any>;
@@ -191,4 +192,107 @@ test("changing an indexed sprite without a Background to rgb leaves the transpar
   const { studio, sprite } = indexed(false);
   await studio.call<Reply>("sprite.manage", { op: "set_properties", colorMode: "rgb" });
   assert.deepEqual(composite(studio, sprite), [0, RED]);
+});
+
+// ── merge order ─────────────────────────────────────────────────────────
+
+test("merging a Background that sits above a plain layer keeps the composite, which draws the Background first, in rgb", async () => {
+  const BLUE = rgba(0, 0, 255);
+  const studio = createStudio();
+  const sprite = studio.addSprite({ width: 2, height: 1 });
+  studio.ensureCel(sprite, sprite.layers[0]!, 1).image = img(2, 1, [RED, 0]);
+  const paper = studio.addLayer(sprite, "Paper");
+  paper.background = true;
+  studio.ensureCel(sprite, paper, 1).image = img(2, 1, [BLUE, BLUE]);
+  assert.deepEqual(composite(studio, sprite), [RED, BLUE]);
+  await studio.call<Reply>("layer.apply", { op: "merge", name: "Paper" });
+  assert.deepEqual(sprite.layers.map((l) => l.name), ["Layer 1"]);
+  assert.deepEqual(composite(studio, sprite), [RED, BLUE]);
+});
+
+test("merging a Background that sits above a plain layer keeps the composite, which draws the Background first, in indexed", async () => {
+  const studio = createStudio();
+  const sprite = studio.addSprite({ width: 2, height: 1, colorMode: "indexed", palette: [WHITE, RED, GREEN] });
+  sprite.transparentIndex = 0;
+  studio.ensureCel(sprite, sprite.layers[0]!, 1).image = img(2, 1, [1, 0]);
+  const paper = studio.addLayer(sprite, "Paper");
+  paper.background = true;
+  studio.ensureCel(sprite, paper, 1).image = img(2, 1, [2, 2]);
+  assert.deepEqual(composite(studio, sprite), [RED, GREEN]);
+  await studio.call<Reply>("layer.apply", { op: "merge", name: "Paper" });
+  assert.deepEqual(composite(studio, sprite), [RED, GREEN]);
+  assert.deepEqual([...sprite.layers[0]!.cels.get(1)!.image.pixels], [1, 2]);
+});
+
+// ── tools that hand a Background layer's transparent index on as colour ─
+
+/** A sprite whose one Background layer holds `rows` of palette indexes: palette [white, red, green], transparent index 0. */
+function backgroundOf(rows: number[][], studio = createStudio()) {
+  const sprite = studio.addSprite({ width: rows[0]!.length, height: rows.length, colorMode: "indexed", palette: [WHITE, RED, GREEN], filename: "/tmp/bg.aseprite" });
+  sprite.transparentIndex = 0;
+  const layer = sprite.layers[0]!;
+  layer.background = true;
+  studio.ensureCel(sprite, layer, 1).image = img(rows[0]!.length, rows.length, rows.flat());
+  return { studio, sprite, layer };
+}
+
+const findings = async (studio: ReturnType<typeof createStudio>, args: Record<string, unknown>) =>
+  (await studio.call<{ findings: Reply[] }>("validate.run", args)).findings;
+
+test("look preview of a layer shows a Background's transparent-index pixel as its palette colour", async () => {
+  const { studio } = backgroundOf([[0, 1]]);
+  const reply = await studio.call<Reply>("look.preview", { layer: "Layer 1", scale: 1 });
+  const shown = decodePng(reply.png);
+  assert.deepEqual([shown.get(0, 0), shown.get(1, 0)], [WHITE, RED]);
+});
+
+test("outline inside recolours a Background's border pixels even where they hold the transparent index", async () => {
+  const { studio, layer } = backgroundOf([[0, 0, 0], [0, 0, 0], [0, 0, 0]]);
+  const r = await studio.call<Reply>("transform.apply", { op: "outline", color: "#00ff00", side: "inside" });
+  assert.equal(r.pixelsChanged, 8);
+  assert.deepEqual([...layer.cels.get(1)!.image.pixels], [2, 2, 2, 2, 0, 2, 2, 2, 2]);
+});
+
+test("outline outside grows a ring around a Background pixel that holds the transparent index", async () => {
+  const { studio, layer } = backgroundOf([[0]]);
+  const r = await studio.call<Reply>("transform.apply", { op: "outline", color: "#00ff00", side: "outside" });
+  assert.equal(r.pixelsChanged, 4);
+  assert.deepEqual([...layer.cels.get(1)!.image.pixels], [0, 2, 0, 2, 0, 2, 0, 2, 0]);
+});
+
+test("blit with skipTransparent copies a Background's transparent-index pixel, which is a colour there", async () => {
+  const { studio, sprite } = backgroundOf([[0, 1, 1, 1]]);
+  const ink = studio.addLayer(sprite, "ink");
+  const cel = studio.ensureCel(sprite, ink, 1);
+  cel.image = img(4, 1, [0, 0, 2, 2]);
+  const r = await studio.call<Reply>("draw.batch", {
+    layer: "ink",
+    paletteLock: false,
+    ops: [{ kind: "blit", from: { x: 0, y: 0, width: 2, height: 1 }, to: { x: 2, y: 0 }, fromLayer: "Layer 1" }],
+  });
+  assert.equal(r.pixelsChanged, 2);
+  assert.deepEqual([...cel.image.pixels], [0, 0, 0, 1]);
+});
+
+test("validate outline counts a Background's transparent-index pixel as a white edge colour, and as no hole beside the inner pixel", async () => {
+  const { studio } = backgroundOf([[0, 0, 0], [0, 1, 0], [1, 1, 0]]);
+  const found = await findings(studio, { checks: ["outline"] });
+  assert.deepEqual(found.map((f) => [f.check, f.severity, f.count]), [["outline", "warning", 2]]);
+});
+
+test("validate outline sees an inner pixel of a Background as enclosed by the transparent-index pixels around it", async () => {
+  const { studio } = backgroundOf([[0, 0, 0], [0, 1, 0], [0, 0, 0]]);
+  assert.deepEqual(await findings(studio, { checks: ["outline"] }), []);
+});
+
+test("validate banding finds a straight boundary under a Background's transparent-index row", async () => {
+  const top = await findings(backgroundOf([Array(8).fill(0), Array(8).fill(1)]).studio, { checks: ["banding"] });
+  assert.deepEqual(top.map((f) => [f.check, f.count]), [["banding", 8]]);
+  const bottom = await findings(backgroundOf([Array(8).fill(1), Array(8).fill(0)]).studio, { checks: ["banding"] });
+  assert.deepEqual(bottom.map((f) => [f.check, f.count]), [["banding", 8]]);
+});
+
+test("validate expect.layerFrames counts a Background cel of only the transparent index as art", async () => {
+  const { studio } = backgroundOf([[0, 0]]);
+  assert.deepEqual(await findings(studio, { checks: [], expect: { layerFrames: { "Layer 1": [[1, 1]] } } }), []);
 });
