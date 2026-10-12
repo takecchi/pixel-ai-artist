@@ -81,7 +81,8 @@ export function registerAssetTools(server: McpServer, studio: Studio): void {
       title: "Export",
       description:
         "Write game-ready files. Ops: 'png' (single frame), 'gif' (animation), 'spritesheet' (packed sheet plus a JSON atlas with per-frame and per-tag data), 'frames' (numbered PNGs), 'aseprite' (a copy of the document as an .aseprite file). " +
-        "Spritesheet is what an engine actually consumes: pass `sheetType` and `byTag` to control layout. Exporting does not save the working document — use sprite_manage op 'save' for that.",
+        "Spritesheet is what an engine actually consumes: pass `sheetType` and `byTag` to control layout. Exporting does not save the working document — use sprite_manage op 'save' for that. " +
+        "Reference layers are not left out: a visible one is drawn into the files like any other layer, so `reference op=\"remove\"` it or hide it first.",
       inputSchema: {
         op: z.enum(["png", "gif", "spritesheet", "frames", "aseprite"]),
         sprite: targetShape.sprite,
