@@ -159,6 +159,15 @@ test("remove refuses a layer that is not a reference, pointing at list, and keep
   assert.deepEqual(sprite.layers.map((l) => l.name), ["Layer 1", "ink"]);
 });
 
+test("importing under a name a layer already has takes the next free ' 2', ' 3' and reports it", async () => {
+  const { studio, sprite } = setup();
+  const file = png("twice.png", [[RED]]);
+  await apply(studio, { op: "import", path: file });
+  assert.equal((await apply(studio, { op: "import", path: file })).layer, "reference 2");
+  assert.equal((await apply(studio, { op: "import", path: file })).layer, "reference 3");
+  assert.deepEqual(sprite.layers.map((l) => l.name), ["Layer 1", "reference", "reference 2", "reference 3"]);
+});
+
 test("a duplicated reference layer is still a reference", async () => {
   const { studio, sprite } = setup();
   await apply(studio, { op: "import", path: png("d.png", [[RED]]), name: "pose" });
