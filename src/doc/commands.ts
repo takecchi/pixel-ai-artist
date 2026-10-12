@@ -5,6 +5,7 @@
  * rather than pretending to succeed.
  */
 
+import { pixelHandlers } from "./handlers/pixels.js";
 import { sessionHandlers } from "./handlers/session.js";
 import { spriteHandlers } from "./handlers/sprite.js";
 import type { HandlerTable } from "./studio.js";
@@ -12,4 +13,5 @@ import type { HandlerTable } from "./studio.js";
 export const handlers: HandlerTable = {
   ...sessionHandlers,
   ...spriteHandlers,
+  ...pixelHandlers,
 };
