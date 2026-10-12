@@ -57,12 +57,12 @@ export function readRegion(sprite: Sprite, source: PixelSource, rect: Rect) {
 
 function pixelsRead(studio: Studio, args: Record<string, unknown>) {
   const sprite = studio.resolveSprite(args.sprite);
-  // The extension resolved the layer even for a composite read, so an unknown
-  // name is refused there too; kept until that is changed on purpose.
-  const layer = studio.resolveLayer(sprite, args.layer);
   const frame = studio.resolveFrame(sprite, args.frame);
   const rect = clampRegion(sprite, args.region);
-  const source = args.composite === false ? celSource(studio, sprite, layer, frame) : compositeSource(studio, sprite, frame);
+  const source =
+    args.composite === false
+      ? celSource(studio, sprite, studio.resolveLayer(sprite, args.layer), frame)
+      : compositeSource(studio, sprite, frame);
   return readRegion(sprite, source, rect);
 }
 
