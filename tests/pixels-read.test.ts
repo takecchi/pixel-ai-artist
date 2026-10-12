@@ -135,9 +135,15 @@ test("a grayscale sprite reads without alpha", async () => {
   assert.deepEqual((await studio.call<Reply>("pixels.read", { composite: false })).colors, ["#00000000", "#505050"]);
 });
 
-test("an unknown layer name is invalid_args even for a composite read, as in the extension", async () => {
+test("a composite read does not look at layer, so any name reads the whole picture", async () => {
   const { studio } = setup();
-  await rejectsWith(studio.call("pixels.read", { layer: "nope" }), "invalid_args", /No layer named 'nope'/);
+  const plain = await studio.call<Reply>("pixels.read");
+  assert.deepEqual(await studio.call<Reply>("pixels.read", { layer: "nope" }), plain);
+});
+
+test("a single-layer read of an unknown layer is invalid_args", async () => {
+  const { studio } = setup();
+  await rejectsWith(studio.call("pixels.read", { layer: "nope", composite: false }), "invalid_args", /No layer named 'nope'/);
 });
 
 test("reading does not change the document", async () => {
