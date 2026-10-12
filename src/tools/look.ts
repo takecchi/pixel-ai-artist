@@ -1,6 +1,3 @@
-import { readFile, unlink } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import path from "node:path";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Studio } from "../doc/index.js";
@@ -171,7 +168,6 @@ export function registerLookTools(server: McpServer, studio: Studio): void {
           }
 
           case "onion": {
-            const out = tempPng("onion");
             const meta = await studio.call<{
               sprite: string;
               frame: number;
@@ -181,6 +177,7 @@ export function registerLookTools(server: McpServer, studio: Studio): void {
               width: number;
               height: number;
               scale: number;
+              png: Uint8Array;
             }>("look.onion", {
               sprite: args.sprite,
               frame: args.frame,
@@ -189,10 +186,9 @@ export function registerLookTools(server: McpServer, studio: Studio): void {
               ghostOpacity: args.ghostOpacity,
               layer: args.layer,
               region: args.region,
-              path: out,
               scale: args.scale,
             });
-            const image = await readAndClean(out);
+            const image = pngImage(meta.png);
             return okWithImage(
               {
                 op: "onion",
@@ -208,21 +204,20 @@ export function registerLookTools(server: McpServer, studio: Studio): void {
           }
 
           case "filmstrip": {
-            const out = tempPng("filmstrip");
             const meta = await studio.call<{
               sprite: string;
               frames: number;
               width: number;
               height: number;
               scale: number;
+              png: Uint8Array;
             }>("look.filmstrip", {
               sprite: args.sprite,
               layer: args.layer,
-              path: out,
               scale: args.scale,
             });
             const layout = filmstripLayout(meta.frames);
-            const image = await readAndClean(out);
+            const image = pngImage(meta.png);
             return okWithImage(
               {
                 op: "filmstrip",
@@ -240,7 +235,6 @@ export function registerLookTools(server: McpServer, studio: Studio): void {
           }
 
           case "compare": {
-            const out = tempPng("compare");
             const meta = await studio.call<{
               sprite: string;
               frame: number;
@@ -248,6 +242,7 @@ export function registerLookTools(server: McpServer, studio: Studio): void {
               sourceWidth: number;
               sourceHeight: number;
               scale: number;
+              png: Uint8Array;
             }>(
               "look.compare",
               {
@@ -255,12 +250,11 @@ export function registerLookTools(server: McpServer, studio: Studio): void {
                 frame: args.frame,
                 reference: args.reference,
                 region: args.region,
-                path: out,
                 scale: args.scale,
               },
               { expect: ["frame", "reference", "sourceWidth", "sourceHeight", "scale"] },
             );
-            const image = await readAndClean(out);
+            const image = pngImage(meta.png);
             return okWithImage(
               {
                 op: "compare",
@@ -276,7 +270,6 @@ export function registerLookTools(server: McpServer, studio: Studio): void {
           }
 
           default: {
-            const out = tempPng("preview");
             const meta = await studio.call<{
               sprite: string;
               sourceWidth: number;
@@ -284,16 +277,16 @@ export function registerLookTools(server: McpServer, studio: Studio): void {
               width: number;
               height: number;
               scale: number;
+              png: Uint8Array;
             }>("look.preview", {
               sprite: args.sprite,
               frame: args.frame,
               layer: args.layer,
               region: args.region,
-              path: out,
-              // Omitted scale means the extension picks one from the sprite size.
+              // Omitted scale means the handler picks one from the sprite size.
               scale: args.scale,
             });
-            const image = await readAndClean(out);
+            const image = pngImage(meta.png);
             return okWithImage(
               {
                 op: "preview",
@@ -416,14 +409,8 @@ function offPaletteNote(glyphs: string[]): string {
     : `\nOff-palette (glyphs not stable between reads): ${glyphs.join(" ")}`;
 }
 
-function tempPng(prefix: string): string {
-  return path.join(tmpdir(), `pixel-ai-artist-${prefix}-${Date.now()}-${process.pid}.png`);
-}
-
-async function readAndClean(file: string): Promise<{ data: string; mimeType: string }> {
-  const buf = await readFile(file);
-  await unlink(file).catch(() => {});
-  return { data: buf.toString("base64"), mimeType: "image/png" };
+function pngImage(png: Uint8Array): { data: string; mimeType: string } {
+  return { data: Buffer.from(png).toString("base64"), mimeType: "image/png" };
 }
 
 function formatLegend(legend: Record<string, string>): string {
