@@ -40,11 +40,17 @@ See [docs/INSTALL.md](docs/INSTALL.md). In short, for Claude Code:
 /plugin install pixel-ai-artist@pixel-ai-artist
 ```
 
-and for the other clients:
+For the other clients, build a checkout and point the client's MCP config at
+it — the package is **not on npm yet**:
 
 ```bash
-npx pixel-ai-artist install codex      # or gemini, cursor, opencode, --all
+git clone https://github.com/takecchi/pixel-ai-artist
+cd pixel-ai-artist && npm ci && npm run build
+# then the server is: node /path/to/pixel-ai-artist/dist/cli.js serve
 ```
+
+Once it is published, `npx pixel-ai-artist install codex` (or `gemini`,
+`cursor`, `opencode`, `--all`) writes that config for you.
 
 ## How it draws
 

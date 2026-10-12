@@ -7,8 +7,49 @@ nothing to keep open.
 ## Requirements
 
 - **Node 22.6 or newer.**
+- **git**, until the package is on npm.
 
-## 1. Wire up your agent
+## 1. Get the server
+
+`pixel-ai-artist` is **not published on npm yet**. Until it is, run it from a
+checkout:
+
+```bash
+git clone https://github.com/takecchi/pixel-ai-artist
+cd pixel-ai-artist
+npm ci && npm run build
+```
+
+The server is then `node /path/to/pixel-ai-artist/dist/cli.js serve`, and every
+`npx pixel-ai-artist …` command below is `node dist/cli.js …` run in the
+checkout.
+
+One catch while it is unpublished: `install` writes client entries that start
+the server with `npx -y pixel-ai-artist@latest serve`, which cannot start until
+the package exists on npm. For any client other than the Claude Code and omp
+plugins, write the entry by hand instead, pointing at the checkout — for the
+JSON clients:
+
+```json
+{
+  "mcpServers": {
+    "pixel-ai-artist": {
+      "command": "node",
+      "args": ["/path/to/pixel-ai-artist/dist/cli.js", "serve"]
+    }
+  }
+}
+```
+
+`node dist/cli.js install <client> --dry-run` prints the file and the exact
+entry each client wants; take that and change `command` and `args` as above.
+The Claude Code and omp plugins need none of this: they run the checkout they
+install from GitHub.
+
+## 2. Wire up your agent
+
+The `npx` commands below work as written once the package is on npm; until
+then, see step 1.
 
 ### Everything at once
 
@@ -154,10 +195,10 @@ npx pixel-ai-artist install codex cursor --project
 Writes into the current directory (`.codex/config.toml`, `.cursor/mcp.json`) so
 the setup travels with the repository.
 
-## 2. Check it
+## 3. Check it
 
 ```bash
-npx pixel-ai-artist doctor
+node dist/cli.js doctor          # in the checkout; npx pixel-ai-artist doctor once published
 ```
 
 ```
@@ -170,17 +211,10 @@ Then restart your agent so it picks up the new server, and ask it to call
 (`sprite_manage` `save` / `save_as`) or exports them — `preflight` tells it
 so.
 
-## Running from a checkout
+## Once it is on npm: `npx` inside the checkout
 
-```bash
-git clone https://github.com/takecchi/pixel-ai-artist
-cd pixel-ai-artist
-npm ci && npm run build
-node dist/cli.js install --all
-```
-
-Use `node dist/cli.js`, not `npx pixel-ai-artist`, and only inside
-this checkout. npm sees that the current project *is* that package, so it skips
+Inside a checkout of this repository keep using `node dist/cli.js`, not
+`npx pixel-ai-artist`. npm sees that the current project *is* that package, so it skips
 fetching it and looks for the binary in `node_modules/.bin` — where a package's
 own bin is never linked. You get:
 
