@@ -4,6 +4,7 @@ import { decodeImage } from "../../lib/decode.js";
 import { ToolError, need } from "../errors.js";
 import { Image, displayName, rgbaToHex, rgbaToPixel, transparentPixel, type Rect, type Sprite } from "../model.js";
 import type { HandlerTable, Studio } from "../studio.js";
+import { freeLayerName } from "./layer.js";
 
 /** The first frame of an image file, as RGBA. */
 function readImage(file: string): Image {
@@ -113,7 +114,7 @@ function importReference(studio: Studio, sprite: Sprite, img: Image, args: Recor
     );
   }
   const [tw, th] = fitted(sprite, panels[0]!.width, panels[0]!.height, args.fit);
-  const name = typeof args.name === "string" ? args.name : "reference";
+  const name = freeLayerName(sprite, typeof args.name === "string" ? args.name : "reference");
 
   // The layer tools draw on stays where it was: a reference made active would take the next draw call.
   const active = sprite.activeLayerId;

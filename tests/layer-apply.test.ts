@@ -83,6 +83,31 @@ test("rename, set and delete change the named layer", async () => {
   await rejectsWith(apply(studio, { op: "rename", name: "Layer 1" }), "invalid_args", /'newName'/);
 });
 
+test("create, rename and set refuse a name another layer has, and change nothing", async () => {
+  const { studio, sprite } = setup();
+  studio.addLayer(sprite, "ink");
+  sprite.modified = false;
+  await rejectsWith(apply(studio, { op: "create", name: "ink" }), "invalid_args", /'ink' already exists/);
+  await rejectsWith(apply(studio, { op: "rename", name: "Layer 1", newName: "ink" }), "invalid_args", /'ink' already exists/);
+  await rejectsWith(apply(studio, { op: "set", name: "Layer 1", newName: "ink", visible: false }), "invalid_args", /'ink' already exists/);
+  assert.deepEqual(sprite.layers.map((l) => [l.name, l.visible]), [["Layer 1", true], ["ink", true]]);
+  assert.equal(sprite.modified, false);
+});
+
+test("renaming a layer to its own name is allowed", async () => {
+  const { studio } = setup();
+  assert.deepEqual(names(await apply(studio, { op: "rename", name: "Layer 1", newName: "Layer 1" })), ["Layer 1"]);
+});
+
+test("an unnamed new layer and a duplicate take the next free name", async () => {
+  const { studio, sprite } = setup();
+  studio.addLayer(sprite, "Layer 2");
+  assert.deepEqual(names(await apply(studio, { op: "create" })), ["Layer 1", "Layer 2", "Layer 3"]);
+  await apply(studio, { op: "duplicate", name: "Layer 1" });
+  const reply = await apply(studio, { op: "duplicate", name: "Layer 1" });
+  assert.deepEqual(names(reply), ["Layer 1", "Layer 1 Copy 2", "Layer 1 Copy", "Layer 2", "Layer 3"]);
+});
+
 test("the last layer cannot be deleted", async () => {
   const { studio } = setup();
   await rejectsWith(apply(studio, { op: "delete", name: "Layer 1" }), "invalid_args", /at least one layer/);

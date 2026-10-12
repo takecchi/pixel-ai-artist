@@ -49,6 +49,25 @@ function restack(sprite: Sprite, layer: Layer, index: unknown): void {
   sprite.layers.splice(target, 0, layer);
 }
 
+/** `base`, or `base 2`, `base 3`… — the first that no layer of the sprite already has. */
+export function freeLayerName(sprite: Sprite, base: string): string {
+  const taken = new Set(sprite.layers.map((l) => l.name));
+  let name = base;
+  for (let suffix = 2; taken.has(name); suffix++) name = `${base} ${suffix}`;
+  return name;
+}
+
+/**
+ * Two layers with one name can never be told apart again — a lookup by name
+ * refuses as ambiguous, as the extension's did, and without groups there is
+ * no path to pass instead — so a name an agent chooses must be free.
+ */
+function refuseTaken(sprite: Sprite, name: string, self?: Layer): void {
+  if (sprite.layers.some((l) => l !== self && l.name === name)) {
+    throw new ToolError("invalid_args", `A layer named '${name}' already exists. Pick another name.`);
+  }
+}
+
 function cloneCel(cel: Cel): Cel {
   return { ...cel, image: cel.image.clone() };
 }
@@ -56,7 +75,7 @@ function cloneCel(cel: Cel): Cel {
 /** Aseprite's DuplicateLayer: a copy named "<name> Copy" directly above, with every cel. */
 function duplicateHere(studio: Studio, sprite: Sprite, layer: Layer): void {
   const active = sprite.activeLayerId;
-  const copy = studio.addLayer(sprite, `${layer.name} Copy`);
+  const copy = studio.addLayer(sprite, freeLayerName(sprite, `${layer.name} Copy`));
   Object.assign(copy, { visible: layer.visible, editable: layer.editable, opacity: layer.opacity });
   if (layer.reference) copy.reference = true;
   for (const [frame, cel] of layer.cels) copy.cels.set(frame, cloneCel(cel));
@@ -66,9 +85,7 @@ function duplicateHere(studio: Studio, sprite: Sprite, layer: Layer): void {
 }
 
 function duplicateInto(studio: Studio, source: Sprite, layer: Layer, target: Sprite): Duplicated {
-  const taken = new Set(target.layers.map((l) => l.name));
-  let name = layer.name;
-  for (let suffix = 2; taken.has(name); suffix++) name = `${layer.name} ${suffix}`;
+  const name = freeLayerName(target, layer.name);
   const active = target.activeLayerId;
   const copy = studio.addLayer(target, name);
   target.activeLayerId = active;
@@ -122,7 +139,16 @@ function mergeDown(studio: Studio, sprite: Sprite, layer: Layer): void {
 function applyOp(studio: Studio, sprite: Sprite, op: Op, duplicated: Duplicated[]): void {
   const kind = op.op;
   if (kind === "create") {
-    const layer = studio.addLayer(sprite, typeof op.name === "string" ? op.name : `Layer ${sprite.layers.length + 1}`);
+    let name: string;
+    if (typeof op.name === "string") {
+      refuseTaken(sprite, op.name);
+      name = op.name;
+    } else {
+      let n = sprite.layers.length + 1;
+      while (sprite.layers.some((l) => l.name === `Layer ${n}`)) n++;
+      name = `Layer ${n}`;
+    }
+    const layer = studio.addLayer(sprite, name);
     if (op.opacity !== undefined) layer.opacity = opacityArg(op.opacity);
     if (op.visible !== undefined) layer.visible = Boolean(op.visible);
     if (op.editable !== undefined) layer.editable = Boolean(op.editable);
@@ -135,9 +161,12 @@ function applyOp(studio: Studio, sprite: Sprite, op: Op, duplicated: Duplicated[
 
   const layer = studio.resolveLayer(sprite, op.name);
   switch (kind) {
-    case "rename":
-      layer.name = String(need(op.newName, "newName"));
+    case "rename": {
+      const name = String(need(op.newName, "newName"));
+      refuseTaken(sprite, name, layer);
+      layer.name = name;
       break;
+    }
     case "delete":
       if (sprite.layers.length === 1) throw new ToolError("invalid_args", "A sprite keeps at least one layer.");
       sprite.layers.splice(sprite.layers.indexOf(layer), 1);
@@ -156,6 +185,7 @@ function applyOp(studio: Studio, sprite: Sprite, op: Op, duplicated: Duplicated[
       mergeDown(studio, sprite, layer);
       break;
     case "set":
+      if (op.newName !== undefined) refuseTaken(sprite, String(op.newName), layer);
       if (op.visible !== undefined) layer.visible = Boolean(op.visible);
       if (op.editable !== undefined) layer.editable = Boolean(op.editable);
       if (op.opacity !== undefined) layer.opacity = opacityArg(op.opacity);
