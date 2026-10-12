@@ -8,12 +8,15 @@
 
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createServer } from "./server.js";
-import { CLIENTS, ClientId, install, mergeAgentsFile } from "./install.js";
+import { CLIENTS, ClientId, install, mergeAgentsFile, serverLaunch } from "./install.js";
 import { packageVersion } from "./lib/version.js";
 
 interface Flags {
   [key: string]: string | boolean;
 }
+
+/** Flags that never take a value, so `install --local codex` keeps `codex` a client. */
+const SWITCHES = new Set(["all", "project", "local", "dry-run", "version", "help"]);
 
 function parseArgs(argv: string[]): { command: string; positional: string[]; flags: Flags } {
   const flags: Flags = {};
@@ -27,7 +30,7 @@ function parseArgs(argv: string[]): { command: string; positional: string[]; fla
     }
     const key = arg.slice(2);
     const next = argv[i + 1];
-    if (next !== undefined && !next.startsWith("--")) {
+    if (!SWITCHES.has(key) && next !== undefined && !next.startsWith("--")) {
       flags[key] = next;
       i++;
     } else {
@@ -100,11 +103,19 @@ async function runInstall(positional: string[], flags: Flags): Promise<void> {
 
   const env: Record<string, string> = {};
 
+  let launch: { command: string; args: string[] };
+  try {
+    launch = serverLaunch(truthy(flags.local));
+  } catch (err) {
+    process.stderr.write(`${(err as Error).message}\n`);
+    process.exitCode = 1;
+    return;
+  }
+
   const opts = {
     scope: scope as "user" | "project",
     projectDir,
-    command: "npx",
-    args: ["-y", "pixel-ai-artist@latest", "serve"],
+    ...launch,
     env,
     dryRun,
   };
@@ -162,10 +173,12 @@ Options:
   --project            Write project-scoped config instead of user-scoped
   --dir <path>         Project directory (default: cwd)
   --agents [path]      Also write an AGENTS.md section (default: ./AGENTS.md)
+  --local              Start this checkout's build (node …/dist/cli.js serve) instead of the npm package
   --dry-run            Print what would change, write nothing
   --version, --help
 
 Examples:
+  node dist/cli.js install --all --local    # from a checkout, until the package is on npm
   npx pixel-ai-artist install --all --agents
   npx pixel-ai-artist install codex cursor --project
   npx pixel-ai-artist doctor

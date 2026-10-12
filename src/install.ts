@@ -66,6 +66,20 @@ export function configPath(client: ClientId, opts: InstallOptions): string {
 
 const SERVER_KEY = "pixel-ai-artist";
 
+/**
+ * How a client should start the server: the published package through npx,
+ * or (`local`) this very checkout's build, by absolute path, so an unpublished
+ * or modified copy can be wired in.
+ */
+export function serverLaunch(local: boolean, root: string = packageRoot()): { command: string; args: string[] } {
+  if (!local) return { command: "npx", args: ["-y", "pixel-ai-artist@latest", "serve"] };
+  const cli = path.join(root, "dist", "cli.js");
+  if (!existsSync(cli)) {
+    throw new Error(`${cli} does not exist. Build this checkout first: npm ci && npm run build`);
+  }
+  return { command: "node", args: [cli, "serve"] };
+}
+
 export function install(client: ClientId, opts: InstallOptions): InstallResult {
   const file = configPath(client, opts);
   if (client === "codex") return installToml(file, opts);

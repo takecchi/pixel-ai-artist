@@ -56,7 +56,9 @@ For any other MCP client, start it straight from GitHub — the package is
 
 The first start takes about ten seconds (clone, install, build); later starts
 reuse npm's cache and take two or three. Pin a branch, tag or commit with
-`github:takecchi/pixel-ai-artist#<ref>`. Once the package is published,
+`github:takecchi/pixel-ai-artist#<ref>`. Working from a checkout instead?
+`npm ci`, then `node dist/cli.js install <client> --local` points the client at
+it. Once the package is published,
 `npx pixel-ai-artist install codex` (or `gemini`, `cursor`, `opencode`,
 `--all`) writes the config for you.
 
