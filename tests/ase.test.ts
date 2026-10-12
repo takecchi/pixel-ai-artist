@@ -261,6 +261,38 @@ test("a user data chunk that does not follow the tags chunk does not change tag 
   assert.deepEqual(decodeAse(file).tags[0]!.color, [1, 1, 1, 255]);
 });
 
+test("round trips the user data text of a layer, written right after its layer chunk", () => {
+  const file = sample("rgba");
+  file.layers[0]!.text = "pixel-ai-artist:reference";
+  const bytes = encodeAse(file);
+  const types = chunkTypes(bytes);
+  assert.equal(types[types.indexOf(0x2004) + 1], 0x2020);
+  const d = decodeAse(bytes);
+  assert.equal(d.layers[0]!.text, "pixel-ai-artist:reference");
+  assert.equal(d.layers[1]!.text, undefined);
+});
+
+test("decoder takes a layer's text only from a user data chunk right after it, and one with just a colour gives none", () => {
+  const withText = new B().u32(1 | 2).str("note").u8(1).u8(2).u8(3).u8(4).bytes;
+  const colourOnly = new B().u32(2).u8(9).u8(9).u8(9).u8(9).bytes;
+  const file = mkFile([
+    mkFrame([mkLayerChunk("A"), mkChunk(0x2020, withText), mkLayerChunk("B"), mkChunk(0x2020, colourOnly), mkLayerChunk("C")], 10),
+  ]);
+  assert.deepEqual(decodeAse(file).layers.map((l) => l.text), ["note", undefined, undefined]);
+});
+
+test("a layer's user data does not take a tag's colour, and tag user data still goes to the tags", () => {
+  const tags = new B().u16(1).zeros(8).u16(0).u16(0).u8(0).u16(0).zeros(6).u8(1).u8(1).u8(1).u8(0).str("a").bytes;
+  const layerText = new B().u32(1).str("mine").bytes;
+  const tagColour = new B().u32(2).u8(5).u8(6).u8(7).u8(8).bytes;
+  const file = mkFile([
+    mkFrame([mkLayerChunk("L"), mkChunk(0x2020, layerText), mkChunk(0x2018, tags), mkChunk(0x2020, tagColour)], 10),
+  ]);
+  const d = decodeAse(file);
+  assert.equal(d.layers[0]!.text, "mine");
+  assert.deepEqual(d.tags[0]!.color, [5, 6, 7, 8]);
+});
+
 test("writes the old palette chunk only for opaque palettes of at most 256 colors", () => {
   const opaque = sample("rgba");
   assert.deepEqual(chunkTypes(encodeAse(opaque)).slice(0, 2), [0x0004, 0x2019]);

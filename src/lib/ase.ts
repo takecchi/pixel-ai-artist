@@ -15,6 +15,8 @@ export interface AseLayer {
   reference: boolean;
   blendMode: number;
   opacity: number;
+  /** The text of the user data chunk that follows the layer chunk, when there is one. */
+  text?: string;
 }
 export interface AseCelImage {
   width: number;
@@ -234,6 +236,7 @@ function validate(file: AseFile): void {
     // A tilemap layer needs a tileset chunk and tilemap cels, which this writer has no way to give it.
     if (l.type === "tilemap") throw new RangeError(`layer ${i}: tilemap layers cannot be written`);
     checkString(`layer ${i} name`, l.name);
+    if (l.text !== undefined) checkString(`layer ${i} text`, l.text);
     checkInt(`layer ${i} childLevel`, l.childLevel, 0, 0xffff);
     checkInt(`layer ${i} blendMode`, l.blendMode, 0, 0xffff);
     checkInt(`layer ${i} opacity`, l.opacity, 0, 255);
@@ -380,7 +383,10 @@ export function encodeAse(file: AseFile): Uint8Array {
       for (let i = 3; i < file.palette.length; i += 4) if (file.palette[i] !== 255) opaque = false;
       if (opaque && colors <= 256) chunks.push(oldPaletteChunk(file.palette));
       chunks.push(newPaletteChunk(file.palette));
-      for (const l of file.layers) chunks.push(layerChunk(l));
+      for (const l of file.layers) {
+        chunks.push(layerChunk(l));
+        if (l.text !== undefined) chunks.push(chunk(0x2020, new Writer().u32(1).str(l.text)));
+      }
       if (file.tags.length > 0) chunks.push(...tagChunks(file.tags));
     }
     for (const cel of frame.cels) chunks.push(celChunk(cel));
@@ -522,6 +528,7 @@ export function decodeAse(bytes: Uint8Array): AseDecoded {
     const frame: AseFrame = { durationMs: duration === 0 ? speed : duration, cels: [] };
     let cp = pos + FRAME_HEADER_SIZE;
     let afterTags = false;
+    let afterLayer = false;
     for (let ci = 0; ci < chunkCount; ci++) {
       if (cp + 6 > frameEnd) throw new Error("ase: chunk header is outside its frame");
       const cr = new Reader(bytes, cp, frameEnd);
@@ -532,7 +539,9 @@ export function decodeAse(bytes: Uint8Array): AseDecoded {
       cp += chunkSize;
 
       const wasAfterTags = afterTags;
+      const wasAfterLayer = afterLayer;
       afterTags = false;
+      afterLayer = false;
       const isPalette = type === 0x0004 || type === 0x0011 || type === 0x2019;
       if (fi > 0 && isPalette) {
         // The palette is the first frame's, as Aseprite's load_palette reads it; later ones are only counted.
@@ -578,6 +587,7 @@ export function decodeAse(bytes: Uint8Array): AseDecoded {
             blendMode: blendValid ? blendMode : 0,
             opacity: blendValid && headerFlags & 1 ? opacity : 255,
           });
+          afterLayer = true;
           break;
         }
         case 0x2005: {
@@ -627,7 +637,10 @@ export function decodeAse(bytes: Uint8Array): AseDecoded {
           break;
         }
         case 0x2020:
-          if (wasAfterTags && tagUserData.next < tagUserData.end) {
+          if (wasAfterLayer) {
+            const flags = body.u32();
+            if (flags & 1) layers[layers.length - 1]!.text = body.str();
+          } else if (wasAfterTags && tagUserData.next < tagUserData.end) {
             const flags = body.u32();
             if (flags & 1) body.str();
             if (flags & 2) {
