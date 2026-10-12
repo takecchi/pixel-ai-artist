@@ -9,8 +9,11 @@ import { drawHandlers } from "./handlers/draw.js";
 import { layerHandlers } from "./handlers/layer.js";
 import { lookHandlers } from "./handlers/look.js";
 import { pixelHandlers } from "./handlers/pixels.js";
+import { recolorHandlers } from "./handlers/recolor.js";
 import { sessionHandlers } from "./handlers/session.js";
 import { spriteHandlers } from "./handlers/sprite.js";
+import { transformHandlers } from "./handlers/transform.js";
+import { validateHandlers } from "./handlers/validate.js";
 import type { HandlerTable } from "./studio.js";
 
 export const handlers: HandlerTable = {
@@ -20,4 +23,7 @@ export const handlers: HandlerTable = {
   ...lookHandlers,
   ...layerHandlers,
   ...drawHandlers,
+  ...recolorHandlers,
+  ...transformHandlers,
+  ...validateHandlers,
 };
