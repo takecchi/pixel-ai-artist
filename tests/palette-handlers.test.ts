@@ -25,12 +25,18 @@ function setup(palette = [rgba(0, 0, 0), RED]) {
 
 const call = (studio: ReturnType<typeof createStudio>, cmd: string, args: Record<string, unknown> = {}) => studio.call<Reply>(cmd, args);
 
-test("palette.get lists the entries as hex, alpha only where not opaque, with the size", async () => {
-  const { studio } = setup([rgba(0, 0, 0, 0), RED, rgba(41, 173, 255, 128)]);
+test("palette.get lists the entries as hex, alpha only where not opaque, with the size and each entry's pixel count", async () => {
+  const { studio, sprite } = setup([rgba(0, 0, 0, 0), RED, rgba(41, 173, 255, 128)]);
+  studio.ensureCel(sprite, sprite.layers[0]!, 1).image = Image.from(2, 1, new Uint32Array([RED, RED]));
   assert.deepEqual(await call(studio, "palette.get"), {
     sprite: "Sprite",
     colors: ["#00000000", "#ff004d", "#29adff80"],
     size: 3,
+    usage: [
+      { index: 0, hex: "#00000000", pixels: 0 },
+      { index: 1, hex: "#ff004d", pixels: 2 },
+      { index: 2, hex: "#29adff80", pixels: 0 },
+    ],
   });
 });
 

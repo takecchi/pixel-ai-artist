@@ -27,7 +27,8 @@ function answer(sprite: Sprite) {
 }
 
 function paletteGet(studio: Studio, args: Record<string, unknown>) {
-  return answer(studio.resolveSprite(args.sprite));
+  const sprite = studio.resolveSprite(args.sprite);
+  return { ...answer(sprite), usage: paletteStats(sprite).usage };
 }
 
 /** Repaints every cel with each colour's perceptually nearest entry of the new palette, keeping alpha. */
