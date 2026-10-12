@@ -55,6 +55,7 @@ function spriteInfo(studio: Studio, args: Record<string, unknown>) {
     activeFrame: sprite.activeFrame,
     palette: args.includePalette === false ? undefined : sprite.palette.map((c) => rgbaToHex(c, true)),
     selection: selectionBounds(sprite),
+    pixelAspect: `${sprite.pixelRatio.w}:${sprite.pixelRatio.h}`,
   };
 }
 
