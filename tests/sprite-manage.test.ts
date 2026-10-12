@@ -25,14 +25,16 @@ test("new makes the sprite active and answers an id that resolves back to it", a
   assert.equal((await studio.call<Reply>("session.site")).sprite.id, made.id);
 });
 
-test("a new indexed sprite starts on the DawnBringer 32 palette with index 0 transparent", async () => {
+test("a new sprite of any colour mode starts on the DawnBringer 32 palette", async () => {
   const studio = createStudio();
-  await manage(studio, { op: "new", width: 4, height: 4, colorMode: "indexed" });
-  const info = await studio.call<Reply>("sprite.info");
-  assert.equal(info.colorMode, "indexed");
-  assert.equal(info.transparentIndex, 0);
-  assert.equal(info.palette.length, 32);
-  assert.deepEqual(info.palette.slice(0, 3), ["#000000", "#222034", "#45283c"]);
+  for (const colorMode of ["rgb", "grayscale", "indexed"]) {
+    await manage(studio, { op: "new", width: 4, height: 4, colorMode });
+    const info = await studio.call<Reply>("sprite.info");
+    assert.equal(info.colorMode, colorMode);
+    assert.equal(info.palette.length, 32, colorMode);
+    assert.deepEqual(info.palette.slice(0, 3), ["#000000", "#222034", "#45283c"], colorMode);
+  }
+  assert.equal((await studio.call<Reply>("sprite.info")).transparentIndex, 0);
 });
 
 test("new refuses a missing or non-positive size and an unknown colour mode", async () => {
@@ -182,6 +184,7 @@ test("converting to indexed without a palette is refused and leaves the art alon
   const studio = createStudio();
   await manage(studio, { op: "new", width: 1, height: 1 });
   const sprite = studio.activeSprite()!;
+  sprite.palette = [];
   const cel = studio.ensureCel(sprite, sprite.layers[0]!, 1);
   cel.image = Image.from(1, 1, new Uint32Array([rgba(5, 6, 7)]));
   await rejectsWith(manage(studio, { op: "set_properties", colorMode: "indexed" }), "invalid_args", /palette/);

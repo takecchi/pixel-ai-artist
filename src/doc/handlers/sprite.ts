@@ -198,7 +198,7 @@ function spriteManage(studio: Studio, args: Record<string, unknown>) {
     const width = sizeArg(args.width, "width");
     const height = sizeArg(args.height, "height");
     const colorMode = args.colorMode === undefined ? "rgb" : colorModeArg(args.colorMode);
-    const s = studio.addSprite({ width, height, colorMode, palette: colorMode === "indexed" ? defaultPalette() : [] });
+    const s = studio.addSprite({ width, height, colorMode, palette: defaultPalette() });
     return { sprite: displayName(s), id: s.id, width: s.width, height: s.height };
   }
 
