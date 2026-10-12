@@ -1,6 +1,16 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
+import { readFileSync } from "node:fs";
 import { presets, searchPresets } from "../dist/lib/palettes.js";
+
+test("every preset key the palette tool's description names as an example exists", () => {
+  const source = readFileSync(new URL("../src/tools/palette.ts", import.meta.url), "utf8");
+  const lists = source.match(/the classics \(([^)]*)\) and the most-downloaded on Lospec \(([^)]*)\)/);
+  assert.ok(lists, "the description still lists example keys");
+  const keys = [lists[1], lists[2]].flatMap((l) => l!.replace(/…/g, "").split(",").map((k) => k.trim()).filter(Boolean));
+  const table = presets();
+  assert.deepEqual(keys.filter((k) => !(k in table)), []);
+});
 
 test("every bundled preset is a loadable palette", () => {
   const table = presets();
