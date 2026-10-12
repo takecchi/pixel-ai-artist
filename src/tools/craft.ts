@@ -73,13 +73,19 @@ export function registerCraftTools(server: McpServer, studio: Studio): void {
           expect: ["pixelsChanged"],
         });
         const mapping = (data.mapping as { from: string; to: string; pixels: number }[]) ?? [];
-        return ok(
-          data,
+        const summary = [
           `${String(data.pixelsChanged ?? 0)} pixel(s) recoloured. ${mapping
             .slice(0, 8)
             .map((m) => `${m.from}→${m.to}`)
-            .join(", ")}`,
-        );
+            .join(", ")}`.trim(),
+        ];
+        if (data.pixelsChanged === 0 && args.op !== "snap" && args.op !== "replace" && args.clampToPalette !== false) {
+          summary.push(
+            "Nothing changed: either the scope held no paint, or every new colour snapped back onto the palette entry it started from (clampToPalette). " +
+              "For a visible step, widen the palette (palette op 'ramp'), ask for a stronger change, or pass clampToPalette: false on an RGB or grayscale sprite.",
+          );
+        }
+        return ok(data, summary.join(" ").trim());
       } catch (err) {
         return fail(err);
       }
