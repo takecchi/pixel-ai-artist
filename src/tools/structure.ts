@@ -192,7 +192,7 @@ export function registerStructureTools(server: McpServer, studio: Studio): void 
     async (args) => {
       try {
         const data = await studio.call<Record<string, unknown>>("tag.apply", args);
-        return ok(data);
+        return ok(data, describeTags(data.tags as TagInfo[]));
       } catch (err) {
         return fail(err);
       }
@@ -273,12 +273,48 @@ export function registerStructureTools(server: McpServer, studio: Studio): void 
     async (args) => {
       try {
         const data = await studio.call<Record<string, unknown>>("cel.apply", args);
+        if ((args.op === "move" || args.op === "set") && data.applied) {
+          const site =
+            args.layer === undefined || args.frame === undefined
+              ? await studio.call<{ activeLayer?: string; activeFrame?: number }>("sprite.info", {
+                  sprite: args.sprite,
+                  includePalette: false,
+                })
+              : {};
+          const layer = args.layer ?? site.activeLayer;
+          const frame = args.frame ?? site.activeFrame;
+          const { cels } = await studio.call<{ cels: { x: number; y: number; opacity: number }[] }>("cel.apply", {
+            op: "list",
+            sprite: args.sprite,
+            layer,
+            frame,
+          });
+          const cel = cels[0];
+          if (cel) {
+            return ok(data, `${args.op}: the cel on '${layer}' frame ${frame} is now at (${cel.x},${cel.y}), opacity ${cel.opacity}.`);
+          }
+        }
         return ok(data);
       } catch (err) {
         return fail(err);
       }
     },
   );
+}
+
+interface TagInfo {
+  name: string;
+  from: number;
+  to: number;
+  direction: string;
+  frames: number;
+  durationMs: number;
+}
+
+function describeTags(tags: TagInfo[]): string {
+  if (tags.length === 0) return "No tags.";
+  const each = tags.map((t) => `'${t.name}' frames ${t.from}–${t.to} (${t.direction}, ${t.frames} frame(s), ${t.durationMs}ms)`);
+  return `${tags.length} tag(s): ${each.join("; ")}.`;
 }
 
 function describeLayers(data: Record<string, unknown>): string | undefined {

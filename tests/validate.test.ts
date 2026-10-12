@@ -1,4 +1,7 @@
 import { strict as assert } from "node:assert";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { test } from "node:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
@@ -50,9 +53,23 @@ test("a fresh unsaved sprite is told its layer is empty and that nothing is on d
     {
       check: "export_readiness",
       severity: "warning",
-      message: "Sprite has never been saved, so there is nothing on disk to hand to a game project.",
+      message:
+        "Sprite has never been saved as a document; files written by export do not count here. " +
+        "To keep its layers and tags on disk, save_as an .aseprite file — a .png or .gif keeps only how it looks.",
     },
   ]);
+});
+
+test("after an export, export_readiness still flags an unsaved document, says exports do not count and points at .aseprite", async () => {
+  const studio = createStudio();
+  studio.addSprite({ width: 2, height: 2 });
+  const dir = mkdtempSync(path.join(tmpdir(), "pixel-ai-artist-readiness-"));
+  await studio.call("export.run", { op: "png", path: path.join(dir, "out.png") });
+  const [finding] = await run(studio, { checks: ["export_readiness"] });
+  assert.equal(finding?.severity, "warning");
+  assert.match(String(finding?.message), /files written by export do not count/);
+  assert.match(String(finding?.message), /save_as an \.aseprite file/);
+  assert.doesNotMatch(String(finding?.message), /nothing on disk/);
 });
 
 test("palette: off-palette colours are counted and the most used is named", async () => {
@@ -397,4 +414,48 @@ test("the validate tool scores and summarises the findings over MCP", async () =
   assert.deepEqual(data.findings[0].at, { x: 0, y: 0 });
   assert.equal(data.summary, "1 error(s), 0 warning(s). Fix the errors before calling this done.");
   await server.close();
+});
+
+async function validateText(studio: Studio, server: Awaited<ReturnType<typeof createServer>>["server"], args = {}) {
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const client = new Client({ name: "test", version: "0" });
+  await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
+  const result = await client.callTool({ name: "validate", arguments: args });
+  await server.close();
+  const text = (result.content as { type: string; text: string }[]).map((c) => c.text).join("\n");
+  return { text, data: result.structuredContent as Record<string, any> };
+}
+
+test("a run with warnings and no errors is not summarised as clean, and says how many warnings there are", async () => {
+  const { server, studio } = createServer();
+  studio.addSprite({ width: 2, height: 2 });
+  const { text, data } = await validateText(studio, server, { checks: ["export_readiness"] });
+  assert.equal(data.passed, true);
+  assert.equal(data.summary, "No errors, 1 warning(s): fix each, or say why you leave it.");
+  assert.doesNotMatch(text, /Clean/);
+});
+
+test("a run with no findings at all is summarised as clean", async () => {
+  const { server, studio } = createServer();
+  sketch(studio, 2, 2, []);
+  const { data } = await validateText(studio, server, { checks: ["export_readiness"] });
+  assert.equal(data.summary, "Clean.");
+});
+
+test("the text lists the first 15 findings and says how many more there are and where to see them", async () => {
+  const { server, studio } = createServer();
+  const sprite = studio.addSprite({ width: 2, height: 2 });
+  for (let i = 0; i < 17; i++) studio.addLayer(sprite, `empty ${i}`);
+  const { text, data } = await validateText(studio, server, { checks: ["layers", "export_readiness"] });
+  assert.equal(data.findings.length, 19);
+  const lines = text.split("\n");
+  assert.equal(lines.filter((l) => l.startsWith("[")).length, 15);
+  assert.match(lines.at(-1)!, /^… and 4 more finding\(s\), not shown: every one is in the result's `findings`, or narrow the run with `checks`\.$/);
+});
+
+test("the text adds no 'more findings' line when every finding fits", async () => {
+  const { server, studio } = createServer();
+  studio.addSprite({ width: 2, height: 2 });
+  const { text } = await validateText(studio, server, { checks: ["export_readiness"] });
+  assert.doesNotMatch(text, /more finding/);
 });

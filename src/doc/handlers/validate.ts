@@ -260,7 +260,8 @@ function validateRun(studio: Studio, args: Record<string, unknown>) {
       findings,
       "export_readiness",
       "warning",
-      "Sprite has never been saved, so there is nothing on disk to hand to a game project.",
+      "Sprite has never been saved as a document; files written by export do not count here. " +
+        "To keep its layers and tags on disk, save_as an .aseprite file — a .png or .gif keeps only how it looks.",
     );
   }
 

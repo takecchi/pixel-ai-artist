@@ -178,16 +178,20 @@ export function registerCraftTools(server: McpServer, studio: Studio): void {
         const passed = errors.length === 0 && (!args.strict || warnings.length === 0);
         const score = Math.max(0, 100 - errors.length * 15 - warnings.length * 5);
 
-        const summary = passed
-          ? `Clean${warnings.length > 0 ? ` (${warnings.length} style note(s))` : ""}.`
-          : `${errors.length} error(s), ${warnings.length} warning(s). Fix the errors before calling this done.`;
+        const summary = !passed
+          ? `${errors.length} error(s), ${warnings.length} warning(s). Fix the errors before calling this done.`
+          : warnings.length > 0
+            ? `No errors, ${warnings.length} warning(s): fix each, or say why you leave it.`
+            : "Clean.";
+        const shown = 15;
+        const hidden = data.findings.length - shown;
 
         return ok(
           { ...data, passed, score, summary },
           [
             summary,
             ...data.findings
-              .slice(0, 15)
+              .slice(0, shown)
               .map(
                 (f) =>
                   `[${f.severity}] ${f.check}: ${f.message}` +
@@ -195,6 +199,9 @@ export function registerCraftTools(server: McpServer, studio: Studio): void {
                   (f.layer ? ` on '${f.layer}'` : "") +
                   (f.frame ? ` frame ${f.frame}` : ""),
               ),
+            ...(hidden > 0
+              ? [`… and ${hidden} more finding(s), not shown: every one is in the result's \`findings\`, or narrow the run with \`checks\`.`]
+              : []),
           ].join("\n"),
         );
       } catch (err) {
