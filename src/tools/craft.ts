@@ -52,7 +52,7 @@ export function registerCraftTools(server: McpServer, studio: Studio): void {
         clampToPalette: z
           .boolean()
           .default(true)
-          .describe("Snap the result back onto the palette. Turn off only when growing the palette deliberately."),
+          .describe("Snap the result back onto the palette. Turn off only when growing the palette deliberately. Ignored by 'snap', and by indexed sprites, whose pixels are palette entries already."),
       },
       outputSchema: {
         sprite: z.string(),

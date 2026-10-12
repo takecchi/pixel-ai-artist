@@ -37,6 +37,14 @@ test("list reports the layers bottom to top and the active one, without changing
   assert.equal(sprite.modified, false);
 });
 
+test("create with editable false makes a layer that starts locked", async () => {
+  const { studio, sprite } = setup();
+  await apply(studio, { op: "create", name: "guide", editable: false });
+  assert.equal(sprite.layers.find((l) => l.name === "guide")!.editable, false);
+  await apply(studio, { op: "create", name: "ink" });
+  assert.equal(sprite.layers.find((l) => l.name === "ink")!.editable, true);
+});
+
 test("create adds a layer on top with its settings, makes it active, and marks the sprite modified", async () => {
   const { studio, sprite } = setup();
   const reply = await apply(studio, { op: "create", name: "shade", opacity: 128, visible: false });
