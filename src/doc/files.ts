@@ -7,7 +7,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { decodeImage } from "../lib/decode.js";
 import { encodeGif } from "../lib/gif.js";
-import type { AnimationFrame } from "../lib/image.js";
+import { distinctColors, type AnimationFrame } from "../lib/image.js";
 import { encodePng } from "../lib/png.js";
 import { frameFileNames } from "../lib/spritesheet.js";
 import { ToolError } from "./errors.js";
@@ -21,16 +21,9 @@ function isAseprite(bytes: Uint8Array): boolean {
 }
 
 /** The image's own colours when they fit a palette, else the default a new sprite gets. */
-function paletteOf(frames: AnimationFrame[]): Rgba[] {
-  const seen = new Set<number>();
-  for (const f of frames) {
-    for (const v of f.image.pixels) {
-      if ((v & 255) === 0) continue;
-      seen.add((v | 255) >>> 0);
-      if (seen.size > 256) return defaultPalette();
-    }
-  }
-  return seen.size > 0 ? [...seen] : defaultPalette();
+function openedPalette(frames: AnimationFrame[]): Rgba[] {
+  const colors = distinctColors(frames.map((f) => f.image));
+  return colors && colors.length > 0 ? colors : defaultPalette();
 }
 
 /** Opens a PNG, GIF or JPEG as an RGB sprite with one layer, and makes it active. */
@@ -58,7 +51,7 @@ export function openSprite(studio: Studio, file: string): Sprite {
     ? decoded.map((f) => ({ image: f.image, durationMs: f.durationMs > 0 ? f.durationMs : 100 }))
     : [{ image: decoded, durationMs: 100 }];
   const { width, height } = frames[0]!.image;
-  const sprite = studio.addSprite({ width, height, colorMode: "rgb", filename: full, palette: paletteOf(frames) });
+  const sprite = studio.addSprite({ width, height, colorMode: "rgb", filename: full, palette: openedPalette(frames) });
   const layer = sprite.layers[0]!;
   sprite.frames = frames.map((f) => ({ durationMs: f.durationMs }));
   frames.forEach((f, i) => layer.cels.set(i + 1, { x: 0, y: 0, image: f.image, opacity: 255 }));

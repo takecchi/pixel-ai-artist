@@ -6,6 +6,22 @@ export interface AnimationFrame {
   durationMs: number;
 }
 
+/**
+ * The opaque colours of RGBA images in order of first appearance, alpha set
+ * to 255 as a palette entry has it; null when there are more than `limit`.
+ */
+export function distinctColors(images: readonly Image[], limit = 256): number[] | null {
+  const seen = new Set<number>();
+  for (const img of images) {
+    for (const v of img.pixels) {
+      if ((v & 255) === 0) continue;
+      seen.add((v | 255) >>> 0);
+      if (seen.size > limit) return null;
+    }
+  }
+  return [...seen];
+}
+
 export function toRgbaBytes(img: Image): Uint8Array {
   const out = new Uint8Array(img.pixels.length * 4);
   for (let i = 0; i < img.pixels.length; i++) {

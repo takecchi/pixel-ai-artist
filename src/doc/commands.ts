@@ -11,6 +11,7 @@ import { exportHandlers } from "./handlers/export.js";
 import { frameHandlers } from "./handlers/frame.js";
 import { layerHandlers } from "./handlers/layer.js";
 import { lookHandlers } from "./handlers/look.js";
+import { paletteHandlers } from "./handlers/palette.js";
 import { pixelHandlers } from "./handlers/pixels.js";
 import { recolorHandlers } from "./handlers/recolor.js";
 import { sessionHandlers } from "./handlers/session.js";
@@ -34,4 +35,5 @@ export const handlers: HandlerTable = {
   ...transformHandlers,
   ...validateHandlers,
   ...exportHandlers,
+  ...paletteHandlers,
 };
