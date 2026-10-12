@@ -1,0 +1,250 @@
+/**
+ * Client configuration writer.
+ *
+ * The four target agents disagree on file format (JSON vs TOML), file location,
+ * and key names — and getting any of them wrong produces a silent no-op rather
+ * than an error. Encoding that here means a user types one command instead of
+ * reading four sets of docs.
+ */
+
+import { existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, renameSync, unlinkSync } from "node:fs";
+import { homedir } from "node:os";
+import path from "node:path";
+import { packageRoot } from "./lib/version.js";
+
+export type ClientId = "claude" | "codex" | "gemini" | "cursor" | "vscode" | "windsurf" | "opencode";
+
+export const CLIENTS: ClientId[] = ["claude", "codex", "gemini", "cursor", "vscode", "windsurf", "opencode"];
+
+export interface InstallOptions {
+  scope: "user" | "project";
+  projectDir: string;
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+  dryRun: boolean;
+}
+
+export interface InstallResult {
+  client: ClientId;
+  file: string;
+  written: boolean;
+  note?: string;
+}
+
+export function configPath(client: ClientId, opts: InstallOptions): string {
+  const home = homedir();
+  const project = opts.projectDir;
+
+  switch (client) {
+    case "claude":
+      return opts.scope === "user"
+        ? path.join(home, ".claude.json")
+        : path.join(project, ".mcp.json");
+    case "codex":
+      return opts.scope === "user"
+        ? path.join(home, ".codex", "config.toml")
+        : path.join(project, ".codex", "config.toml");
+    case "gemini":
+      return opts.scope === "user"
+        ? path.join(home, ".gemini", "settings.json")
+        : path.join(project, ".gemini", "settings.json");
+    case "cursor":
+      return opts.scope === "user"
+        ? path.join(home, ".cursor", "mcp.json")
+        : path.join(project, ".cursor", "mcp.json");
+    case "vscode":
+      return path.join(project, ".vscode", "mcp.json");
+    case "windsurf":
+      return path.join(home, ".codeium", "windsurf", "mcp_config.json");
+    case "opencode":
+      return opts.scope === "user"
+        ? path.join(process.env.XDG_CONFIG_HOME ?? path.join(home, ".config"), "opencode", "opencode.json")
+        : path.join(project, ".opencode", "opencode.json");
+  }
+}
+
+const SERVER_KEY = "libresprite-ai-artist";
+
+export function install(client: ClientId, opts: InstallOptions): InstallResult {
+  const file = configPath(client, opts);
+  if (client === "codex") return installToml(file, opts);
+  if (client === "opencode") return installOpenCode(file, opts);
+  return installJson(client, file, opts);
+}
+
+function installOpenCode(file: string, opts: InstallOptions): InstallResult {
+  const existing = readJson(file);
+  // `mcp` and `mcp.servers` are only treated as objects when they already are
+  // one. A config that stored `"mcp": "hello"` (or `"mcp": { "servers": 42 }`)
+  // would otherwise be spread into a character-indexed blob. Replacing the bad
+  // value with a fresh object keeps the rest of the file and still writes the
+  // server. installJson below has no such guard on purpose: those clients keep
+  // the server map at a single top-level key that no one has observed holding a
+  // non-object, so the same latent spread there is left out of scope rather
+  // than diverging its behaviour in this change.
+  const mcp = isPlainObject(existing.mcp) ? existing.mcp : {};
+  const servers = isPlainObject(mcp.servers) ? mcp.servers : {};
+  const entry = {
+    type: "local",
+    command: [opts.command, ...opts.args],
+    // Plugin harnesses disable MCP prompts: the plugin already lists the
+    // skills as /libresprite:*; the prompts would double every workflow.
+    environment: { ...opts.env, LIBRESPRITE_AI_PROMPTS: "0" },
+  };
+  const next = { ...existing, mcp: { ...mcp, servers: { ...servers, [SERVER_KEY]: entry } } };
+  if (opts.dryRun) return { client: "opencode", file, written: false, note: JSON.stringify({ [SERVER_KEY]: entry }, null, 2) };
+  backup(file);
+  writeAtomic(file, JSON.stringify(next, null, 2) + "\n");
+  return { client: "opencode", file, written: true };
+}
+
+function installJson(client: ClientId, file: string, opts: InstallOptions): InstallResult {
+  const existing = readJson(file);
+
+  // VS Code's mcp.json uses `servers`; everyone else uses `mcpServers`.
+  const key = client === "vscode" ? "servers" : "mcpServers";
+  const servers = (existing[key] as Record<string, unknown> | undefined) ?? {};
+
+  const entry: Record<string, unknown> = {
+    command: opts.command,
+    args: opts.args,
+  };
+  if (Object.keys(opts.env).length > 0) entry.env = opts.env;
+  // VS Code wants an explicit transport marker.
+  if (client === "vscode") entry.type = "stdio";
+
+  const next = { ...existing, [key]: { ...servers, [SERVER_KEY]: entry } };
+
+  if (opts.dryRun) {
+    return { client, file, written: false, note: JSON.stringify(next[key], null, 2) };
+  }
+
+  backup(file);
+  writeAtomic(file, JSON.stringify(next, null, 2) + "\n");
+  return { client, file, written: true };
+}
+
+/**
+ * Codex uses TOML. Rewriting a whole TOML document without a parser risks
+ * mangling comments and unrelated tables, so this only ever appends or replaces
+ * the one `[mcp_servers.libresprite-ai-artist]` block and leaves the rest byte
+ * for byte as it was.
+ */
+function installToml(file: string, opts: InstallOptions): InstallResult {
+  const header = `[mcp_servers.${SERVER_KEY}]`;
+  const lines = [
+    header,
+    `command = ${tomlString(opts.command)}`,
+    `args = [${opts.args.map(tomlString).join(", ")}]`,
+  ];
+  if (Object.keys(opts.env).length > 0) {
+    lines.push("");
+    lines.push(`[mcp_servers.${SERVER_KEY}.env]`);
+    for (const [k, v] of Object.entries(opts.env)) lines.push(`${k} = ${tomlString(v)}`);
+  }
+  const block = lines.join("\n") + "\n";
+
+  if (opts.dryRun) return { client: "codex", file, written: false, note: block };
+
+  let existing = existsSync(file) ? readFileSync(file, "utf8") : "";
+  // Anchored to the start of a line: a bare indexOf would also match the header
+  // text inside a comment or a string value and splice around the wrong offset.
+  const headerAt = new RegExp(`^\\s*${header.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`, "m").exec(existing);
+  const start = headerAt?.index ?? -1;
+  if (start !== -1) {
+    // Replace from our header up to the next top-level table that is not ours.
+    const rest = existing.slice(start + header.length);
+    const nextTable = rest.search(/\n\[(?!mcp_servers\.libresprite-ai-artist)/);
+    const end = nextTable === -1 ? existing.length : start + header.length + nextTable + 1;
+    existing = existing.slice(0, start) + existing.slice(end);
+  }
+
+  backup(file);
+  const separator = existing.length > 0 && !existing.endsWith("\n\n") ? "\n" : "";
+  writeAtomic(file, existing.trimEnd() + "\n" + separator + block);
+  return { client: "codex", file, written: true };
+}
+
+/**
+ * Write AGENTS.md guidance for clients with no plugin or skill system.
+ * Returns the block so callers can show it rather than write it.
+ */
+export function agentsMarkdown(): string {
+  const file = path.join(packageRoot(), "templates", "AGENTS.section.md");
+  if (existsSync(file)) return readFileSync(file, "utf8");
+  return "";
+}
+
+export function mergeAgentsFile(target: string, dryRun: boolean): { written: boolean; file: string } {
+  const block = agentsMarkdown();
+  const marker = "<!-- libresprite-ai-artist:start -->";
+  const endMarker = "<!-- libresprite-ai-artist:end -->";
+  const wrapped = `${marker}\n${block.trim()}\n${endMarker}\n`;
+
+  let content = existsSync(target) ? readFileSync(target, "utf8") : "";
+  const start = content.indexOf(marker);
+  if (start !== -1) {
+    const end = content.indexOf(endMarker);
+    if (end !== -1) content = content.slice(0, start) + content.slice(end + endMarker.length + 1);
+  }
+  const next = content.trimEnd() + (content.trim() ? "\n\n" : "") + wrapped;
+
+  if (dryRun) return { written: false, file: target };
+  backup(target);
+  writeAtomic(target, next);
+  return { written: true, file: target };
+}
+
+function readJson(file: string): Record<string, unknown> {
+  if (!existsSync(file)) return {};
+  try {
+    const parsed = JSON.parse(readFileSync(file, "utf8"));
+    return typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : {};
+  } catch (err) {
+    throw new Error(
+      `${file} is not valid JSON, so it cannot be edited safely. Fix or move it, then retry. (${(err as Error).message})`,
+    );
+  }
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Write through a sibling temp file and rename over the target.
+ *
+ * `~/.claude.json` is ~128KB and holds Claude Code's own project list, session
+ * and auth state. A plain writeFileSync that dies part-way — full disk, killed
+ * process — leaves that truncated and the user's whole setup broken. A rename
+ * on the same filesystem is atomic, so the file is either the old one or the
+ * new one, never half of either.
+ */
+function writeAtomic(file: string, contents: string): void {
+  const dir = path.dirname(file);
+  mkdirSync(dir, { recursive: true });
+  const temp = path.join(dir, `.${path.basename(file)}.${process.pid}.tmp`);
+  try {
+    writeFileSync(temp, contents, "utf8");
+    renameSync(temp, file);
+  } catch (err) {
+    try {
+      unlinkSync(temp);
+    } catch {
+      /* the temp file may never have been created */
+    }
+    throw err;
+  }
+}
+
+/** Never overwrite someone's config without leaving them a way back. */
+function backup(file: string): void {
+  if (!existsSync(file)) return;
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  copyFileSync(file, `${file}.bak-${stamp}`);
+}
+
+function tomlString(value: string): string {
+  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}

@@ -1,0 +1,7 @@
+{
+  "name": "opencode-libresprite-ai-artist",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "OpenCode plugin for libresprite-ai-artist: /libresprite:* commands, skills and the two hooks.",
+  "exports": { ".": "./index.mjs" }
+}

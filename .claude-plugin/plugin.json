@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "libresprite",
+  "displayName": "LibreSprite AI Artist",
+  "version": "0.1.0",
+  "description": "Make pixel art from your agent, no editor required; files open in LibreSprite. An MCP server with a deliberately small tool surface, an encoded pixel-art rulebook, /libresprite:* workflows and review/palette/rig/animation subagents. The same skills are served over MCP, so Codex, Gemini CLI and Cursor get them too.",
+  "author": {
+    "name": "takecchi",
+    "url": "https://github.com/takecchi"
+  },
+  "homepage": "https://github.com/takecchi/libresprite-ai-artist#readme",
+  "repository": "https://github.com/takecchi/libresprite-ai-artist",
+  "license": "MIT",
+  "keywords": [
+    "libresprite",
+    "pixel-art",
+    "sprites",
+    "animation",
+    "gamedev",
+    "mcp"
+  ],
+  "mcpServers": {
+    "libresprite": {
+      "command": "node",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/bin/libresprite-ai-artist.mjs",
+        "serve"
+      ],
+      "env": {
+        "LIBRESPRITE_AI_PLUGIN_PORT": "9941",
+        "LIBRESPRITE_AI_CONTROL_PORT": "9942",
+        "LIBRESPRITE_AI_PROMPTS": "0"
+      }
+    }
+  },
+  "hooks": "./hooks/hooks.json"
+}

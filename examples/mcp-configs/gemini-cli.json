@@ -1,0 +1,9 @@
+{
+  "//": "Gemini CLI — ~/.gemini/settings.json for user scope, .gemini/settings.json for a project.",
+  "mcpServers": {
+    "libresprite-ai-artist": {
+      "command": "npx",
+      "args": ["-y", "libresprite-ai-artist@latest", "serve"]
+    }
+  }
+}
