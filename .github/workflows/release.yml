@@ -1,0 +1,57 @@
+name: Release
+
+# Pushing a tag vX.Y.Z publishes that version to npm, through npm's Trusted
+# Publishing (OIDC): no NPM_TOKEN secret exists to leak, and every version
+# carries a provenance statement tying it to this workflow run.
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to npm
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write # the OIDC token npm exchanges for a publish credential
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      # Trusted Publishing needs npm 11.5.1 or later; Node 22 ships npm 10.
+      - run: npm install -g npm@^11.5.1
+
+      - name: The tag names the version being published
+        run: |
+          node -e "
+            const tag = process.env.GITHUB_REF_NAME.replace(/^v/, '');
+            const versions = {
+              'package.json': require('./package.json').version,
+              'opencode/package.json': require('./opencode/package.json').version,
+            };
+            const wrong = Object.entries(versions).filter(([, v]) => v !== tag);
+            if (wrong.length) {
+              console.error('tag v' + tag + ' does not match ' + wrong.map(([f, v]) => f + ' (' + v + ')').join(', '));
+              process.exit(1);
+            }
+          "
+
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+
+      # prepublishOnly rebuilds from clean, so the tarball holds exactly this commit's build.
+      - run: npm publish --provenance --access public
