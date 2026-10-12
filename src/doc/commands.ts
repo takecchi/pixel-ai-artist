@@ -13,6 +13,7 @@ import { pixelHandlers } from "./handlers/pixels.js";
 import { recolorHandlers } from "./handlers/recolor.js";
 import { sessionHandlers } from "./handlers/session.js";
 import { spriteHandlers } from "./handlers/sprite.js";
+import { tagHandlers } from "./handlers/tag.js";
 import { transformHandlers } from "./handlers/transform.js";
 import { validateHandlers } from "./handlers/validate.js";
 import type { HandlerTable } from "./studio.js";
@@ -24,6 +25,7 @@ export const handlers: HandlerTable = {
   ...lookHandlers,
   ...layerHandlers,
   ...frameHandlers,
+  ...tagHandlers,
   ...drawHandlers,
   ...recolorHandlers,
   ...transformHandlers,
