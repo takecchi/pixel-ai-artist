@@ -14,6 +14,7 @@ import { lookHandlers } from "./handlers/look.js";
 import { paletteHandlers } from "./handlers/palette.js";
 import { pixelHandlers } from "./handlers/pixels.js";
 import { recolorHandlers } from "./handlers/recolor.js";
+import { referenceHandlers } from "./handlers/reference.js";
 import { sessionHandlers } from "./handlers/session.js";
 import { spriteHandlers } from "./handlers/sprite.js";
 import { tagHandlers } from "./handlers/tag.js";
@@ -33,6 +34,7 @@ export const handlers: HandlerTable = {
   ...paletteHandlers,
   ...pixelHandlers,
   ...recolorHandlers,
+  ...referenceHandlers,
   ...sessionHandlers,
   ...spriteHandlers,
   ...tagHandlers,
