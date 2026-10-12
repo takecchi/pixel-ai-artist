@@ -1,0 +1,25 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-status.mjs\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "mcp__plugin_libresprite_libresprite__draw|mcp__plugin_libresprite_libresprite__recolor|mcp__plugin_libresprite_libresprite__transform",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/look-nudge.mjs\""
+          }
+        ]
+      }
+    ]
+  }
+}

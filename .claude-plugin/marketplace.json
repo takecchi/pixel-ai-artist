@@ -1,0 +1,16 @@
+{
+  "name": "libresprite-ai-artist",
+  "displayName": "LibreSprite AI Artist",
+  "description": "Pixel art from your agent without an editor: drawing over MCP, an encoded pixel-art rulebook, /libresprite:* workflows and specialist subagents.",
+  "owner": {
+    "name": "takecchi",
+    "url": "https://github.com/takecchi"
+  },
+  "plugins": [
+    {
+      "name": "libresprite",
+      "source": "./",
+      "description": "Make pixel art without an editor: compact MCP tool surface, pixel-art rules, /libresprite:* skills, review/palette/rig/animation agents."
+    }
+  ]
+}

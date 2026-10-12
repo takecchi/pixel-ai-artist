@@ -1,0 +1,12 @@
+{
+  "//": "OpenCode — ~/.config/opencode/opencode.json for user scope, .opencode/opencode.json for a project. Add the /libresprite:* commands and skills with the plugin (see docs/INSTALL.md).",
+  "mcp": {
+    "servers": {
+      "libresprite-ai-artist": {
+        "type": "local",
+        "command": ["npx", "-y", "libresprite-ai-artist@latest", "serve"],
+        "environment": { "LIBRESPRITE_AI_PROMPTS": "0" }
+      }
+    }
+  }
+}
