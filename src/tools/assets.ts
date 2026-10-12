@@ -109,7 +109,7 @@ export function registerAssetTools(server: McpServer, studio: Studio): void {
           .min(0)
           .max(16)
           .default(0)
-          .describe("Spritesheet: transparent pixels added inside each frame on all four sides (0–16), so neighbouring frames sit 2×padding apart; prevents bleed at non-integer zoom."),
+          .describe("Spritesheet: transparent pixels added inside each frame on all four sides (0–16), so neighbouring frames sit 2×padding apart; prevents bleed at non-integer zoom. As with Aseprite's inner padding, each atlas `frame` rectangle includes it: the art starts padding pixels in, and `spriteSourceSize`/`sourceSize` leave it out."),
         trim: z.boolean().default(false).describe("Trim transparent margins; the atlas keeps the original offsets."),
         includeJson: z.boolean().default(true).describe("Write a sibling JSON atlas for 'spritesheet'."),
         layers: z
@@ -125,8 +125,8 @@ export function registerAssetTools(server: McpServer, studio: Studio): void {
         sprite: z.string(),
         op: z.string(),
         files: z.array(z.string()),
-        width: z.number().int().optional(),
-        height: z.number().int().optional(),
+        width: z.number().int().optional().describe("The sprite's own width — not the written file's, which scale and spritesheet change."),
+        height: z.number().int().optional().describe("The sprite's own height — not the written file's."),
         frameCount: z.number().int().optional(),
         frame: z.number().int().optional().describe("Which frame a single-frame export wrote. Defaults to the active frame, which is not always the one you drew on."),
         atlas: z.string().nullish().optional(),
