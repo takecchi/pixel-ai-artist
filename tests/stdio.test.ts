@@ -34,7 +34,7 @@ const squash = [
   "DDDDDDDDDDDD",
 ];
 
-test("over stdio, with no editor anywhere, a sprite goes from preflight to a saved PNG and a two-frame GIF", async () => {
+test("over stdio, with no editor anywhere, a sprite goes from preflight to a saved PNG and a tagged, validated two-frame GIF", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "pixel-ai-artist-stdio-"));
   const client = new Client({ name: "stdio-test", version: "0.0.0" });
   await client.connect(new StdioClientTransport({ command: process.execPath, args: [CLI, "serve"], stderr: "ignore" }));
@@ -65,6 +65,14 @@ test("over stdio, with no editor anywhere, a sprite goes from preflight to a sav
     await call("frame", { op: "duplicate", frame: 1 });
     await call("draw", { frame: 2, ops: [{ kind: "grid", x: 2, y: 6, legend, rows: squash }] });
     await call("frame", { op: "set_duration", durations: [300, 300] });
+
+    const errors = async () =>
+      ((await call("validate", {})).structuredContent.findings as { check: string; severity: string }[])
+        .filter((f) => f.severity === "error")
+        .map((f) => f.check);
+    assert.deepEqual(await errors(), ["animation"], "two frames and no tag is the one error");
+    await call("tag", { op: "create", name: "idle", from: 1, to: 2 });
+    assert.deepEqual(await errors(), []);
 
     const gifPath = path.join(dir, "slime.gif");
     await call("sprite_manage", { op: "save_as", path: gifPath });
