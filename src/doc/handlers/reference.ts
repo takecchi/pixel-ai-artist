@@ -155,9 +155,11 @@ function referenceApply(studio: Studio, args: Record<string, unknown>) {
     return { sprite: displayName(sprite), op };
   }
 
+  if (op !== "import" && op !== "sample_palette") {
+    throw new ToolError("unsupported_command", `reference op '${String(op)}' is not supported.`);
+  }
   const img = sourceRegion(readImage(String(need(args.path, "path"))), args.region);
   if (op === "sample_palette") return samplePalette(sprite, img, args.colors);
-  // The extension imported for any other op; kept until that is fixed on its own.
   return importReference(studio, sprite, img, args);
 }
 
