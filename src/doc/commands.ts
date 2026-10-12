@@ -5,6 +5,7 @@
  * rather than pretending to succeed.
  */
 
+import { celHandlers } from "./handlers/cel.js";
 import { drawHandlers } from "./handlers/draw.js";
 import { frameHandlers } from "./handlers/frame.js";
 import { layerHandlers } from "./handlers/layer.js";
@@ -26,6 +27,7 @@ export const handlers: HandlerTable = {
   ...layerHandlers,
   ...frameHandlers,
   ...tagHandlers,
+  ...celHandlers,
   ...drawHandlers,
   ...recolorHandlers,
   ...transformHandlers,
