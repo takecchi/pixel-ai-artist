@@ -1,5 +1,11 @@
 # Install
 
+> **Before the npm release.** `pixel-ai-artist` is not published on npm yet, so
+> the `npx pixel-ai-artist …` commands below do not work. Start the server
+> straight from GitHub instead — in any MCP client config, the server is
+> `npx -y github:takecchi/pixel-ai-artist serve` (npm clones and builds it on
+> first use, then caches it). See the [README](../README.md#run-it).
+
 Two pieces: an **Aseprite extension** (so Aseprite can be driven) and an **MCP
 server** (so your agent can drive it). The extension is the same in every case;
 only the agent wiring differs.
