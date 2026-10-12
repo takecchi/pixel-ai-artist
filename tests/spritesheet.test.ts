@@ -416,3 +416,8 @@ test("frame file names refuse a frame count that is not a positive integer", () 
     assert.throws(() => frameFileNames("w{frame}.png", bad), RangeError, String(bad));
   }
 });
+
+test("a source with no extension names frames without a trailing dot", () => {
+  const sheet = buildSpriteSheet([frame(art(1, 1, RED)), frame(art(1, 1, BLUE))], { ...base, title: "Sprite", extension: "" });
+  assert.deepEqual(sheet.atlas.frames.map((f) => f.filename), ["Sprite 0", "Sprite 1"]);
+});
