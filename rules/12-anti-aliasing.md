@@ -39,7 +39,7 @@ line. This file decides *whether*, *where* and *how much*. Filters, resampling a
     background). Light pixels at a tip taper it like a brush; 1–2 shades are enough. Do not mistake line weight
     for shading.
 11. **No filter AA.** Bilinear/bicubic resize, rotation by non-90° angles and soft brushes add dozens of near-colours
-    and mush. `transform` op `scale` is nearest-neighbour and integer; leave `allowLossy` off.
+    and mush. `transform` op `scale` is nearest-neighbour and integer, and op `rotate` refuses anything but 90° steps.
 12. **Large 45° curves (≥ 48 px, optional).** On a curved 45° section of a soft-shaded outline a convex bulge takes a
     lighter centre pixel with darker ends, a concave hollow a darker centre with lighter ends. Do not do this on
     sprites ≤ 32 px or on straight diagonals.

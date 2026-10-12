@@ -10,7 +10,7 @@ render) that avoid hand redrawing. Walk/run sets in `rules://42-walk-and-run` an
 ## Rules
 
 1. **Never rotate pixel art by algorithm.** 90° steps and flips are safe. `transform` op
-   `rotate` refuses other angles without `allowLossy`, and `scale` is integer-only. Redraw
+   `rotate` refuses every other angle, and `scale` is integer-only. Redraw
    each needed angle. For a spinning saw or blade at speed, smear it (motion blur) instead
    of rotating.
 2. **If you must rotate,** use a pixel-art algorithm (RotSprite: enlarge ×8 with a
