@@ -149,9 +149,9 @@ test("decodeJpeg rejects a progressive JPEG cut off between scans", () => {
   assert.throws(() => decodeJpeg(base.subarray(0, base.length - 30)), Error);
 });
 
-test("decodeJpeg rejects a JPEG with no EOI marker", () => {
+test("decodeJpeg reads a JPEG that ends after its last scan without an EOI marker", () => {
   const base = jpg("baseline-444");
-  assert.throws(() => decodeJpeg(base.subarray(0, base.length - 2)), /EOI|truncated/);
+  assert.deepEqual(decodeJpeg(base.subarray(0, base.length - 2)).pixels, decodeJpeg(base).pixels);
 });
 
 test("decodeJpeg rejects a JPEG cut off inside a marker segment", () => {

@@ -521,7 +521,9 @@ export function decodeJpeg(bytes: Uint8Array): Image {
   let pos = 2;
 
   for (;;) {
-    if (pos >= bytes.length) throw new Error("JPEG is truncated: missing EOI marker");
+    // libjpeg accepts a file that stops after a complete scan; so do we.
+    if (pos >= bytes.length && scans > 0) break;
+    if (pos >= bytes.length) throw truncated();
     if (bytes[pos] !== 0xff) throw new Error(`invalid JPEG marker at offset ${pos}`);
     while (bytes[pos + 1] === 0xff) pos++;
     const marker = bytes[pos + 1];
