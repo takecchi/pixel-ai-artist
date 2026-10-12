@@ -18,7 +18,7 @@ routes, and none needs a release:
 |-------|-----|-----|
 | **Plugin** | Claude Code, omp | `/plugin marketplace add takecchi/pixel-ai-artist` — see [Claude Code](#claude-code) and [omp](#omp-oh-my-pi). Brings the skills, subagents and hook too. |
 | **From GitHub** | Any MCP client | Name `npx -y github:takecchi/pixel-ai-artist serve` as the server. npm clones and builds it on first start (about ten seconds), then caches it (two or three). Pin a version with `#<branch, tag or commit>`. |
-| **A checkout** | Working on the server itself | `git clone`, then `npm ci` (which builds); the server is `node /path/to/pixel-ai-artist/dist/cli.js serve`. |
+| **A checkout** | Working on the server itself | `git clone`, then `npm ci` (which builds); the server is `node /path/to/pixel-ai-artist/dist/cli.js serve`, and `node dist/cli.js install <client> --local` writes it into a client's config. |
 
 The GitHub route, in a JSON client config:
 
@@ -33,11 +33,17 @@ The GitHub route, in a JSON client config:
 }
 ```
 
-`install` (below) still writes `npx -y pixel-ai-artist@latest serve`, which starts
-only once the package is published. Until then, run
-`npx -y github:takecchi/pixel-ai-artist install <client> --dry-run` to see the
-file and the exact entry each client wants, and write it with the GitHub
-`command` and `args` above.
+`install` (below) writes `npx -y pixel-ai-artist@latest serve` by default, which
+starts only once the package is published. Until then, either:
+
+- write the GitHub entry by hand —
+  `npx -y github:takecchi/pixel-ai-artist install <client> --dry-run` prints the
+  file and the exact entry each client wants; swap in the GitHub `command` and
+  `args` above; or
+- from a checkout, run `node dist/cli.js install <client> --local` (or
+  `--all --local`). It writes entries that start this checkout's build by
+  absolute path, and refuses a checkout that has not been built. After pulling
+  changes, `npm run build` again; the entries keep pointing at the same place.
 
 ## 2. Wire up your agent
 

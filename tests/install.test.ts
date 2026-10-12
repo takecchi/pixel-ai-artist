@@ -2,8 +2,12 @@ import { strict as assert } from "node:assert";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import { test } from "node:test";
-import { CLIENTS, configPath, install, type InstallOptions } from "../dist/install.js";
+import { fileURLToPath } from "node:url";
+import { CLIENTS, configPath, install, serverLaunch, type InstallOptions } from "../dist/install.js";
+
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const base = (projectDir: string, extra: Partial<InstallOptions> = {}): InstallOptions => ({
   scope: "project",
@@ -16,6 +20,23 @@ const base = (projectDir: string, extra: Partial<InstallOptions> = {}): InstallO
 });
 
 const scratch = () => mkdtempSync(path.join(tmpdir(), "aia-install-"));
+
+test("install --local points the client at this checkout's built server by absolute path", () => {
+  const dir = scratch();
+  // --local before the client name: a switch must not swallow the next word.
+  execFileSync(process.execPath, [path.join(ROOT, "dist", "cli.js"), "install", "--local", "claude", "--project", "--dir", dir]);
+  const entry = JSON.parse(readFileSync(path.join(dir, ".mcp.json"), "utf8")).mcpServers["pixel-ai-artist"];
+  assert.equal(entry.command, "node");
+  assert.deepEqual(entry.args, [path.join(ROOT, "dist", "cli.js"), "serve"]);
+});
+
+test("a local install from a checkout that was never built is refused, naming the build command", () => {
+  assert.throws(() => serverLaunch(true, scratch()), /npm ci && npm run build/);
+});
+
+test("without --local the client starts the published package through npx", () => {
+  assert.deepEqual(serverLaunch(false), { command: "npx", args: ["-y", "pixel-ai-artist@latest", "serve"] });
+});
 
 test("opencode is a client, with an XDG-aware user path", () => {
   assert.ok(CLIENTS.includes("opencode"));
