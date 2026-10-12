@@ -12,7 +12,7 @@ import { homedir, platform } from "node:os";
 import path from "node:path";
 import { packageRoot } from "./lib/version.js";
 
-const EXTENSION_DIR_NAME = "libresprite-ai-artist";
+const EXTENSION_DIR_NAME = "pixel-ai-artist";
 
 /** Candidate Aseprite user-config directories, most likely first. */
 export function asepriteConfigCandidates(): string[] {
@@ -51,7 +51,7 @@ export function findAsepriteConfigDir(): string | null {
 }
 
 /**
- * Where an Aseprite executable usually lives when `LIBRESPRITE_PATH` is not set:
+ * Where an Aseprite executable usually lives when `ASEPRITE_PATH` is not set:
  * the standalone and Steam install locations, then `aseprite` on PATH.
  */
 export function asepriteBinaryCandidates(env: NodeJS.ProcessEnv = process.env): string[] {
@@ -106,12 +106,12 @@ export function asepriteBinaryCandidates(env: NodeJS.ProcessEnv = process.env): 
 
 /**
  * The Aseprite executable headless mode will run, or null when there is none.
- * An explicit `LIBRESPRITE_PATH` that points nowhere is null, not a cue to try
+ * An explicit `ASEPRITE_PATH` that points nowhere is null, not a cue to try
  * the other locations: running a different Aseprite than the one the user
  * named would be a silent substitution they have no way to notice.
  */
 export function findAsepriteBinary(env: NodeJS.ProcessEnv = process.env): string | null {
-  const candidates = env.LIBRESPRITE_PATH ? [env.LIBRESPRITE_PATH] : asepriteBinaryCandidates(env);
+  const candidates = env.ASEPRITE_PATH ? [env.ASEPRITE_PATH] : asepriteBinaryCandidates(env);
   for (const candidate of candidates) {
     try {
       if (statSync(candidate).isFile()) return candidate;

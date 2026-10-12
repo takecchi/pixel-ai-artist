@@ -17,7 +17,7 @@ just makes the wrongness harder to see and more expensive to fix.
 palette. Do not assume them — a wrong layer name means drawing into the user's
 finished art.
 
-If `libresprite:concept` produced a PixelSpec, it is the plan: its landmarks and
+If `pixel-ai-artist:concept` produced a PixelSpec, it is the plan: its landmarks and
 bounding boxes are where the shapes go, its palette mapping is which colour
 each mass gets, its deviations are what you leave out. When a reference layer
 exists (`reference op="list"`), you are drawing over it — the steps below are
@@ -98,7 +98,7 @@ leather, cloth. Still flat. Still one `draw` call.
 
 ### 5. Shade
 
-See `libresprite:shade`. One shadow step, look, one light step, look. Stop there
+See `pixel-ai-artist:shade`. One shadow step, look, one light step, look. Stop there
 unless the sprite is 32px+ and genuinely needs more.
 
 ### 6. Outline

@@ -141,7 +141,7 @@ test("headless preflight without an executable says so instead of pretending", a
     const structured = result.structuredContent as { ready: boolean; mode: string; directive: string };
     assert.equal(structured.ready, false);
     assert.equal(structured.mode, "headless");
-    assert.match(structured.directive, /Could not run|LIBRESPRITE_PATH/);
+    assert.match(structured.directive, /Could not run|ASEPRITE_PATH/);
   } finally {
     live.close();
     await server.close();

@@ -16,7 +16,7 @@ That single fact produces the three-process shape below.
                                │ stdio, MCP JSON-RPC
                                ▼
    ┌──────────────────────────────────────────────┐   one per agent window;
-   │  libresprite-ai-artist serve   (src/server.ts)  │   the host owns its
+   │  pixel-ai-artist serve   (src/server.ts)  │   the host owns its
    │  LiveClient  =  control client               │   lifecycle and may
    └───────────────────────────┬──────────────────┘   restart or duplicate it
                                │ WebSocket  ws://127.0.0.1:9942
@@ -25,7 +25,7 @@ That single fact produces the three-process shape below.
                                │ • reads bridge_state → pluginConnected
                                ▼
    ┌──────────────────────────────────────────────────────────────┐
-   │  libresprite-ai-artist bridge   (src/bridge/bridge.ts)          │
+   │  pixel-ai-artist bridge   (src/bridge/bridge.ts)          │
    │  SINGLETON by port ownership · owns :9941 and :9942          │
    │  dumb relay; outlives every MCP server restart               │
    └───────────────────────────┬──────────────────────────────────┘
@@ -86,7 +86,7 @@ mode that does not quietly destroy work.
 
 ## Headless mode
 
-`serve --headless` (or `LIBRESPRITE_AI_HEADLESS=1`) swaps the link, not the tools.
+`serve --headless` (or `PIXEL_AI_HEADLESS=1`) swaps the link, not the tools.
 Every tool talks to an `AsepriteLink` (`src/bridge/link.ts`); the live one goes
 through the bridge, the headless one (`src/bridge/headless.ts`) owns a single
 `aseprite -b` running `headless/runner.lua`:
@@ -124,8 +124,8 @@ is never entered as a recovery from a dropped live session. See
 
 | Port | Owner | Purpose | Environment override |
 |------|-------|---------|---------------------|
-| 9941 | bridge | The Aseprite extension dials here | `LIBRESPRITE_AI_PLUGIN_PORT` |
-| 9942 | bridge | MCP servers dial here as control clients | `LIBRESPRITE_AI_CONTROL_PORT` |
+| 9941 | bridge | The Aseprite extension dials here | `PIXEL_AI_PLUGIN_PORT` |
+| 9942 | bridge | MCP servers dial here as control clients | `PIXEL_AI_CONTROL_PORT` |
 
 Both bind `127.0.0.1` only. Nothing listens on a public interface, and there is
 no authentication because there is no remote surface to authenticate.

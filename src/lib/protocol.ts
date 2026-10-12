@@ -135,10 +135,10 @@ export function notConnected(detail?: string): LiveError {
   return new LiveError(
     "not_connected",
     detail ??
-      "Aseprite is not connected. Open Aseprite with the libresprite-ai-artist extension installed, then retry.",
+      "Aseprite is not connected. Open Aseprite with the pixel-ai-artist extension installed, then retry.",
     {
       doNotFallBackToDisk: true,
-      remediation: "Run `npx libresprite-ai-artist doctor` for a step-by-step check.",
+      remediation: "Run `npx pixel-ai-artist doctor` for a step-by-step check.",
     },
   );
 }

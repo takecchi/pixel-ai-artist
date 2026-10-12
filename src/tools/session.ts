@@ -130,8 +130,8 @@ export function registerSessionTools(server: McpServer, live: LinkSelector): voi
             activeSprite: null,
             directive:
               (live.bridgeConnected
-                ? "The bridge is running but Aseprite is not attached. Ask the user to open Aseprite with the libresprite-ai-artist extension installed, then call preflight again."
-                : "The bridge is not running. Ask the user to run `npx libresprite-ai-artist doctor`.") +
+                ? "The bridge is running but Aseprite is not attached. Ask the user to open Aseprite with the pixel-ai-artist extension installed, then call preflight again."
+                : "The bridge is not running. Ask the user to run `npx pixel-ai-artist doctor`.") +
               " If the work does not need their window, you may offer headless mode — ask; do not switch on your own.",
           },
           "NOT READY — Aseprite is not connected. Do not attempt to edit files on disk instead.",

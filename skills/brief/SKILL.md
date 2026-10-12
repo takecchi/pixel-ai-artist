@@ -44,7 +44,7 @@ the user's time and yours. Five questions, one answer, then draw.
    do not care about it.
 
    When the request is something new — a character, a prop, an animation —
-   `libresprite:concept` follows, and its offer goes **in this same message**:
+   `pixel-ai-artist:concept` follows, and its offer goes **in this same message**:
    the decisions above, then the image-model prompt in one code block, then the
    choice between sending references and continuing without. The user answers
    once. If they correct a decision, fix the prompt to match before they copy it.
@@ -58,9 +58,9 @@ the user's time and yours. Five questions, one answer, then draw.
 
 ## Then
 
-`libresprite:concept` for anything drawn from scratch — its offer is already in
-the message above. Then `libresprite:new` to create the document, or
-`libresprite:draw` if a suitable sprite is already open.
+`pixel-ai-artist:concept` for anything drawn from scratch — its offer is already in
+the message above. Then `pixel-ai-artist:new` to create the document, or
+`pixel-ai-artist:draw` if a suitable sprite is already open.
 
 ## Related
 

@@ -10,7 +10,7 @@
  *
  * A plugin installed from git arrives as source with no build step, so this
  * builds once on first use and then runs the compiled CLI. Published npm users
- * never touch this file — they run `npx libresprite-ai-artist`.
+ * never touch this file — they run `npx pixel-ai-artist`.
  */
 
 import { spawnSync } from "node:child_process";
@@ -23,7 +23,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const cli = path.join(root, "dist", "cli.js");
 
 // stderr only: stdout is the MCP stdio channel and any stray byte corrupts it.
-const log = (msg) => process.stderr.write(`[libresprite-ai-artist] ${msg}\n`);
+const log = (msg) => process.stderr.write(`[pixel-ai-artist] ${msg}\n`);
 
 if (!existsSync(cli)) {
   log("first run — building…");

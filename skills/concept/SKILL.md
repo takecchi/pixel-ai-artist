@@ -25,13 +25,13 @@ amount of cleanup turns it into pixel art (see *What this must not do*).
 |-------------------|------|----------|
 | Only words ("a fire mage with a walk cycle") | **Creative** — spec → prompt → offer | step 1 |
 | An image — concept art, a sketch, a screenshot, a sheet | **Reference** — read it, import it | step 5 |
-| An edit to art that already exists | neither — use `libresprite:fix` | — |
+| An edit to art that already exists | neither — use `pixel-ai-artist:fix` | — |
 
 ## Procedure
 
 ### 1. Start from the brief
 
-`libresprite:brief` has already fixed canvas size, palette, view, light, outline
+`pixel-ai-artist:brief` has already fixed canvas size, palette, view, light, outline
 and destination. Do not ask any of it again. The prompt needs colours, not a
 palette's name: for a preset, read its hex values from the
 `knowledge://palettes` resource (no document has to exist yet); for an open
@@ -153,7 +153,7 @@ placed. This is where the design becomes decisions you can check against:
 
 ### 6. Import it
 
-After `libresprite:new` has made the document:
+After `pixel-ai-artist:new` has made the document:
 
 - **A concept sheet** — import the panel for the view you are drawing:
   `reference op="import" path=… region={x, y, width, height}` (source pixels).
@@ -166,7 +166,7 @@ After `libresprite:new` has made the document:
 
 ### 7. Hand over to drawing
 
-`libresprite:draw` (or `libresprite:animate` for a storyboard) does the work, over
+`pixel-ai-artist:draw` (or `pixel-ai-artist:animate` for a storyboard) does the work, over
 the reference. The loop that makes a reference pay off:
 
 1. `look op="compare"` — reference left, art right, same scale.
@@ -176,7 +176,7 @@ the reference. The loop that makes a reference pay off:
 4. Compare again. Stop when every remaining mismatch is a listed deviation.
 
 Two rounds is normal. Remove the reference layer before export
-(`reference op="remove"`) — `libresprite:export` checks for it.
+(`reference op="remove"`) — `pixel-ai-artist:export` checks for it.
 
 ## What this must not do
 
@@ -192,7 +192,7 @@ Two rounds is normal. Remove the reference layer before export
 
 ## Related
 
-`libresprite:brief` before this, `libresprite:draw` and `libresprite:animate` after it.
+`pixel-ai-artist:brief` before this, `pixel-ai-artist:draw` and `pixel-ai-artist:animate` after it.
 `rules://03-silhouette-and-form` for reading proportions,
 `rules://01-palette-and-color` for mapping colours onto a palette,
 `rules://05-animation` for key poses.

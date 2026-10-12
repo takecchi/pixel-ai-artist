@@ -1,13 +1,13 @@
 # OpenAI Codex CLI — ~/.codex/config.toml (or .codex/config.toml in a trusted project).
 # Codex reads TOML; the JSON that Claude Code and Cursor use will not work here.
 #
-# Written for you by:  npx libresprite-ai-artist install codex
+# Written for you by:  npx pixel-ai-artist install codex
 
-[mcp_servers.libresprite-ai-artist]
+[mcp_servers.pixel-ai-artist]
 command = "npx"
-args = ["-y", "libresprite-ai-artist@latest", "serve"]
+args = ["-y", "pixel-ai-artist@latest", "serve"]
 
 # Optional: point at a non-default Aseprite, or move the ports.
-# [mcp_servers.libresprite-ai-artist.env]
-# LIBRESPRITE_AI_PLUGIN_PORT = "9941"
-# LIBRESPRITE_AI_CONTROL_PORT = "9942"
+# [mcp_servers.pixel-ai-artist.env]
+# PIXEL_AI_PLUGIN_PORT = "9941"
+# PIXEL_AI_CONTROL_PORT = "9942"

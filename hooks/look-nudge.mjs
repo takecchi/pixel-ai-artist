@@ -22,7 +22,7 @@ try {
 
 const sessionId = payload.session_id || "unknown";
 const stateDir = path.join(
-  process.env.CLAUDE_PLUGIN_DATA || path.join(os.tmpdir(), "libresprite-ai-artist"),
+  process.env.CLAUDE_PLUGIN_DATA || path.join(os.tmpdir(), "pixel-ai-artist"),
   "look-nudge",
 );
 const marker = path.join(stateDir, `${sessionId}.seen`);

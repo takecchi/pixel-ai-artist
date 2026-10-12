@@ -22,8 +22,8 @@ bridge.
 Stop it when you are not using it:
 
 ```bash
-pkill -f "libresprite-ai-artist bridge"     # macOS / Linux
-taskkill /F /FI "WINDOWTITLE eq libresprite-ai-artist*"   # Windows, or use Task Manager
+pkill -f "pixel-ai-artist bridge"     # macOS / Linux
+taskkill /F /FI "WINDOWTITLE eq pixel-ai-artist*"   # Windows, or use Task Manager
 ```
 
 ## Filesystem access
@@ -57,7 +57,7 @@ Two protections:
   setup, and a rename cannot produce one.
 
 Rewriting is also surgical where it can be: the Codex TOML editor replaces only
-its own `[mcp_servers.libresprite-ai-artist]` table, matched at the start of a
+its own `[mcp_servers.pixel-ai-artist]` table, matched at the start of a
 line so the same text inside a comment or a string cannot misdirect the splice.
 
 There is no file lock. If your agent writes its own config at the same moment,
@@ -75,10 +75,10 @@ unsaved work. It has full Aseprite API access, which includes the filesystem.
 It is **off by default, and gated twice**:
 
 - The server hides the tool unless `--allowLua` on the CLI, or
-  `LIBRESPRITE_AI_ALLOW_LUA=1` in the server's environment, is set. The agent
+  `PIXEL_AI_ALLOW_LUA=1` in the server's environment, is set. The agent
   cannot see or call it.
 - The extension itself refuses `lua.run` unless the Aseprite process was
-  started with `LIBRESPRITE_AI_ALLOW_LUA=1`. The capability is absent, not just
+  started with `PIXEL_AI_ALLOW_LUA=1`. The capability is absent, not just
   the tool entry.
 
 A live session therefore needs the variable in the environment that started
@@ -114,4 +114,4 @@ any local process could exhaust memory with one connection.
 ## Reporting a vulnerability
 
 Open a security advisory on the repository rather than a public issue:
-https://github.com/takecchi/libresprite-ai-artist/security/advisories/new
+https://github.com/takecchi/pixel-ai-artist/security/advisories/new

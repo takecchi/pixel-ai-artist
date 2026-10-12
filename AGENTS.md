@@ -25,7 +25,7 @@ under them changes, not ahead of it.
 
 - No editor is involved. The documents live in the server's memory and the
   tools draw into them; results leave as files (PNG, GIF, sprite sheets, and
-  later `.ase` so LibreSprite or Aseprite can open them).
+  later `.ase` so Aseprite can open them).
 - The Aseprite link — the Lua extension, the WebSocket bridge, the control
   client and headless `aseprite -b` — is being removed; code still under
   `src/bridge/` is on its way out.
@@ -74,5 +74,5 @@ Copy both blocks into any new workflow.
 npm test   # colour, rendering, bridge transport, MCP surface
 ```
 
-`package-lock.json` is the only lockfile; `bin/libresprite-ai-artist.mjs`
+`package-lock.json` is the only lockfile; `bin/pixel-ai-artist.mjs`
 builds a git install with `npm ci`, and CI uses the same tree.

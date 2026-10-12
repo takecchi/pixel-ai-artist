@@ -2,13 +2,13 @@ import { strict as assert } from "node:assert";
 import { existsSync, readdirSync } from "node:fs";
 import { test } from "node:test";
 // @ts-ignore — plain .mjs on purpose: omp loads it from a git clone with no build step.
-import extension, { isPixelMutation } from "../omp/libresprite-ai-artist.mjs";
+import extension, { isPixelMutation } from "../omp/pixel-ai-artist.mjs";
 // @ts-ignore
 import { LOOK_NUDGE, loadSkillCommands, skillPrompt } from "../hooks/shared.mjs";
 
 // Nothing listens here, so the status probe answers fast and never touches a
 // real Aseprite session.
-process.env.LIBRESPRITE_AI_CONTROL_PORT = "19961";
+process.env.PIXEL_AI_CONTROL_PORT = "19961";
 
 type Handler = (event?: unknown) => unknown;
 
@@ -37,17 +37,17 @@ const result = (toolName: string, isError = false) => ({
   isError,
 });
 
-test("every skill becomes an /libresprite:<workflow> command carrying its body", () => {
+test("every skill becomes an /pixel-ai-artist:<workflow> command carrying its body", () => {
   const commands = loadSkillCommands();
   // Every skill directory on disk, not a hardcoded count: a new skill that the
   // omp extension silently skipped is the bug this test exists to catch.
   const onDisk = readdirSync(new URL("../skills/", import.meta.url)).filter((name) =>
     existsSync(new URL(`../skills/${name}/SKILL.md`, import.meta.url)),
   );
-  assert.deepEqual(commands.map((c: { name: string }) => c.name).sort(), onDisk.map((n) => `libresprite:${n}`).sort());
-  assert.ok(commands.some((c: { name: string }) => c.name === "libresprite:studio"));
-  const draw = commands.find((c: { name: string }) => c.name === "libresprite:draw");
-  assert.ok(draw, "draw maps to libresprite:draw");
+  assert.deepEqual(commands.map((c: { name: string }) => c.name).sort(), onDisk.map((n) => `pixel-ai-artist:${n}`).sort());
+  assert.ok(commands.some((c: { name: string }) => c.name === "pixel-ai-artist:studio"));
+  const draw = commands.find((c: { name: string }) => c.name === "pixel-ai-artist:draw");
+  assert.ok(draw, "draw maps to pixel-ai-artist:draw");
   assert.ok(!draw.body.startsWith("---"), "frontmatter is stripped");
   assert.ok(!draw.description.startsWith("description"), "description is parsed");
   const prompt = skillPrompt(draw, " a knight ");
@@ -58,17 +58,17 @@ test("every skill becomes an /libresprite:<workflow> command carrying its body",
 
 test("mutating tools match under both harnesses' MCP naming", () => {
   for (const name of [
-    "mcp__libresprite_libresprite_draw",
-    "mcp__libresprite_libresprite_recolor",
-    "mcp__libresprite_libresprite_transform",
-    "mcp__plugin_libresprite_libresprite__draw",
-    "mcp__libresprite_draw",
+    "mcp__pixel-ai-artist_pixel-ai-artist_draw",
+    "mcp__pixel-ai-artist_pixel-ai-artist_recolor",
+    "mcp__pixel-ai-artist_pixel-ai-artist_transform",
+    "mcp__plugin_pixel-ai-artist_pixel-ai-artist__draw",
+    "mcp__pixel-ai-artist_draw",
   ]) {
     assert.equal(isPixelMutation(name), true, name);
   }
   for (const name of [
-    "mcp__libresprite_libresprite_look",
-    "mcp__libresprite_libresprite_draw_extra",
+    "mcp__pixel-ai-artist_pixel-ai-artist_look",
+    "mcp__pixel-ai-artist_pixel-ai-artist_draw_extra",
     "mcp__other_draw",
     "write",
     undefined,
@@ -81,17 +81,17 @@ test("look nudge is appended once per session, only after a successful mutation"
   const { emit } = load();
   emit("session_start", { type: "session_start" });
 
-  assert.equal(await emit("tool_result", result("mcp__libresprite_libresprite_look")), undefined);
-  assert.equal(await emit("tool_result", result("mcp__libresprite_libresprite_draw", true)), undefined);
+  assert.equal(await emit("tool_result", result("mcp__pixel-ai-artist_pixel-ai-artist_look")), undefined);
+  assert.equal(await emit("tool_result", result("mcp__pixel-ai-artist_pixel-ai-artist_draw", true)), undefined);
 
-  const first = (await emit("tool_result", result("mcp__libresprite_libresprite_draw"))) as {
+  const first = (await emit("tool_result", result("mcp__pixel-ai-artist_pixel-ai-artist_draw"))) as {
     content: unknown[];
   };
   assert.deepEqual(first.content, [text("412 pixels changed"), text(LOOK_NUDGE)]);
-  assert.equal(await emit("tool_result", result("mcp__libresprite_libresprite_recolor")), undefined);
+  assert.equal(await emit("tool_result", result("mcp__pixel-ai-artist_pixel-ai-artist_recolor")), undefined);
 
   emit("session_start", { type: "session_start" });
-  assert.ok(await emit("tool_result", result("mcp__libresprite_libresprite_transform")));
+  assert.ok(await emit("tool_result", result("mcp__pixel-ai-artist_pixel-ai-artist_transform")));
 });
 
 test("bridge status reaches the model once per session, hidden from the transcript", async () => {

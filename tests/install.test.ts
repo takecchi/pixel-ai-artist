@@ -9,7 +9,7 @@ const base = (projectDir: string, extra: Partial<InstallOptions> = {}): InstallO
   scope: "project",
   projectDir,
   command: "npx",
-  args: ["-y", "libresprite-ai-artist@latest", "serve"],
+  args: ["-y", "pixel-ai-artist@latest", "serve"],
   env: {},
   dryRun: false,
   ...extra,
@@ -37,13 +37,13 @@ test("opencode is a client, with an XDG-aware user path", () => {
 
 test("project scope writes the mcp.servers entry the plugin expects", () => {
   const dir = scratch();
-  const result = install("opencode", base(dir, { env: { LIBRESPRITE_AI_HEADLESS: "1" } }));
+  const result = install("opencode", base(dir, { env: { PIXEL_AI_HEADLESS: "1" } }));
   assert.equal(result.written, true);
   const doc = JSON.parse(readFileSync(path.join(dir, ".opencode", "opencode.json"), "utf8"));
-  assert.deepEqual(doc.mcp.servers["libresprite-ai-artist"], {
+  assert.deepEqual(doc.mcp.servers["pixel-ai-artist"], {
     type: "local",
-    command: ["npx", "-y", "libresprite-ai-artist@latest", "serve"],
-    environment: { LIBRESPRITE_AI_HEADLESS: "1", LIBRESPRITE_AI_PROMPTS: "0" },
+    command: ["npx", "-y", "pixel-ai-artist@latest", "serve"],
+    environment: { PIXEL_AI_HEADLESS: "1", PIXEL_AI_PROMPTS: "0" },
   });
 });
 
@@ -62,7 +62,7 @@ test("install merges into an existing config and backs it up", () => {
   assert.equal(after.$schema, before.$schema);
   assert.equal(after.theme, "x");
   assert.deepEqual(after.mcp.servers.other, before.mcp.servers.other);
-  assert.equal(after.mcp.servers["libresprite-ai-artist"].type, "local");
+  assert.equal(after.mcp.servers["pixel-ai-artist"].type, "local");
   assert.ok(
     readdirSync(path.join(dir, ".opencode")).some((n) => n.startsWith("opencode.json.bak-")),
     "a timestamped backup exists",
@@ -79,10 +79,10 @@ test("install defaults a non-object mcp / mcp.servers to an empty object", () =>
     const after = JSON.parse(readFileSync(file, "utf8"));
     assert.equal(after.theme, "x", "unrelated keys survive");
     // The bad value is replaced by a real object, not spread into a character-indexed blob.
-    assert.deepEqual(after.mcp.servers["libresprite-ai-artist"], {
+    assert.deepEqual(after.mcp.servers["pixel-ai-artist"], {
       type: "local",
-      command: ["npx", "-y", "libresprite-ai-artist@latest", "serve"],
-      environment: { LIBRESPRITE_AI_PROMPTS: "0" },
+      command: ["npx", "-y", "pixel-ai-artist@latest", "serve"],
+      environment: { PIXEL_AI_PROMPTS: "0" },
     });
     assert.ok(
       readdirSync(path.join(dir, ".opencode")).some((n) => n.startsWith("opencode.json.bak-")),
@@ -95,7 +95,7 @@ test("dry run returns the entry and writes nothing", () => {
   const dir = scratch();
   const result = install("opencode", base(dir, { dryRun: true }));
   assert.equal(result.written, false);
-  assert.ok(result.note?.includes("libresprite-ai-artist"));
+  assert.ok(result.note?.includes("pixel-ai-artist"));
   assert.equal(existsSync(path.join(dir, ".opencode", "opencode.json")), false);
 });
 

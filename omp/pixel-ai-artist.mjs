@@ -17,16 +17,16 @@
 
 import { bridgeStatusMessage, LOOK_NUDGE, loadSkillCommands, skillPrompt } from "../hooks/shared.mjs";
 
-// Claude names plugin MCP tools `mcp__plugin_libresprite_libresprite__draw`; omp
-// names the same tool `mcp__libresprite_libresprite_draw`, and a server wired by hand
-// as `libresprite-ai-artist` gives `mcp__libresprite-ai-artist__draw`.
-const PIXEL_MUTATION = /^mcp__.*libresprite.*_(?:draw|recolor|transform)$/;
+// Claude names plugin MCP tools `mcp__plugin_pixel-ai-artist_pixel-ai-artist__draw`; omp
+// names the same tool `mcp__pixel-ai-artist_pixel-ai-artist_draw`, and a server wired by hand
+// as `pixel-ai-artist` gives `mcp__pixel-ai-artist__draw`.
+const PIXEL_MUTATION = /^mcp__.*pixel-ai-artist.*_(?:draw|recolor|transform)$/;
 
 export function isPixelMutation(toolName) {
   return typeof toolName === "string" && PIXEL_MUTATION.test(toolName);
 }
 
-export default function libreSpriteAiArtist(pi) {
+export default function pixelAiArtist(pi) {
   let status = null;
   let statusSent = false;
   let nudged = false;
@@ -56,7 +56,7 @@ export default function libreSpriteAiArtist(pi) {
     statusSent = true;
     return {
       message: {
-        customType: "libresprite-ai-artist/status",
+        customType: "pixel-ai-artist/status",
         content: await (status ?? bridgeStatusMessage()),
         display: false,
         attribution: "agent",

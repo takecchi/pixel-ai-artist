@@ -64,7 +64,7 @@ export function configPath(client: ClientId, opts: InstallOptions): string {
   }
 }
 
-const SERVER_KEY = "libresprite-ai-artist";
+const SERVER_KEY = "pixel-ai-artist";
 
 export function install(client: ClientId, opts: InstallOptions): InstallResult {
   const file = configPath(client, opts);
@@ -89,8 +89,8 @@ function installOpenCode(file: string, opts: InstallOptions): InstallResult {
     type: "local",
     command: [opts.command, ...opts.args],
     // Plugin harnesses disable MCP prompts: the plugin already lists the
-    // skills as /libresprite:*; the prompts would double every workflow.
-    environment: { ...opts.env, LIBRESPRITE_AI_PROMPTS: "0" },
+    // skills as /pixel-ai-artist:*; the prompts would double every workflow.
+    environment: { ...opts.env, PIXEL_AI_PROMPTS: "0" },
   };
   const next = { ...existing, mcp: { ...mcp, servers: { ...servers, [SERVER_KEY]: entry } } };
   if (opts.dryRun) return { client: "opencode", file, written: false, note: JSON.stringify({ [SERVER_KEY]: entry }, null, 2) };
@@ -128,7 +128,7 @@ function installJson(client: ClientId, file: string, opts: InstallOptions): Inst
 /**
  * Codex uses TOML. Rewriting a whole TOML document without a parser risks
  * mangling comments and unrelated tables, so this only ever appends or replaces
- * the one `[mcp_servers.libresprite-ai-artist]` block and leaves the rest byte
+ * the one `[mcp_servers.pixel-ai-artist]` block and leaves the rest byte
  * for byte as it was.
  */
 function installToml(file: string, opts: InstallOptions): InstallResult {
@@ -155,7 +155,7 @@ function installToml(file: string, opts: InstallOptions): InstallResult {
   if (start !== -1) {
     // Replace from our header up to the next top-level table that is not ours.
     const rest = existing.slice(start + header.length);
-    const nextTable = rest.search(/\n\[(?!mcp_servers\.libresprite-ai-artist)/);
+    const nextTable = rest.search(/\n\[(?!mcp_servers\.pixel-ai-artist)/);
     const end = nextTable === -1 ? existing.length : start + header.length + nextTable + 1;
     existing = existing.slice(0, start) + existing.slice(end);
   }
@@ -178,8 +178,8 @@ export function agentsMarkdown(): string {
 
 export function mergeAgentsFile(target: string, dryRun: boolean): { written: boolean; file: string } {
   const block = agentsMarkdown();
-  const marker = "<!-- libresprite-ai-artist:start -->";
-  const endMarker = "<!-- libresprite-ai-artist:end -->";
+  const marker = "<!-- pixel-ai-artist:start -->";
+  const endMarker = "<!-- pixel-ai-artist:end -->";
   const wrapped = `${marker}\n${block.trim()}\n${endMarker}\n`;
 
   let content = existsSync(target) ? readFileSync(target, "utf8") : "";

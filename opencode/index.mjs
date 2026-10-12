@@ -7,7 +7,7 @@ import { bridgeStatusMessage, LOOK_NUDGE, loadSkillCommands, skillPrompt } from 
 const OWN_DIR = path.dirname(fileURLToPath(import.meta.url));
 
 export function isPixelMutation(toolName) {
-  return typeof toolName === "string" && /^libresprite(-ai-artist)?_(draw|recolor|transform)$/.test(toolName);
+  return typeof toolName === "string" && /^pixel-ai-artist_(draw|recolor|transform)$/.test(toolName);
 }
 
 // Sibling tree first (checkout, and git layouts that keep it); then the npm
@@ -16,7 +16,7 @@ export function resolveSkillsDir(pluginDir = OWN_DIR) {
   const sibling = path.join(pluginDir, "..", "skills");
   if (existsSync(path.join(sibling, "studio", "SKILL.md"))) return path.resolve(sibling);
   try {
-    const pkg = createRequire(import.meta.url).resolve("libresprite-ai-artist/package.json");
+    const pkg = createRequire(import.meta.url).resolve("pixel-ai-artist/package.json");
     const bundled = path.join(path.dirname(pkg), "skills");
     if (existsSync(path.join(bundled, "studio", "SKILL.md"))) return bundled;
   } catch { /* not installed — the caller reports */ }
@@ -24,13 +24,13 @@ export function resolveSkillsDir(pluginDir = OWN_DIR) {
 }
 
 export default {
-  id: "libresprite",
+  id: "pixel-ai-artist",
   async setup(ctx) {
     const skillsDir = resolveSkillsDir();
     if (!skillsDir) {
       // A plugin load must not take the session down; the MCP tools and
       // resources work without us.
-      process.stderr.write("[libresprite-ai-artist] skills not found next to the plugin; /libresprite:* commands and skills are skipped. See docs/INSTALL.md.\n");
+      process.stderr.write("[pixel-ai-artist] skills not found next to the plugin; /pixel-ai-artist:* commands and skills are skipped. See docs/INSTALL.md.\n");
       return;
     }
     const commands = loadSkillCommands(skillsDir);

@@ -1,5 +1,5 @@
 {
-  "name": "libresprite-ai-artist",
+  "name": "pixel-ai-artist",
   "version": "0.1.0",
   "description": "Pixel art from your coding agent, no editor required. MCP server + cross-agent skills for Claude Code, omp, Codex, Gemini CLI and Cursor. A port of with-pebbly/aseprite-ai-artist.",
   "license": "MIT",
@@ -8,7 +8,7 @@
     "node": ">=22.6.0"
   },
   "bin": {
-    "libresprite-ai-artist": "dist/cli.js"
+    "pixel-ai-artist": "dist/cli.js"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -29,12 +29,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/takecchi/libresprite-ai-artist.git"
+    "url": "git+https://github.com/takecchi/pixel-ai-artist.git"
   },
-  "homepage": "https://github.com/takecchi/libresprite-ai-artist#readme",
-  "bugs": "https://github.com/takecchi/libresprite-ai-artist/issues",
+  "homepage": "https://github.com/takecchi/pixel-ai-artist#readme",
+  "bugs": "https://github.com/takecchi/pixel-ai-artist/issues",
   "keywords": [
-    "libresprite",
     "pixel-art",
     "mcp",
     "model-context-protocol",
@@ -58,7 +57,7 @@
   },
   "omp": {
     "extensions": [
-      "./omp/libresprite-ai-artist.mjs"
+      "./omp/pixel-ai-artist.mjs"
     ]
   },
   "dependencies": {

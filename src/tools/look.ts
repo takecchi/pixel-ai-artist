@@ -417,7 +417,7 @@ function offPaletteNote(glyphs: string[]): string {
 }
 
 function tempPng(prefix: string): string {
-  return path.join(tmpdir(), `libresprite-ai-artist-${prefix}-${Date.now()}-${process.pid}.png`);
+  return path.join(tmpdir(), `pixel-ai-artist-${prefix}-${Date.now()}-${process.pid}.png`);
 }
 
 async function readAndClean(file: string): Promise<{ data: string; mimeType: string }> {

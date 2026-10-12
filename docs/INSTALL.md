@@ -14,7 +14,7 @@ only the agent wiring differs.
 ## 1. Install the Aseprite extension
 
 ```bash
-npx libresprite-ai-artist install-extension
+npx pixel-ai-artist install-extension
 ```
 
 Then **restart Aseprite**. It connects on startup.
@@ -29,7 +29,7 @@ Linux `~/.config/aseprite`.
 ### Everything at once
 
 ```bash
-npx libresprite-ai-artist install --all --agents
+npx pixel-ai-artist install --all --agents
 ```
 
 Writes config for Claude Code, Codex, Gemini CLI, Cursor, OpenCode, VS Code
@@ -40,37 +40,33 @@ prints the change without making it.
 ### Workflow names
 
 Every client sees the same fourteen workflows under the same names:
-`libresprite:studio` (the front door — give it any request and it picks and runs
-the rest), `libresprite:brief`, `libresprite:concept`, `libresprite:new`, `libresprite:palette`, `libresprite:draw`,
-`libresprite:shade`, `libresprite:rig`, `libresprite:animate`, `libresprite:tileset`,
-`libresprite:review`, `libresprite:fix`, `libresprite:export`, `libresprite:submit`.
+`pixel-ai-artist:studio` (the front door — give it any request and it picks and runs
+the rest), `pixel-ai-artist:brief`, `pixel-ai-artist:concept`, `pixel-ai-artist:new`, `pixel-ai-artist:palette`, `pixel-ai-artist:draw`,
+`pixel-ai-artist:shade`, `pixel-ai-artist:rig`, `pixel-ai-artist:animate`, `pixel-ai-artist:tileset`,
+`pixel-ai-artist:review`, `pixel-ai-artist:fix`, `pixel-ai-artist:export`, `pixel-ai-artist:submit`.
 
 | Client | How they appear |
 |--------|-----------------|
-| Claude Code (plugin) | `/libresprite:draw` — plugin skills |
-| omp (plugin) | `/libresprite:draw` — commands from the omp extension |
-| OpenCode (plugin) | `/libresprite:draw` — commands from the OpenCode plugin |
-| Gemini CLI, Cursor, other prompt-aware MCP clients | MCP prompt `libresprite:draw` |
+| Claude Code (plugin) | `/pixel-ai-artist:draw` — plugin skills |
+| omp (plugin) | `/pixel-ai-artist:draw` — commands from the omp extension |
+| OpenCode (plugin) | `/pixel-ai-artist:draw` — commands from the OpenCode plugin |
+| Gemini CLI, Cursor, other prompt-aware MCP clients | MCP prompt `pixel-ai-artist:draw` |
 | Codex, and any client without prompts | resource `skill://draw`; the server instructions list the names |
 
 ### Claude Code
 
-The plugin is the better route — it brings the `/libresprite:*` workflows, the
+The plugin is the better route — it brings the `/pixel-ai-artist:*` workflows, the
 specialist subagents and the hooks, not just the tools:
 
 ```
-/plugin marketplace add takecchi/libresprite-ai-artist
-/plugin install aseprite@libresprite-ai-artist
+/plugin marketplace add takecchi/pixel-ai-artist
+/plugin install pixel-ai-artist@pixel-ai-artist
 ```
-
-Installed before the rename, as `libresprite-ai-artist`? Uninstall that one first
-(`/plugin uninstall libresprite-ai-artist`) — the plugin ID changed so the commands
-could be `libresprite:*`, and both copies would start a server.
 
 Or wire the server alone:
 
 ```bash
-npx libresprite-ai-artist install claude
+npx pixel-ai-artist install claude
 ```
 
 ### omp (oh-my-pi)
@@ -78,18 +74,18 @@ npx libresprite-ai-artist install claude
 omp installs the same plugin from its own marketplace:
 
 ```bash
-omp plugin marketplace add takecchi/libresprite-ai-artist
-omp plugin install aseprite@libresprite-ai-artist
+omp plugin marketplace add takecchi/pixel-ai-artist
+omp plugin install pixel-ai-artist@pixel-ai-artist
 ```
 
 The skills, subagents and MCP server come from the same tree Claude Code reads.
 omp does not run Claude's `hooks/hooks.json`, so the plugin ships the two hooks
-again as an omp extension (`omp/libresprite-ai-artist.mjs`, declared in
+again as an omp extension (`omp/pixel-ai-artist.mjs`, declared in
 `package.json` under `omp.extensions`): the bridge status on the first prompt
 and the once-per-session nudge to `look` after a mutating call.
 
 omp lists plugin skills as `/skill:<name>`, so the same extension registers the
-`/libresprite:*` commands itself, from the same `SKILL.md` files. They inject the
+`/pixel-ai-artist:*` commands itself, from the same `SKILL.md` files. They inject the
 skill as a prompt, with anything typed after the command as the request.
 
 omp also imports Claude Code's plugins. Install it in omp under the same ID as
@@ -101,22 +97,22 @@ every tool twice.
 From a checkout, point the marketplace at the directory instead:
 
 ```bash
-omp plugin marketplace add /path/to/libresprite-ai-artist
-omp plugin install aseprite@libresprite-ai-artist
+omp plugin marketplace add /path/to/pixel-ai-artist
+omp plugin install pixel-ai-artist@pixel-ai-artist
 ```
 
 omp copies the tree into its plugin cache, so after changing it run
-`omp plugin marketplace update libresprite-ai-artist` and
-`omp plugin install --force aseprite@libresprite-ai-artist`, then restart
+`omp plugin marketplace update pixel-ai-artist` and
+`omp plugin install --force pixel-ai-artist@pixel-ai-artist`, then restart
 the session.
 
 ### Codex CLI
 
 ```bash
-npx libresprite-ai-artist install codex
+npx pixel-ai-artist install codex
 ```
 
-Writes `[mcp_servers.libresprite-ai-artist]` into `~/.codex/config.toml`. Codex uses
+Writes `[mcp_servers.pixel-ai-artist]` into `~/.codex/config.toml`. Codex uses
 TOML — the JSON config from other clients will not work, which is a common
 source of "it silently does nothing".
 
@@ -128,37 +124,37 @@ them on its own — verified against Codex CLI 0.145.0.
 ### Gemini CLI
 
 ```bash
-npx libresprite-ai-artist install gemini
+npx pixel-ai-artist install gemini
 ```
 
 ### Cursor
 
 ```bash
-npx libresprite-ai-artist install cursor
+npx pixel-ai-artist install cursor
 ```
 
 ### OpenCode
 
 ```bash
-npx libresprite-ai-artist install opencode
+npx pixel-ai-artist install opencode
 ```
 
-Writes `mcp.servers.libresprite-ai-artist` into
+Writes `mcp.servers.pixel-ai-artist` into
 `~/.config/opencode/opencode.json`. That is OpenCode 2.x's native config shape,
 and the plugin below is 2.x-only too. OpenCode 1.x cannot read a file in that
 shape, so on 1.x — including after `install --all` — skip this target and put
-the same entry directly under `mcp` as `mcp.libresprite-ai-artist`, without the
-`servers` level. On 2.x, add the plugin — it brings the `/libresprite:*` commands,
+the same entry directly under `mcp` as `mcp.pixel-ai-artist`, without the
+`servers` level. On 2.x, add the plugin — it brings the `/pixel-ai-artist:*` commands,
 the skills and the two hooks:
 
 ```bash
-opencode plugin add github:takecchi/libresprite-ai-artist::path:opencode
+opencode plugin add github:takecchi/pixel-ai-artist::path:opencode
 ```
 
 From a checkout, point at the directory instead:
 
 ```jsonc
-{ "plugins": ["/path/to/libresprite-ai-artist/opencode"] }
+{ "plugins": ["/path/to/pixel-ai-artist/opencode"] }
 ```
 
 MCP prompts are off for this client on purpose: the plugin already lists the
@@ -168,7 +164,7 @@ plugin the skills still reach the model as `skill://` resources, like Codex.
 ### Project scope instead of user scope
 
 ```bash
-npx libresprite-ai-artist install codex cursor --project
+npx pixel-ai-artist install codex cursor --project
 ```
 
 Writes into the current directory (`.codex/config.toml`, `.cursor/mcp.json`) so
@@ -177,22 +173,22 @@ the setup travels with the repository.
 ### Headless: no Aseprite window
 
 ```bash
-npx libresprite-ai-artist install codex --headless --aseprite /path/to/aseprite
+npx pixel-ai-artist install codex --headless --aseprite /path/to/aseprite
 ```
 
-Writes `LIBRESPRITE_AI_HEADLESS=1` (and `LIBRESPRITE_PATH`) into the client config.
+Writes `PIXEL_AI_HEADLESS=1` (and `ASEPRITE_PATH`) into the client config.
 The server then runs one batch Aseprite (`aseprite -b`) itself; neither the
 extension nor the bridge is involved. For the Claude Code, omp and OpenCode
-plugins, set `LIBRESPRITE_AI_HEADLESS=1` — and `LIBRESPRITE_PATH` if Aseprite is not in
+plugins, set `PIXEL_AI_HEADLESS=1` — and `ASEPRITE_PATH` if Aseprite is not in
 a standard place — in the environment the agent is started from.
 
 One variable belongs to Aseprite itself: `lua.run` refuses unless the Aseprite
-process carries `LIBRESPRITE_AI_ALLOW_LUA=1`. A headless server passes it to the
+process carries `PIXEL_AI_ALLOW_LUA=1`. A headless server passes it to the
 batch process when started with `--allowLua`; a live session needs it on
 Aseprite's own environment. See
 [SECURITY](../SECURITY.md#run_lua).
 
-Without `--aseprite`/`LIBRESPRITE_PATH` the server looks in the standard and Steam
+Without `--aseprite`/`ASEPRITE_PATH` the server looks in the standard and Steam
 install locations, then on `PATH`. `doctor` prints the one it would use:
 
 ```
@@ -205,11 +201,11 @@ exported — the agent is told so by `preflight`.
 ## 3. Check it
 
 ```bash
-npx libresprite-ai-artist doctor
+npx pixel-ai-artist doctor
 ```
 
 ```
-libresprite-ai-artist 0.1.0
+pixel-ai-artist 0.1.0
 
 ✓ Aseprite config dir   /Users/you/Library/Application Support/Aseprite
 ✓ Bridge                 ws://127.0.0.1:9942
@@ -226,13 +222,13 @@ Then restart your agent so it picks up the new server, and ask it to call
 **"Aseprite extension not connected"** — Aseprite is closed, or the extension is
 not installed, or it was installed while Aseprite was running. Install, then
 restart Aseprite. Check `Edit ▸ Preferences ▸ Extensions` for
-`LibreSprite AI Artist`.
+`Pixel AI Artist`.
 
 To tell "never loaded" apart from "loaded but could not connect", look for the
 marker the extension writes on startup:
 
 ```
-<Aseprite config dir>/libresprite-ai-artist.status
+<Aseprite config dir>/pixel-ai-artist.status
 ```
 
 No file at all means Aseprite never ran the script — the extension is not
@@ -254,10 +250,10 @@ with the transcript.
 **Ports already in use** — something else owns 9941/9942. Move both:
 
 ```bash
-npx libresprite-ai-artist install --all --plugin-port 9941 --control-port 9942
+npx pixel-ai-artist install --all --plugin-port 9941 --control-port 9942
 ```
 
-and set `LIBRESPRITE_AI_PLUGIN_PORT` in Aseprite's environment to match.
+and set `PIXEL_AI_PLUGIN_PORT` in Aseprite's environment to match.
 
 **A reconnect is not happening** — the extension's reconnect timer runs on
 Aseprite's UI loop. Click the Aseprite window once. A connection that is already
@@ -266,20 +262,20 @@ live keeps working unfocused; only re-establishing a dropped one needs focus.
 ## Running from a checkout
 
 ```bash
-git clone https://github.com/takecchi/libresprite-ai-artist
-cd libresprite-ai-artist
+git clone https://github.com/takecchi/pixel-ai-artist
+cd pixel-ai-artist
 pnpm install && pnpm run build
 node dist/cli.js install --all
 node dist/cli.js install-extension
 ```
 
-Use `node dist/cli.js`, not `npx libresprite-ai-artist`, and only inside
+Use `node dist/cli.js`, not `npx pixel-ai-artist`, and only inside
 this checkout. npm sees that the current project *is* that package, so it skips
 fetching it and looks for the binary in `node_modules/.bin` — where a package's
 own bin is never linked. You get:
 
 ```
-sh: libresprite-ai-artist: command not found
+sh: pixel-ai-artist: command not found
 ```
 
 which reads like a broken package and is only ever a wrong working directory.
@@ -287,20 +283,20 @@ The `npx` form is correct everywhere else.
 
 ## Uninstall
 
-Delete the `libresprite-ai-artist` directory from Aseprite's `extensions` folder,
+Delete the `pixel-ai-artist` directory from Aseprite's `extensions` folder,
 remove the server entry from your agent's config (in omp:
-`omp plugin uninstall aseprite@libresprite-ai-artist`), and stop any
+`omp plugin uninstall pixel-ai-artist@pixel-ai-artist`), and stop any
 running bridge:
 
 ```bash
-pkill -f "libresprite-ai-artist bridge"    # macOS / Linux
+pkill -f "pixel-ai-artist bridge"    # macOS / Linux
 ```
 
 On Windows there is no `pkill` — end the `node` process running
-`libresprite-ai-artist bridge` from Task Manager, or:
+`pixel-ai-artist bridge` from Task Manager, or:
 
 ```powershell
 Get-CimInstance Win32_Process |
-  Where-Object CommandLine -like '*libresprite-ai-artist*bridge*' |
+  Where-Object CommandLine -like '*pixel-ai-artist*bridge*' |
   ForEach-Object { Stop-Process -Id $_.ProcessId }
 ```

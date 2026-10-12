@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Superseded by libresprite-ai-artist.mjs, which the plugin manifest now names as
+# Superseded by pixel-ai-artist.mjs, which the plugin manifest now names as
 # its MCP command: Windows does not interpret a `#!` line, so a bash shim there
 # fails to start the server at all. Kept as a thin delegate so an existing POSIX
 # invocation of this path keeps working, with no duplicated build logic.
-exec node "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/libresprite-ai-artist.mjs" "$@"
+exec node "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/pixel-ai-artist.mjs" "$@"

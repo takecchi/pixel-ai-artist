@@ -24,8 +24,8 @@ export interface CreateServerOptions {
   allowLua?: boolean;
   /**
    * Register every workflow as an MCP prompt. Plugin installs (Claude Code,
-   * omp) turn this off: they already list the skills as `/libresprite:<name>`, and
-   * the harness would add the prompts again as `/libresprite:libresprite:libresprite:<name>`.
+   * omp) turn this off: they already list the skills as `/pixel-ai-artist:<name>`, and
+   * the harness would add the prompts again as `/pixel-ai-artist:pixel-ai-artist:pixel-ai-artist:<name>`.
    */
   prompts?: boolean;
   autoSpawnBridge?: boolean;
@@ -36,7 +36,7 @@ export interface CreateServerOptions {
    * nothing switches on its own (ADR-0008).
    */
   headless?: boolean;
-  /** Headless: the Aseprite executable. Default: LIBRESPRITE_PATH, then the usual install locations. */
+  /** Headless: the Aseprite executable. Default: ASEPRITE_PATH, then the usual install locations. */
   asepritePath?: string;
 }
 
@@ -51,7 +51,7 @@ export function createServer(opts: CreateServerOptions = {}): RunningServer {
   const rules = loadRules(root);
 
   // stderr is the only channel that will not corrupt a stdio MCP session.
-  const log = (msg: string) => process.stderr.write(`[libresprite-ai-artist] ${msg}\n`);
+  const log = (msg: string) => process.stderr.write(`[pixel-ai-artist] ${msg}\n`);
   const live = new LinkSelector(
     {
       live: () =>
@@ -79,9 +79,9 @@ export function createServer(opts: CreateServerOptions = {}): RunningServer {
 
   const server = new McpServer(
     {
-      name: "libresprite-ai-artist",
+      name: "pixel-ai-artist",
       version: packageVersion(),
-      title: "LibreSprite AI Artist",
+      title: "Pixel AI Artist",
     },
     {
       // Capabilities are left to the SDK to infer from what actually gets
@@ -201,12 +201,12 @@ function registerSkillSurface(
     },
   );
 
-  // Prompt names carry the same `libresprite:` namespace the Claude Code plugin and
+  // Prompt names carry the same `pixel-ai-artist:` namespace the Claude Code plugin and
   // the omp extension give these workflows, so a client that turns MCP prompts
-  // into slash commands (Gemini CLI, Cursor) shows `/libresprite:draw` as well.
+  // into slash commands (Gemini CLI, Cursor) shows `/pixel-ai-artist:draw` as well.
   for (const skill of prompts ? skills : []) {
     server.registerPrompt(
-      `libresprite:${skill.name}`,
+      `pixel-ai-artist:${skill.name}`,
       {
         title: skill.title,
         description: skill.description,
