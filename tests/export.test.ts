@@ -508,3 +508,21 @@ test("spritesheet names a saved sprite's frames after its file", async () => {
     assert.equal(existsSync(path.join(dir, "hero.png")), true);
   });
 });
+
+test("a visible reference layer is drawn into an export like any other layer, and a hidden one is not", async () => {
+  await inTempDir(async (dir) => {
+    const studio = createStudio();
+    const sprite = studio.addSprite({ width: 2, height: 1 });
+    studio.ensureCel(sprite, studio.resolveLayer(sprite), 1).image.set(0, 0, RED);
+    const ref = studio.addLayer(sprite, "reference");
+    ref.reference = true;
+    studio.ensureCel(sprite, ref, 1).image.set(1, 0, BLUE);
+
+    await run(studio, { op: "png", path: path.join(dir, "shown.png") });
+    assert.deepEqual([...readPng(path.join(dir, "shown.png")).pixels], [RED, BLUE]);
+
+    ref.visible = false;
+    await run(studio, { op: "png", path: path.join(dir, "hidden.png") });
+    assert.deepEqual([...readPng(path.join(dir, "hidden.png")).pixels], [RED, 0]);
+  });
+});
