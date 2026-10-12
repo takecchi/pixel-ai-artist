@@ -14,6 +14,7 @@ under them changes, not ahead of it.
 | Path | What |
 |------|------|
 | `src/` | The MCP server, bridge, control client and CLI (TypeScript) |
+| `src/doc/` | The in-process documents: model, `Studio`, and one handler module per area under `handlers/` |
 | `rules/` | Pixel-art craft, served as `rules://` resources |
 | `skills/` | Workflows, served as `skill://` resources and MCP prompts |
 | `agents/`, `hooks/` | Claude Code plugin surface; omp reads the same tree as a marketplace plugin |
