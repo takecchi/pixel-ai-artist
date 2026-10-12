@@ -16,7 +16,7 @@ export function registerPaletteTools(server: McpServer, studio: Studio): void {
         "• 'get' — current palette with per-colour usage counts.\n" +
         "• 'set' — write specific indices, or replace the palette wholesale.\n" +
         "• 'preset' — load a bundled palette by key: ~2000 of them, the classics (pico8, gameboy, cga, nes…) and the most-downloaded on Lospec (sweetie-16, endesga-32, resurrect-64, aap-64…). An unknown key or a name answers with the matching keys, so 'preset: \"gameboy\"' or 'preset: \"endesga\"' is a search.\n" +
-        "• 'load' — replace the palette with one read from disk: .gpl, .hex, JASC .pal, .act, .col, or a PNG/GIF/JPEG (an indexed PNG gives its own palette; other images the colours they use, up to 256). Existing art is not repainted.\n" +
+        "• 'load' — replace the palette with one read from disk (or append it, with replace=false): .gpl, .hex, JASC .pal, .act, .col, or a PNG/GIF/JPEG (an indexed PNG gives its own palette; other images the colours they use, up to 256). Art is repainted only with remapArt.\n" +
         "• 'ramp' — generate a hue-shifted ramp from a base colour and append it. Shadows rotate toward blue, highlights toward orange; a ramp that only changes brightness is the clearest tell of machine-made pixel art.\n" +
         "• 'analyze' — report ramp structure, contrast, near-duplicate entries and colours used in the art that are not in the palette.\n" +
         "• 'extract' — replace the palette with one quantized from the art itself (RGB sprites only). Use to derive a curated palette from a reference image imported at full colour.\n" +
@@ -38,8 +38,10 @@ export function registerPaletteTools(server: McpServer, studio: Studio): void {
           .describe("For op 'set': where `colors` starts. Ignored when `replace` is true."),
         replace: z
           .boolean()
-          .default(false)
-          .describe("For op 'set'/'preset': replace the whole palette instead of merging."),
+          .optional()
+          .describe(
+            "For op 'set'/'preset': true replaces the whole palette instead of merging. For op 'load': the file's colours replace the palette unless this is false, which appends them.",
+          ),
         base: hexColor.optional().describe("Base colour for op 'ramp'."),
         steps: z.number().int().min(2).max(16).default(5).describe("Ramp length."),
         spread: z
@@ -150,7 +152,7 @@ export function registerPaletteTools(server: McpServer, studio: Studio): void {
             const data = await studio.call<Record<string, unknown>>("palette.set", {
               sprite: args.sprite,
               colors: chosen.colors,
-              replace: args.replace !== false,
+              replace: args.replace === true,
               remapArt: args.remapArt,
             });
             return ok(

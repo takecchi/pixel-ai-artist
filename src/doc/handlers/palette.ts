@@ -178,14 +178,21 @@ function paletteLoad(studio: Studio, args: Record<string, unknown>) {
   } catch (err) {
     throw new ToolError("io_error", `Cannot read '${file}': ${(err as Error).message}`, { path: full });
   }
+  if (args.remapArt === true && s.colorMode === "indexed") {
+    throw new ToolError(
+      "invalid_args",
+      "remapArt repaints rgb and grayscale art; an indexed sprite's pixels already follow its palette.",
+    );
+  }
   const colors = decodePaletteFile(bytes, path.extname(full));
   if (colors.length === 0) {
     throw new ToolError("io_error", `Could not read a palette from '${file}'.`, { path: full });
   }
 
-  s.palette = colors;
+  s.palette = args.replace === false ? [...s.palette, ...colors] : colors;
+  if (args.remapArt === true) remapArt(s);
   s.modified = true;
-  return { sprite: displayName(s), colors: colors.map((c) => rgbaToHex(c, true)), size: colors.length, path: file };
+  return { ...answer(s), path: file };
 }
 
 export const paletteHandlers: HandlerTable = {

@@ -249,7 +249,7 @@ export function buildSpriteSheet(frames: AnimationFrame[], opts: SheetOptions): 
       samples.push({
         frame,
         tag: item.tag,
-        name: `${opts.title}${tagPart}${framePart}.${opts.extension}`,
+        name: `${opts.title}${tagPart}${framePart}${opts.extension ? `.${opts.extension}` : ""}`,
         bounds,
         cell: { x: 0, y: 0, w: bounds.w + pad * 2, h: bounds.h + pad * 2 },
         sameAs: null,

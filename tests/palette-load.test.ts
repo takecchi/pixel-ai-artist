@@ -152,15 +152,50 @@ test("palette.load of an .aseprite file or an unknown extension is unsupported_c
   });
 });
 
-test("palette.load ignores replace and remapArt: the palette is replaced and the art left alone", async () => {
+test("palette.load without remapArt replaces the palette and leaves the art alone", async () => {
   await inTempDir(async (dir) => {
     const file = path.join(dir, "p.hex");
     writeFileSync(file, "ff0000\n");
     const { studio, sprite } = await newSprite();
     const cel = studio.ensureCel(sprite, sprite.layers[0]!, 1);
     cel.image = Image.from(2, 1, new Uint32Array([BLUE, BLUE]));
-    await load(studio, { path: file, replace: false, remapArt: true });
+    await load(studio, { path: file });
     assert.deepEqual(sprite.palette, [RED]);
     assert.deepEqual([...cel.image.pixels], [BLUE, BLUE]);
+  });
+});
+
+test("palette.load with replace false appends the file's colours to the palette", async () => {
+  await inTempDir(async (dir) => {
+    const file = path.join(dir, "p.hex");
+    writeFileSync(file, "ff0000\n0000ff\n");
+    const { studio, sprite } = await newSprite();
+    const before = [...sprite.palette];
+    const reply = await load(studio, { path: file, replace: false });
+    assert.deepEqual(sprite.palette, [...before, RED, BLUE]);
+    assert.equal(reply.size, before.length + 2);
+  });
+});
+
+test("palette.load with remapArt repaints the art to the nearest loaded colour, as palette.set does", async () => {
+  await inTempDir(async (dir) => {
+    const file = path.join(dir, "p.hex");
+    writeFileSync(file, "ff0000\n0000ff\n");
+    const { studio, sprite } = await newSprite();
+    const cel = studio.ensureCel(sprite, sprite.layers[0]!, 1);
+    cel.image = Image.from(2, 1, new Uint32Array([rgba(240, 20, 20), rgba(10, 10, 230, 128)]));
+    await load(studio, { path: file, remapArt: true });
+    assert.deepEqual([...cel.image.pixels], [RED, rgba(0, 0, 255, 128)]);
+  });
+});
+
+test("palette.load refuses remapArt on an indexed sprite and leaves the palette alone", async () => {
+  await inTempDir(async (dir) => {
+    const file = path.join(dir, "p.hex");
+    writeFileSync(file, "ff0000\n");
+    const { studio, sprite } = await newSprite("indexed");
+    const before = [...sprite.palette];
+    await rejectsWith(load(studio, { path: file, remapArt: true }), "invalid_args", /remapArt/);
+    assert.deepEqual(sprite.palette, before);
   });
 });
