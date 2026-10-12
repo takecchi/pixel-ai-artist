@@ -9,23 +9,10 @@ import {
   rgbaToHex,
   rgbaToPixel,
   snapToPalette,
-  type Rect,
   type Rgba,
-  type Sprite,
 } from "../model.js";
+import { clampRegion } from "../selection.js";
 import type { HandlerTable, Studio } from "../studio.js";
-
-/** The extension's clamp_region. */
-function clampRegion(sprite: Sprite, region: Record<string, unknown>): Rect {
-  const x = Math.max(0, Math.floor(Number(region.x ?? 0)));
-  const y = Math.max(0, Math.floor(Number(region.y ?? 0)));
-  const w = Math.min(Math.floor(Number(region.width ?? sprite.width - x)), sprite.width - x);
-  const h = Math.min(Math.floor(Number(region.height ?? sprite.height - y)), sprite.height - y);
-  if (w <= 0 || h <= 0) {
-    throw new ToolError("invalid_args", `Region is empty after clamping to the ${sprite.width}x${sprite.height} canvas.`);
-  }
-  return { x, y, width: w, height: h };
-}
 
 function toRgb(c: Rgba) {
   const [r, g, b, a] = channels(c);
@@ -55,7 +42,7 @@ function recolorApply(studio: Studio, args: Record<string, unknown>) {
         "`region`, or drop selectionOnly.",
     );
   }
-  const region = args.region ? clampRegion(sprite, args.region as Record<string, unknown>) : null;
+  const region = args.region ? clampRegion(sprite, args.region) : null;
 
   const img = cel.image;
   const inScope = (gx: number, gy: number) => {

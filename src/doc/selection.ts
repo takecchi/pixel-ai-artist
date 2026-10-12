@@ -6,9 +6,9 @@
 import { ToolError } from "./errors.js";
 import type { Rect, Selection, Sprite } from "./model.js";
 
-/** The extension's clamp_region: what a rect means for ops that must stay on the canvas. */
-export function clampRegion(sprite: Sprite, region: Partial<Rect> | undefined): Rect {
-  const r = region ?? {};
+/** The extension's clamp_region: omitted edges run to the canvas edge, and an empty result is refused. */
+export function clampRegion(sprite: Sprite, region: unknown): Rect {
+  const r = (region ?? {}) as Partial<Record<keyof Rect, number>>;
   const x = Math.max(0, Math.floor(r.x ?? 0));
   const y = Math.max(0, Math.floor(r.y ?? 0));
   const w = Math.min(Math.floor(r.width ?? sprite.width - x), sprite.width - x);

@@ -1,19 +1,6 @@
-import { ToolError } from "../errors.js";
 import { Image, displayName, pixelToHex, rgbaToHex, type Layer, type Rect, type Sprite } from "../model.js";
+import { clampRegion } from "../selection.js";
 import type { HandlerTable, Studio } from "../studio.js";
-
-/** The extension's clamp_region: omitted edges run to the canvas edge, and an empty result is refused. */
-export function clampRegion(sprite: Sprite, region: unknown): Rect {
-  const r = (region ?? {}) as Partial<Record<keyof Rect, number>>;
-  const x = Math.max(0, Math.floor(r.x ?? 0));
-  const y = Math.max(0, Math.floor(r.y ?? 0));
-  const w = Math.min(Math.floor(r.width ?? sprite.width - x), sprite.width - x);
-  const h = Math.min(Math.floor(r.height ?? sprite.height - y), sprite.height - y);
-  if (!(w > 0 && h > 0)) {
-    throw new ToolError("invalid_args", `Region is empty after clamping to the ${sprite.width}x${sprite.height} canvas.`);
-  }
-  return { x, y, width: w, height: h };
-}
 
 /**
  * What a canvas pixel shows, as the extension's pixel_to_hex wrote it: null
