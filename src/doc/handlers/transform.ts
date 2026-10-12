@@ -222,51 +222,77 @@ function transformApply(studio: Studio, args: Record<string, unknown>) {
     }
     const neighbors = args.diagonals ? EIGHT : FOUR;
 
-    if (side === "inside") {
-      // Recolour opaque pixels that touch transparency (or the canvas edge,
-      // transparency's counterpart outside the image). Same size in, same size
-      // out — unlike 'outside' this never grows the cel.
-      const result = img.clone();
-      for (let y = 0; y < h; y++) {
-        for (let x = 0; x < w; x++) {
-          if (!isOpaque(sprite, img.get(x, y))) continue;
-          const touching = neighbors.some(([dx, dy]) => {
+    const n = Number(args.thickness ?? 1);
+    if (!Number.isInteger(n) || n < 1) {
+      throw new ToolError("invalid_args", "transform op 'outline' thickness must be a positive integer.");
+    }
+
+    // Steps from the nearest source pixel, up to n; 0 for a source, -1 beyond n.
+    const distances = (gw: number, gh: number, isSource: (x: number, y: number) => boolean) => {
+      const dist = new Int32Array(gw * gh).fill(-1);
+      let frontier: number[] = [];
+      for (let y = 0; y < gh; y++) {
+        for (let x = 0; x < gw; x++) {
+          if (!isSource(x, y)) continue;
+          dist[y * gw + x] = 0;
+          frontier.push(y * gw + x);
+        }
+      }
+      for (let step = 1; step <= n; step++) {
+        const next: number[] = [];
+        for (const at of frontier) {
+          const x = at % gw;
+          const y = (at - x) / gw;
+          for (const [dx, dy] of neighbors) {
             const nx = x + dx;
             const ny = y + dy;
-            return !img.contains(nx, ny) || !isOpaque(sprite, img.get(nx, ny));
-          });
-          if (touching) {
-            result.set(x, y, value);
-            changed++;
+            if (nx < 0 || ny < 0 || nx >= gw || ny >= gh || dist[ny * gw + nx] !== -1) continue;
+            dist[ny * gw + nx] = step;
+            next.push(ny * gw + nx);
           }
+        }
+        frontier = next;
+      }
+      return dist;
+    };
+
+    if (side === "inside") {
+      // Recolour opaque pixels within n steps of transparency. The image's
+      // outside counts as transparent, so the grid carries a one-pixel
+      // transparent ring: that is enough, as the ring's own reach is what
+      // every deeper pixel would measure against. Same size in, same size
+      // out — unlike 'outside' this never grows the cel.
+      const result = img.clone();
+      const gw = w + 2;
+      const dist = distances(gw, h + 2, (x, y) => !img.contains(x - 1, y - 1) || !isOpaque(sprite, img.get(x - 1, y - 1)));
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const d = dist[(y + 1) * gw + x + 1]!;
+          if (d < 1) continue;
+          result.set(x, y, value);
+          changed++;
         }
       }
       cel.image = result;
     } else {
-      // Paint transparent pixels touching opaque ones, on a canvas grown by one
-      // pixel each way.
-      const grown = studio.newImage(sprite, w + 2, h + 2);
+      // Paint transparent pixels within n steps of opaque ones, on a canvas
+      // grown by n pixels each way.
+      const grown = studio.newImage(sprite, w + 2 * n, h + 2 * n);
       for (let y = 0; y < h; y++) {
-        for (let x = 0; x < w; x++) grown.set(x + 1, y + 1, img.get(x, y));
+        for (let x = 0; x < w; x++) grown.set(x + n, y + n, img.get(x, y));
       }
       const result = grown.clone();
+      const dist = distances(grown.width, grown.height, (x, y) => isOpaque(sprite, grown.get(x, y)));
       for (let y = 0; y < grown.height; y++) {
         for (let x = 0; x < grown.width; x++) {
-          if (isOpaque(sprite, grown.get(x, y))) continue;
-          const touching = neighbors.some(([dx, dy]) => {
-            const nx = x + dx;
-            const ny = y + dy;
-            return grown.contains(nx, ny) && isOpaque(sprite, grown.get(nx, ny));
-          });
-          if (touching) {
-            result.set(x, y, value);
-            changed++;
-          }
+          if (dist[y * grown.width + x]! < 1) continue;
+          result.set(x, y, value);
+          changed++;
         }
       }
       cel.image = result;
-      cel.x -= 1;
-      cel.y -= 1;
+      cel.x -= n;
+      cel.y -= n;
     }
   } else {
     throw new ToolError("unsupported_command", `transform op '${String(op)}' is not supported.`);

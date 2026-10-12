@@ -367,7 +367,15 @@ export function registerDrawTools(server: McpServer, studio: Studio): void {
           .boolean()
           .default(false)
           .describe("For 'outline'. Treat diagonal neighbours as touching too (8-neighbour instead of 4)."),
-        thickness: z.number().int().positive().max(8).default(1),
+        thickness: z
+          .number()
+          .int()
+          .positive()
+          .max(8)
+          .default(1)
+          .describe(
+            "For 'outline': how many pixels thick, counted the way `diagonals` says. 1 is a single-pixel ring. 'outside' grows the cel by this many pixels each way.",
+          ),
         allowLossy: z
           .boolean()
           .default(false)
