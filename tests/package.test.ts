@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const pkg = JSON.parse(
   readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "package.json"), "utf8"),
-) as { bin: Record<string, string>; files: string[]; scripts: Record<string, string> };
+) as { bin: Record<string, string>; files: string[]; scripts: Record<string, string> } & Record<string, unknown>;
 
 test("installing from git (npx github:…) builds the file the bin points at, and ships it", () => {
   // npm runs `prepare` after installing a git dependency's devDependencies.
@@ -14,4 +14,8 @@ test("installing from git (npx github:…) builds the file the bin points at, an
   assert.match(pkg.scripts.build!, /^tsc /);
   assert.equal(pkg.bin["pixel-ai-artist"], "dist/cli.js");
   assert.ok(pkg.files.includes("dist"));
+});
+
+test("the package is a CLI and declares no library entry point to import", () => {
+  for (const field of ["main", "types", "exports"]) assert.equal(field in pkg, false, field);
 });
