@@ -195,10 +195,10 @@ test("the server instructions carry the rules an agent gets wrong catastrophical
   await close();
 });
 
-test("a tool whose command is not ported yet returns a structured unsupported_command error", async () => {
+test("a tool whose command is not ported returns a structured unsupported_command error", async () => {
   const { client, close } = await connected();
   const result = await client.callTool({
-    name: "tag",
+    name: "tileset",
     arguments: { op: "list" },
   });
   assert.equal(result.isError, true);
