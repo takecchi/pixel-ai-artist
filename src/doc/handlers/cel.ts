@@ -12,9 +12,13 @@ const EASINGS: Record<string, (t: number) => number> = {
 
 type Touched = { frame: number; x?: number; y?: number; opacity?: number };
 
-function list(sprite: Sprite) {
-  const cels = sprite.layers.flatMap((layer) =>
+/** Every cel, or only those on the named layer and/or frame. */
+function list(studio: Studio, sprite: Sprite, args: Record<string, unknown>) {
+  const layers = args.layer === undefined ? sprite.layers : [studio.resolveLayer(sprite, args.layer)];
+  const frame = args.frame === undefined ? null : studio.resolveFrame(sprite, args.frame);
+  const cels = layers.flatMap((layer) =>
     [...layer.cels]
+      .filter(([f]) => frame === null || f === frame)
       .sort(([a], [b]) => a - b)
       .map(([frame, c]) => ({
         layer: layer.name,
@@ -130,7 +134,7 @@ function oscillate(studio: Studio, sprite: Sprite, layer: Layer, args: Record<st
 function celApply(studio: Studio, args: Record<string, unknown>) {
   const sprite = studio.resolveSprite(args.sprite);
   const op = String(need(args.op, "op"));
-  if (op === "list") return list(sprite);
+  if (op === "list") return list(studio, sprite, args);
 
   const layer = studio.resolveLayer(sprite, args.layer);
   const frame = studio.resolveFrame(sprite, args.frame);
