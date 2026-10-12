@@ -5,7 +5,7 @@ import { fail, hexColor, ok, targetShape } from "./kit.js";
 import { ToolError } from "../doc/errors.js";
 
 /**
- * Operations that encode pixel-art craft rather than Aseprite mechanics.
+ * Operations that encode pixel-art craft rather than editor mechanics.
  *
  * `recolor` exists because "make this darker" done naively — subtract from every
  * channel — produces the muddy, plastic look that reads instantly as generated.
@@ -25,7 +25,7 @@ export function registerCraftTools(server: McpServer, studio: Studio): void {
         "• 'replace' — swap one exact colour for another.\n" +
         "• 'hue_shift' — rotate hue, e.g. to make a colour variant of a finished sprite.\n" +
         "• 'desaturate' — drop toward grey, useful for a value check.\n" +
-        "Operates on a region's distinct colours in one pass, so a 64×64 recolour is one undo step, not four thousand.",
+        "Operates on a region's distinct colours in one pass, so a 64×64 recolour is one call, not four thousand.",
       inputSchema: {
         op: z.enum(["shade", "snap", "replace", "hue_shift", "desaturate"]),
         ...targetShape,

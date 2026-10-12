@@ -5,21 +5,6 @@ import { fail, ok, targetShape } from "./kit.js";
 import { packageVersion } from "../lib/version.js";
 import { ToolError } from "../doc/errors.js";
 
-const boundsShape = z.object({
-  x: z.number().int(),
-  y: z.number().int(),
-  width: z.number().int().positive(),
-  height: z.number().int().positive(),
-});
-
-/** A slice as `sprite_info` and `sprite_manage`'s slice_* ops both report it. */
-const sliceInfoShape = z.object({
-  name: z.string(),
-  bounds: boundsShape,
-  center: boundsShape.optional().describe("Nine-slice centre region, relative to the slice. Only when set."),
-  pivot: z.object({ x: z.number().int(), y: z.number().int() }).optional(),
-});
-
 export function registerSessionTools(server: McpServer, studio: Studio): void {
   server.registerTool(
     "preflight",
@@ -74,11 +59,10 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
     {
       title: "Sprite info",
       description:
-        "Full structured state of a sprite: dimensions, colour mode, palette, every layer (with opacity, blend mode, visibility, group nesting), every frame with its duration, animation tags, slices and the current selection. Read this before editing — guessing at layer names or frame counts is the most common way an agent corrupts someone's file.",
+        "Full structured state of a sprite: dimensions, colour mode, palette, every layer (with opacity and visibility), every frame with its duration, animation tags and the current selection. Read this before editing — guessing at layer names or frame counts is the most common way an agent corrupts someone's file.",
       inputSchema: {
         sprite: targetShape.sprite,
         includePalette: z.boolean().default(true).describe("Include the full palette as hex."),
-        includeSlices: z.boolean().default(false),
       },
       outputSchema: {
         id: z.number().int().describe("Stable id for this open document. Pass it back as '#<id>'."),
@@ -97,10 +81,6 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
             visible: z.boolean(),
             editable: z.boolean(),
             opacity: z.number().int(),
-            blendMode: z.string(),
-            isGroup: z.boolean(),
-            isTilemap: z.boolean(),
-            parent: z.string().nullish(),
             cels: z.array(z.number().int()).describe("1-based frames that have a cel on this layer."),
           }),
         ),
@@ -115,7 +95,6 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
           }),
         ),
         palette: z.array(z.string()).optional(),
-        slices: z.array(sliceInfoShape).optional(),
         selection: z
           .object({ x: z.number().int(), y: z.number().int(), width: z.number().int(), height: z.number().int() })
           .nullish(),
@@ -141,8 +120,7 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
     {
       title: "Manage sprites",
       description:
-        "Open, create, focus, resize, save and close sprites in the running Aseprite session. Ops: 'list' (open documents), 'new', 'open', 'activate', 'save', 'save_as', 'close', 'resize_canvas', 'set_properties', 'slice_create', 'slice_update', 'slice_delete'. Canvas resize keeps existing pixels — pass an anchor to say where they land. " +
-        "Slices name a rectangular region of the canvas for an engine to read back — a 9-patch panel's `center`, or a hotspot's `pivot`.",
+        "Open, create, focus, resize, save and close the sprites this server holds. Ops: 'list' (open documents), 'new', 'open', 'activate', 'save', 'save_as', 'close', 'resize_canvas', 'set_properties'. Canvas resize keeps existing pixels — pass an anchor to say where they land.",
       inputSchema: {
         op: z.enum([
           "list",
@@ -154,9 +132,6 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
           "close",
           "resize_canvas",
           "set_properties",
-          "slice_create",
-          "slice_update",
-          "slice_delete",
         ]),
         sprite: targetShape.sprite,
         path: z
@@ -177,13 +152,6 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
           .boolean()
           .default(false)
           .describe("Allow 'close' to discard unsaved changes. Ask the user before setting this."),
-        name: z.string().optional().describe("Slice name. Required for 'slice_create'; identifies it for update/delete."),
-        bounds: boundsShape.optional().describe("Slice rectangle. Required for 'slice_create'."),
-        center: boundsShape
-          .optional()
-          .describe("For slice ops: nine-slice centre region, relative to `bounds`."),
-        pivot: z.object({ x: z.number().int(), y: z.number().int() }).optional().describe("For slice ops."),
-        color: z.string().optional().describe("For slice ops: slice colour in the timeline, #rrggbb."),
       },
       outputSchema: {
         op: z.string(),
@@ -208,8 +176,6 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
         path: z.string().optional(),
         width: z.number().int().optional(),
         height: z.number().int().optional(),
-        name: z.string().optional().describe("Slice name, for 'slice_delete'."),
-        slice: sliceInfoShape.optional().describe("The affected slice, for 'slice_create'/'slice_update'."),
       },
       annotations: {
         readOnlyHint: false,
@@ -221,7 +187,7 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
     async (args) => {
       try {
         if (args.op === "close" && !args.force) {
-          // A close that discards work is not recoverable through undo.
+          // There is no undo: a close that discards work loses it for good.
           const info = await studio.call<{ modified?: boolean; name?: string }>("sprite.info", {
             sprite: args.sprite,
             includePalette: false,

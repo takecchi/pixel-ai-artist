@@ -1,10 +1,9 @@
 /**
  * Bitmap text layout — turns a string into a list of coloured pixels.
  *
- * Aseprite's Lua API has no text rasteriser, so this runs entirely on the TS
- * side: `draw` op kind `text` calls `layoutText` and hands the result to
- * Aseprite as an ordinary `pixels` op, in the same transaction and under the
- * same palette lock as everything else in the batch (see ADR-0005).
+ * `draw` op kind `text` calls `layoutText` and hands the result to draw.batch
+ * as an ordinary `pixels` op, all or nothing with and under the same palette
+ * lock as everything else in the batch (see ADR-0005).
  *
  * All layout maths happens in *font-grid units* — one cell per glyph column —
  * and only expands to output pixels (via `scale`) at the very end. Doing bold

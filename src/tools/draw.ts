@@ -31,9 +31,8 @@ const rectShape = z.object({
  *
  * Two reasons. First, an agent drawing a 32×32 sprite one primitive per tool
  * call burns a round trip per stroke and fills its own context with acks.
- * Second — and this is the part that matters to the person watching — every op
- * in a batch lands inside a single Aseprite transaction, so one Ctrl+Z undoes
- * "the agent's last edit" rather than one of forty stray pixels.
+ * Second, a batch lands whole or not at all, so a bad op late in the batch
+ * cannot leave forty stray pixels behind.
  */
 const drawOp = z.discriminatedUnion("kind", [
   z.object({
@@ -167,16 +166,16 @@ export function registerDrawTools(server: McpServer, studio: Studio): void {
     {
       title: "Draw",
       description:
-        "Apply a batch of drawing operations to one cel, as a single undoable action. Ops: pixels, line, polyline, rect, ellipse, fill, replace, dither, gradient, clear, blit, text, grid. " +
-        "Batch aggressively — a whole sprite in one call is normal and correct, and it means the user can undo your work with one Ctrl+Z. " +
+        "Apply a batch of drawing operations to one cel, all or nothing: if any op fails, the cel is left as it was. Ops: pixels, line, polyline, rect, ellipse, fill, replace, dither, gradient, clear, blit, text, grid. " +
+        "Batch aggressively — a whole sprite in one call is normal and correct. " +
         "Set `paletteLock` (default true) to snap every colour to the sprite's palette by perceptual distance before anything is written, so you cannot silently widen a curated palette. " +
         "Ops run in array order, so paint fills before outlines and outlines before highlights. " +
-        "'text' is laid out here from a bitmap font and expanded to plain pixels before it reaches Aseprite — pass `measureOnly: true` with only 'text' ops to get each one's ink bounds without touching the sprite, e.g. to centre a label first. " +
+        "'text' is laid out here from a bitmap font and expanded to plain pixels before it is drawn — pass `measureOnly: true` with only 'text' ops to get each one's ink bounds without touching the sprite, e.g. to centre a label first. " +
         "'grid' paints a picture written as text — one character per pixel, a legend mapping characters to colours, the same shape `look op=\"ascii\"` returns — so you can see the whole silhouette while you write it instead of composing it from shapes. " +
         "It is the easiest way to draw a small sprite or a whole animation frame, and to edit one: read a region with `look op=\"ascii\" layer=… rulers=false`, change the rows, and send them back as a grid at the region's x/y.",
       inputSchema: {
         ...targetShape,
-        ops: z.array(drawOp).min(1).max(512).describe("Applied in order, in one transaction."),
+        ops: z.array(drawOp).min(1).max(512).describe("Applied in order, all or nothing."),
         paletteLock: z
           .boolean()
           .default(true)
@@ -191,15 +190,11 @@ export function registerDrawTools(server: McpServer, studio: Studio): void {
           .boolean()
           .default(true)
           .describe("Create the cel if the target layer/frame has none."),
-        label: z
-          .string()
-          .optional()
-          .describe("Name shown in Aseprite's undo history. Describe the intent, e.g. 'shade helmet'."),
         measureOnly: z
           .boolean()
           .default(false)
           .describe(
-            "Every op must be 'text'. Returns each one's ink bounds without calling Aseprite at all — use to size a panel or centre a label before actually drawing it.",
+            "Every op must be 'text'. Returns each one's ink bounds without touching any sprite — use to size a panel or centre a label before actually drawing it.",
           ),
       },
       outputSchema: {
@@ -259,7 +254,6 @@ export function registerDrawTools(server: McpServer, studio: Studio): void {
           );
         }
 
-        // A grid is bounded by the canvas, which only Aseprite knows.
         const canvas: CanvasSize | undefined = args.ops.some((op) => op.kind === "grid")
           ? await studio.call<CanvasSize>("sprite.info", { sprite: args.sprite, includePalette: false }, { expect: ["width", "height"] })
           : undefined;
@@ -282,7 +276,7 @@ export function registerDrawTools(server: McpServer, studio: Studio): void {
         );
         const snapped = (data.colorsSnapped as { from: string; to: string; deltaE: number }[]) ?? [];
         const far = snapped.filter((s) => s.deltaE > 12);
-        // Lua counts the expanded ops; the agent sent — and should hear back about — its own.
+        // draw.batch counts the expanded ops; the agent sent — and should hear back about — its own.
         data.opsApplied = args.ops.length;
         const summary = [
           `${args.ops.length} op(s), ${String(data.pixelsChanged ?? 0)} pixel(s) changed on '${String(data.layer)}' frame ${String(data.frame)}.`,

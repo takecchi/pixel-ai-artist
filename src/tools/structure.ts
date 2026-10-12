@@ -10,16 +10,9 @@ import { fail, ok, targetShape } from "./kit.js";
  * arrive in clusters: building a character rig is eight layers, and blocking in
  * a walk cycle is eight frames with three different durations.
  */
-const blendMode = z.enum([
-  "normal", "multiply", "screen", "overlay", "darken", "lighten",
-  "color_dodge", "color_burn", "hard_light", "soft_light", "difference",
-  "exclusion", "hue", "saturation", "color", "luminosity", "addition",
-  "subtract", "divide",
-]);
-
 const layerOpName = z.enum([
   "list", "create", "rename", "delete", "reorder", "set",
-  "group", "ungroup", "merge", "duplicate", "activate",
+  "merge", "duplicate", "activate",
 ]);
 
 /** One layer operation. Used for both the single-op form and every `batch` entry. */
@@ -27,13 +20,10 @@ const layerOp = z.object({
   op: layerOpName,
   name: z.string().optional(),
   newName: z.string().optional(),
-  parent: z.string().optional().describe("Group layer to nest under."),
   index: z.number().int().optional().describe("Target stack position; 0 is bottom."),
   visible: z.boolean().optional(),
   editable: z.boolean().optional(),
   opacity: z.number().int().min(0).max(255).optional(),
-  blendMode: blendMode.optional(),
-  names: z.array(z.string()).optional().describe("For 'merge' and bulk 'group'."),
   toSprite: z
     .string()
     .optional()
@@ -46,8 +36,8 @@ export function registerStructureTools(server: McpServer, studio: Studio): void 
     {
       title: "Layers",
       description:
-        "Manage layers. Ops: 'list', 'create', 'rename', 'delete', 'reorder', 'set' (visibility/opacity/blend/lock), 'group', 'ungroup', 'merge', 'duplicate', 'activate'. " +
-        "Pass `batch` to run several in one undoable action — building a rig in one call is the normal use. " +
+        "Manage layers. Ops: 'list', 'create', 'rename', 'delete', 'reorder', 'set' (visibility/opacity/lock), 'merge', 'duplicate', 'activate'. " +
+        "Pass `batch` to run several, all or nothing — building a rig in one call is the normal use. " +
         "'duplicate' takes an optional `toSprite` to copy the layer's cels into another OPEN sprite instead of this one, by frame index; frames past the target's frame count are dropped and reported. " +
         "A character that will be animated wants its parts on separate layers (head, torso, arm-far, arm-near, leg-far, leg-near) before any frames exist; splitting baked pixels apart later is far more work.",
       inputSchema: {
@@ -55,13 +45,10 @@ export function registerStructureTools(server: McpServer, studio: Studio): void 
         sprite: targetShape.sprite,
         name: z.string().optional(),
         newName: z.string().optional(),
-        parent: z.string().optional().describe("Group layer to nest under."),
         index: z.number().int().optional().describe("Target stack position for 'reorder'; 0 is bottom."),
         visible: z.boolean().optional(),
         editable: z.boolean().optional(),
         opacity: z.number().int().min(0).max(255).optional(),
-        blendMode: blendMode.optional(),
-        names: z.array(z.string()).optional().describe("For 'merge' and bulk 'group'."),
         toSprite: z
           .string()
           .optional()
@@ -70,7 +57,7 @@ export function registerStructureTools(server: McpServer, studio: Studio): void 
           .array(layerOp)
           .max(128)
           .optional()
-          .describe("Operations applied in order, in one undoable action. Same shape as the single-op arguments."),
+          .describe("Operations applied in order, all or nothing. Same shape as the single-op arguments."),
       },
       outputSchema: {
         sprite: z.string(),
@@ -82,10 +69,6 @@ export function registerStructureTools(server: McpServer, studio: Studio): void 
               visible: z.boolean(),
               editable: z.boolean(),
               opacity: z.number().int(),
-              blendMode: z.string(),
-              isGroup: z.boolean(),
-              isTilemap: z.boolean(),
-              parent: z.string().nullish(),
               cels: z.array(z.number().int()).describe("1-based frames that have a cel on this layer."),
             }),
           )
@@ -141,10 +124,6 @@ export function registerStructureTools(server: McpServer, studio: Studio): void 
           .positive()
           .optional()
           .describe("For 'reorder': the 1-based position `frame` ends up at. Its cels and duration move with it; tag ranges stay where they are."),
-        linkCels: z
-          .boolean()
-          .default(false)
-          .describe("For 'duplicate': share the cel image instead of copying it, so edits apply to both."),
       },
       outputSchema: {
         sprite: z.string(),
@@ -219,17 +198,16 @@ export function registerStructureTools(server: McpServer, studio: Studio): void 
     {
       title: "Cels",
       description:
-        "Manage cels — one layer's image on one frame. Ops: 'list', 'create', 'clear', 'delete', 'move', 'copy', 'link', 'unlink', 'set' (position/opacity), 'tween', 'oscillate'. " +
-        "'move' is how you shift a whole limb between frames without redrawing it; 'link' shares one image across frames so a static part of a cycle stays in sync. " +
-        "'tween' interpolates position or opacity between two frames with an easing curve; 'oscillate' adds a sinusoidal position offset over a frame range — both fill in any missing in-between cels from the start cel, in one transaction.",
+        "Manage cels — one layer's image on one frame. Ops: 'list', 'create', 'clear', 'delete', 'move', 'copy', 'set' (position/opacity), 'tween', 'oscillate'. " +
+        "'move' is how you shift a whole limb between frames without redrawing it. " +
+        "'tween' interpolates position or opacity between two frames with an easing curve; 'oscillate' adds a sinusoidal position offset over a frame range — both fill in any missing in-between cels from the start cel.",
       inputSchema: {
         op: z.enum([
-          "list", "create", "clear", "delete", "move", "copy", "link", "unlink", "set", "tween", "oscillate",
+          "list", "create", "clear", "delete", "move", "copy", "set", "tween", "oscillate",
         ]),
         ...targetShape,
         toFrame: z.number().int().positive().optional(),
         toLayer: z.string().optional(),
-        frames: z.array(z.number().int().positive()).optional().describe("For 'link' across a range."),
         x: z.number().int().optional().describe("Cel origin, for 'set' and 'move'."),
         y: z.number().int().optional(),
         dx: z.number().int().optional().describe("Relative move."),
@@ -267,7 +245,6 @@ export function registerStructureTools(server: McpServer, studio: Studio): void 
               width: z.number().int(),
               height: z.number().int(),
               opacity: z.number().int(),
-              linked: z.boolean(),
             }),
           )
           .optional(),
@@ -298,10 +275,10 @@ export function registerStructureTools(server: McpServer, studio: Studio): void 
 }
 
 function describeLayers(data: Record<string, unknown>): string | undefined {
-  const layers = data.layers as { name: string; isGroup: boolean; visible: boolean }[] | undefined;
+  const layers = data.layers as { name: string; visible: boolean }[] | undefined;
   if (!layers) return undefined;
   return `${layers.length} layer(s), top to bottom: ${[...layers]
     .reverse()
-    .map((l) => `${l.name}${l.isGroup ? "/" : ""}${l.visible ? "" : " (hidden)"}`)
+    .map((l) => `${l.name}${l.visible ? "" : " (hidden)"}`)
     .join(", ")}`;
 }

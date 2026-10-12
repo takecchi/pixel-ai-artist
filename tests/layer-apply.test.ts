@@ -69,7 +69,7 @@ test("rename, set and delete change the named layer", async () => {
   const set = await apply(studio, { op: "set", name: "lines", visible: false, editable: false, opacity: 10, newName: "faint" });
   assert.deepEqual(set.layers[1], {
     name: "faint", index: 2, visible: false, editable: false, opacity: 10,
-    blendMode: "normal", isGroup: false, isTilemap: false, cels: [],
+    cels: [],
   });
   assert.deepEqual(names(await apply(studio, { op: "delete", name: "faint" })), ["Layer 1"]);
   await rejectsWith(apply(studio, { op: "rename", name: "Layer 1" }), "invalid_args", /'newName'/);
@@ -191,20 +191,6 @@ test("a failed merge leaves the lower layer's pixels as they were", async () => 
   await rejectsWith(apply(studio, { batch: [{ op: "merge", name: "top" }, { op: "explode", name: "Layer 1" }] }), "unsupported_command");
   assert.equal(sprite.layers[0]!.cels.get(1)!.image.get(0, 0), RED);
   assert.deepEqual(sprite.layers.map((l) => l.name), ["Layer 1", "top"]);
-});
-
-test("groups, parents and blend modes other than normal answer unsupported_command and change nothing", async () => {
-  const { studio, sprite } = setup();
-  for (const args of [
-    { op: "group", name: "rig", names: ["Layer 1"] },
-    { op: "ungroup", name: "Layer 1" },
-    { op: "create", name: "child", parent: "Layer 1" },
-    { op: "set", name: "Layer 1", blendMode: "multiply" },
-  ]) {
-    await rejectsWith(apply(studio, args), "unsupported_command");
-  }
-  assert.deepEqual(sprite.layers.map((l) => l.name), ["Layer 1"]);
-  await apply(studio, { op: "set", name: "Layer 1", blendMode: "normal" });
 });
 
 test("an out-of-range opacity is invalid_args, and an unknown op or 'list' inside a batch is unsupported_command", async () => {
