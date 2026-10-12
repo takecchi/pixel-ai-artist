@@ -21,19 +21,21 @@ import { transformHandlers } from "./handlers/transform.js";
 import { validateHandlers } from "./handlers/validate.js";
 import type { HandlerTable } from "./studio.js";
 
+// Alphabetical, one module per line, like the imports: two changes that each
+// add a module then touch different lines and merge without a conflict.
 export const handlers: HandlerTable = {
-  ...sessionHandlers,
-  ...spriteHandlers,
-  ...pixelHandlers,
-  ...lookHandlers,
-  ...layerHandlers,
-  ...frameHandlers,
-  ...tagHandlers,
   ...celHandlers,
   ...drawHandlers,
+  ...exportHandlers,
+  ...frameHandlers,
+  ...layerHandlers,
+  ...lookHandlers,
+  ...paletteHandlers,
+  ...pixelHandlers,
   ...recolorHandlers,
+  ...sessionHandlers,
+  ...spriteHandlers,
+  ...tagHandlers,
   ...transformHandlers,
   ...validateHandlers,
-  ...exportHandlers,
-  ...paletteHandlers,
 };
