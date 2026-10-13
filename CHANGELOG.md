@@ -22,13 +22,23 @@ Seventeen MCP tools, with the original's names, arguments and results:
 - In-process sprites in RGB, grayscale and indexed modes, with layers, frames,
   tags, a palette and a Background layer, held in memory until saved or exported.
 - Files:
-  - open PNG, GIF, JPEG and `.aseprite` the way Aseprite opens them (palette
-    PNGs and GIFs as indexed, images with no transparency as a Background);
+  - open PNG, GIF and JPEG the way Aseprite opens them (palette PNGs and GIFs
+    as indexed, images with no transparency as a Background);
+  - open `.aseprite` with its layers, frames, tags, palette and pixel ratio.
+    Layers that share a name are renamed (`Ink 2`), and Background layers
+    are moved to the bottom, where they are drawn; the reply says which;
   - save `.aseprite`, PNG (one file per frame, named as Aseprite names them)
     and GIF.
-- `.aseprite` keeps layer flags, user data, the colour profile and the grid
-  through a save. A file that uses something the model cannot hold is refused,
-  and the reply says what.
+- `.aseprite`:
+  - keeps layer flags, user data, the colour profile and the grid through a
+    save;
+  - a file that uses something the model cannot hold is refused, and the
+    reply says what;
+  - linked cels open as copies and are saved as separate images, which the
+    reply on opening reports.
+- Reference layers made by `reference` import are ordinary layers, as in the
+  original. They are drawn and exported like any other layer, and a mark in
+  the layer's user data keeps them reference layers through `.aseprite`.
 - Export:
   - PNG, GIF, numbered frames, and sprite sheets with an Aseprite-style JSON
     atlas (`rows`, `columns`, `horizontal`, `vertical`, `packed`, padding,
