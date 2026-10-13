@@ -397,16 +397,39 @@ test("no layer op leaves a plain layer under a Background", async () => {
 
 // ── faintBackground reports where the batch ended ───────────────────────
 
-test("faintBackground reports each Background once, by its final name, and not one set back to 255, hidden or deleted", async () => {
+/** faintPaper's Background at full opacity, with a plain layer above it, and a batch runner. */
+function solidPaperUnderInk() {
   const { studio, sprite } = faintPaper();
   sprite.layers[0]!.opacity = 255;
   studio.addLayer(sprite, "Ink");
-  const run = (batch: Record<string, unknown>[]) => layerApply(studio, { batch });
-  const once = await run([{ op: "set", name: "Paper", opacity: 100 }, { op: "set", name: "Paper", opacity: 120 }, { op: "set", name: "Paper", newName: "Card" }]);
-  assert.deepEqual(once.faintBackground, [{ layer: "Card", opacity: 120 }]);
-  assert.equal((await run([{ op: "set", name: "Card", opacity: 90 }, { op: "set", name: "Card", opacity: 255 }])).faintBackground, undefined);
-  assert.equal((await run([{ op: "set", name: "Card", opacity: 90 }, { op: "set", name: "Card", visible: false }])).faintBackground, undefined);
-  assert.equal((await run([{ op: "set", name: "Card", opacity: 90 }, { op: "delete", name: "Card" }])).faintBackground, undefined);
+  return { studio, run: (batch: Record<string, unknown>[]) => layerApply(studio, { batch }) };
+}
+
+test("faintBackground reports a Background set below 255 once, with the opacity the batch ended on", async () => {
+  const { run } = solidPaperUnderInk();
+  const reply = await run([{ op: "set", name: "Paper", opacity: 100 }, { op: "set", name: "Paper", opacity: 120 }]);
+  assert.deepEqual(reply.faintBackground, [{ layer: "Paper", opacity: 120 }]);
+});
+
+test("faintBackground names a Background renamed later in the batch by its new name", async () => {
+  const { run } = solidPaperUnderInk();
+  const reply = await run([{ op: "set", name: "Paper", opacity: 120 }, { op: "set", name: "Paper", newName: "Card" }]);
+  assert.deepEqual(reply.faintBackground, [{ layer: "Card", opacity: 120 }]);
+});
+
+test("faintBackground leaves out a Background set back to 255 later in the batch", async () => {
+  const { run } = solidPaperUnderInk();
+  assert.equal((await run([{ op: "set", name: "Paper", opacity: 90 }, { op: "set", name: "Paper", opacity: 255 }])).faintBackground, undefined);
+});
+
+test("faintBackground leaves out a Background hidden later in the batch", async () => {
+  const { run } = solidPaperUnderInk();
+  assert.equal((await run([{ op: "set", name: "Paper", opacity: 90 }, { op: "set", name: "Paper", visible: false }])).faintBackground, undefined);
+});
+
+test("faintBackground leaves out a Background deleted later in the batch", async () => {
+  const { run } = solidPaperUnderInk();
+  assert.equal((await run([{ op: "set", name: "Paper", opacity: 90 }, { op: "delete", name: "Paper" }])).faintBackground, undefined);
 });
 
 // ── the reference mark after an empty or a CRLF line ───────────────────
@@ -428,6 +451,19 @@ test("export gif of an indexed sprite whose palette carries alpha below 255 writ
     sprite.palette = [rgba(0, 0, 0, 0), rgba(255, 0, 0, 128), rgba(0, 0, 255, 128)];
     studio.ensureCel(sprite, sprite.layers[0]!, 1).image = img(2, 1, [1, 2]);
     const file = path.join(dir, "faint.gif");
+    await exportRun(studio, { op: "gif", path: file });
+    assert.deepEqual(readGif(file), [RED, BLUE]);
+  });
+});
+
+test("export gif of an indexed sprite whose palette entries are nearly clear still writes its pixels opaque", async () => {
+  await inTempDir(async (dir) => {
+    const studio = createStudio();
+    await manage(studio, { op: "new", width: 2, height: 1, colorMode: "indexed" });
+    const sprite = studio.activeSprite()!;
+    sprite.palette = [rgba(0, 0, 0, 0), rgba(255, 0, 0, 50), rgba(0, 0, 255, 50)];
+    studio.ensureCel(sprite, sprite.layers[0]!, 1).image = img(2, 1, [1, 2]);
+    const file = path.join(dir, "nearly-clear.gif");
     await exportRun(studio, { op: "gif", path: file });
     assert.deepEqual(readGif(file), [RED, BLUE]);
   });
