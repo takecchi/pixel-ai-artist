@@ -245,6 +245,7 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
         // is "Sprite" for every unsaved sprite at once, so an agent that feeds
         // the name straight back can address the wrong one.
         const hint = data.id === undefined ? "" : ` Refer to it as '#${String(data.id)}'.`;
+        if (args.op === "list") return ok(merged, describeOpen(data.sprites as OpenSprite[]));
         const renamed = (data.renamedLayers as { from: string; to: string }[] | undefined) ?? [];
         const renames = renamed.length === 0 ? "" : ` Renamed layers that shared a name: ${renamed.map((r) => `'${r.from}' → '${r.to}'`).join(", ")}.`;
         const kinds = (key: string) => Object.entries((data[key] as Record<string, number> | undefined) ?? {}).map(([k, n]) => `${k} ${n}`).join(", ");
@@ -262,6 +263,22 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
       }
     },
   );
+}
+
+interface OpenSprite {
+  id: number;
+  name: string;
+  active: boolean;
+  modified: boolean;
+}
+
+function describeOpen(sprites: OpenSprite[]): string {
+  if (sprites.length === 0) return "list: no sprite is open.";
+  const each = sprites.map((s) => {
+    const marks = [s.active ? "active" : "", s.modified ? "unsaved changes" : ""].filter(Boolean);
+    return `'${s.name}' #${s.id}${marks.length > 0 ? ` (${marks.join(", ")})` : ""}`;
+  });
+  return `list: ${sprites.length} open — ${each.join(", ")}.`;
 }
 
 /** The `activeSprite` preflight reports, from a `session.site` reply. */
