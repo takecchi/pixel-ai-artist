@@ -24,6 +24,8 @@ export function layerInfo(layer: Layer, index: number) {
     visible: layer.visible,
     editable: layer.editable,
     opacity: layer.opacity,
+    // Not in the extension's answer: it tells an agent up front why a reorder of this layer would be refused.
+    ...(layer.background ? { background: true as const } : {}),
     cels: [...layer.cels.keys()].sort((a, b) => a - b),
   };
 }
@@ -217,7 +219,7 @@ function spriteManage(studio: Studio, args: Record<string, unknown>) {
     if (!s.filename) {
       throw new ToolError("invalid_args", "This sprite has never been saved. Use op 'save_as' with a path.");
     }
-    const { files, adjustedDurations, adjustedBackgroundOpacity, alphaDropped } = saveSprite(studio, s, s.filename);
+    const { files, adjustedDurations, adjustedBackgroundOpacity, alphaDropped, lostOnSave } = saveSprite(studio, s, s.filename);
     return {
       sprite: displayName(s),
       id: s.id,
@@ -226,11 +228,12 @@ function spriteManage(studio: Studio, args: Record<string, unknown>) {
       ...(adjustedDurations.length > 0 ? { adjustedDurations } : {}),
       ...(adjustedBackgroundOpacity.length > 0 ? { adjustedBackgroundOpacity } : {}),
       ...(alphaDropped > 0 ? { alphaDropped } : {}),
+      ...(Object.keys(lostOnSave).length > 0 ? { lostOnSave } : {}),
     };
   }
 
   if (op === "save_as") {
-    const { files, adjustedDurations, adjustedBackgroundOpacity, alphaDropped } = saveSprite(studio, s, String(need(args.path, "path")));
+    const { files, adjustedDurations, adjustedBackgroundOpacity, alphaDropped, lostOnSave } = saveSprite(studio, s, String(need(args.path, "path")));
     return {
       sprite: displayName(s),
       id: s.id,
@@ -239,6 +242,7 @@ function spriteManage(studio: Studio, args: Record<string, unknown>) {
       ...(adjustedDurations.length > 0 ? { adjustedDurations } : {}),
       ...(adjustedBackgroundOpacity.length > 0 ? { adjustedBackgroundOpacity } : {}),
       ...(alphaDropped > 0 ? { alphaDropped } : {}),
+      ...(Object.keys(lostOnSave).length > 0 ? { lostOnSave } : {}),
     };
   }
 

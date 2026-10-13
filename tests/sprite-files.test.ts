@@ -356,7 +356,7 @@ test("save_as .png writes the visible layers composited as RGBA and leaves the h
     studio.ensureCel(sprite, hidden, 1).image = img(2, 1, [GREEN, GREEN]);
     const file = path.join(dir, "out.png");
     const reply = await manage(studio, { op: "save_as", path: file });
-    assert.deepEqual(reply, { sprite: "out.png", id: sprite.id, path: file, files: [file] });
+    assert.deepEqual(reply, { sprite: "out.png", id: sprite.id, path: file, files: [file], lostOnSave: { layers: 3 } });
     const written = readPng(file);
     assert.deepEqual([written.width, written.height], [2, 1]);
     assert.deepEqual([...written.pixels], [RED, BLUE]);

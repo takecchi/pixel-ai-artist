@@ -75,6 +75,8 @@ export interface Written {
   adjustedBackgroundOpacity: AdjustedBackgroundOpacity[];
   /** Pixels written opaque, colour kept, because a visible Background leaves the file no transparency. */
   alphaDropped: number;
+  /** What a flat PNG or GIF could not hold of the sprite, counted by kind; empty for .aseprite. */
+  lostOnSave: Record<string, number>;
 }
 
 /** The whole document, layers and all, as an .aseprite file. */
@@ -82,7 +84,7 @@ export function writeAseprite(sprite: Sprite, file: string): Written {
   const full = path.resolve(file);
   const { file: ase, adjustedDurations, adjustedBackgroundOpacity } = aseFromSprite(sprite);
   writeBytes(full, encodeAse(ase));
-  return { files: [full], adjustedDurations, adjustedBackgroundOpacity, alphaDropped: 0 };
+  return { files: [full], adjustedDurations, adjustedBackgroundOpacity, alphaDropped: 0, lostOnSave: {} };
 }
 
 /** Whether a visible Background is among `layers`, which makes Aseprite write PNG and GIF with no transparency. */
@@ -107,6 +109,22 @@ export function opaqueFrames(frames: AnimationFrame[]): { frames: AnimationFrame
     return { image, durationMs: f.durationMs };
   });
   return { frames: out, alphaDropped };
+}
+
+/**
+ * What saving the sprite as a flat PNG or GIF leaves behind: layers drawn into
+ * one picture, a PNG's frames split into numbered files with no durations,
+ * tags, and an indexed sprite's palette in a PNG. An RGB or grayscale
+ * sprite's palette is not counted: it does not decide any pixel, and every
+ * new sprite has one.
+ */
+function flatLosses(sprite: Sprite, ext: string): Record<string, number> {
+  const kept: Record<string, number> = {};
+  if (sprite.layers.length > 1) kept.layers = sprite.layers.length;
+  if (ext === ".png" && sprite.frames.length > 1) kept.frames = sprite.frames.length;
+  if (sprite.tags.length > 0) kept.tags = sprite.tags.length;
+  if (ext === ".png" && sprite.colorMode === "indexed" && sprite.palette.length > 0) kept.palette = sprite.palette.length;
+  return kept;
 }
 
 function rendered(studio: Studio, sprite: Sprite): AnimationFrame[] {
@@ -177,6 +195,7 @@ export function saveSprite(studio: Studio, sprite: Sprite, file: string): Writte
       adjustedDurations: [],
       adjustedBackgroundOpacity: [],
       alphaDropped: out.alphaDropped,
+      lostOnSave: flatLosses(sprite, ext),
     };
   }
   sprite.filename = path.resolve(file);

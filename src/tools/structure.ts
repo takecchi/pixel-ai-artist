@@ -69,6 +69,7 @@ export function registerStructureTools(server: McpServer, studio: Studio): void 
               visible: z.boolean(),
               editable: z.boolean(),
               opacity: z.number().int(),
+              background: z.literal(true).optional().describe("Present on an Aseprite Background layer, which stays at the bottom; see sprite_info."),
               cels: z.array(z.number().int()).describe("1-based frames that have a cel on this layer."),
             }),
           )

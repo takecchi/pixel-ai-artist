@@ -81,6 +81,10 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
             visible: z.boolean(),
             editable: z.boolean(),
             opacity: z.number().int(),
+            background: z
+              .literal(true)
+              .optional()
+              .describe("Present on an Aseprite Background layer. Its pixels can be drawn like any layer's, but it stays at the bottom: it cannot be lifted above a plain layer, nothing goes below it, and PNG or GIF saved while it is visible have no transparency."),
             cels: z.array(z.number().int()).describe("1-based frames that have a cel on this layer."),
           }),
         ),
@@ -192,7 +196,7 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
         lostOnSave: z
           .record(z.number().int())
           .optional()
-          .describe("Op 'open': what the file holds that saving will not write back the same way, counted by kind (linkedCels are saved as separate images; layerUuids and unknownChunks are dropped)."),
+          .describe("Op 'open': what the file holds that saving will not write back the same way, counted by kind (linkedCels are saved as separate images; layerUuids and unknownChunks are dropped). Ops 'save'/'save_as' to .png or .gif: what that flat file could not keep of the sprite (layers drawn into one picture; frames, for PNG, written as numbered files without their durations; tags; an indexed sprite's palette, for PNG). Save to .aseprite to keep them."),
         skippedOnOpen: z
           .record(z.number().int())
           .optional()
@@ -249,7 +253,8 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
         const renamed = (data.renamedLayers as { from: string; to: string }[] | undefined) ?? [];
         const renames = renamed.length === 0 ? "" : ` Renamed layers that shared a name: ${renamed.map((r) => `'${r.from}' → '${r.to}'`).join(", ")}.`;
         const kinds = (key: string) => Object.entries((data[key] as Record<string, number> | undefined) ?? {}).map(([k, n]) => `${k} ${n}`).join(", ");
-        const lost = kinds("lostOnSave") ? ` Saving will not keep: ${kinds("lostOnSave")}.` : "";
+        const lostWhat = kinds("lostOnSave");
+        const lost = !lostWhat ? "" : args.op === "open" ? ` Saving will not keep: ${lostWhat}.` : ` The file could not keep: ${lostWhat} (lostOnSave).`;
         const skipped = kinds("skippedOnOpen") ? ` Not read from the file: ${kinds("skippedOnOpen")}.` : "";
         const misplaced = (data.misplacedBackground as string[] | undefined) ?? [];
         const misplacedNote = misplaced.length > 0 ? ` Moved these Background layers down to the bottom, where they are drawn: ${misplaced.map((n) => `'${n}'`).join(", ")}.` : "";
