@@ -73,6 +73,8 @@ export interface Written {
   adjustedDurations: AdjustedDuration[];
   /** Background layers whose opacity was written as 255, which is all Aseprite reads of it. */
   adjustedBackgroundOpacity: AdjustedBackgroundOpacity[];
+  /** Pixels written opaque, colour kept, because a visible Background leaves the file no transparency. */
+  alphaDropped: number;
 }
 
 /** The whole document, layers and all, as an .aseprite file. */
@@ -80,7 +82,7 @@ export function writeAseprite(sprite: Sprite, file: string): Written {
   const full = path.resolve(file);
   const { file: ase, adjustedDurations, adjustedBackgroundOpacity } = aseFromSprite(sprite);
   writeBytes(full, encodeAse(ase));
-  return { files: [full], adjustedDurations, adjustedBackgroundOpacity };
+  return { files: [full], adjustedDurations, adjustedBackgroundOpacity, alphaDropped: 0 };
 }
 
 /** Whether a visible Background is among `layers`, which makes Aseprite write PNG and GIF with no transparency. */
@@ -88,15 +90,23 @@ export function drawsBackground(layers: readonly Layer[]): boolean {
   return layers.some((l) => l.background && l.visible);
 }
 
-/** Frames with every pixel opaque and its colour kept, as Aseprite writes a sprite that has a visible Background. */
-export function opaqueFrames(frames: AnimationFrame[]): AnimationFrame[] {
-  return frames.map((f) => {
+/**
+ * Frames with every pixel opaque and its colour kept, and how many pixels
+ * that changed: with a visible Background, Aseprite's PNG saver picks a colour
+ * type with no alpha and writes each pixel's r, g and b as they are
+ * (png_format.cpp, color_type and the PNG_COLOR_TYPE_RGB rows).
+ */
+export function opaqueFrames(frames: AnimationFrame[]): { frames: AnimationFrame[]; alphaDropped: number } {
+  let alphaDropped = 0;
+  const out = frames.map((f) => {
     const image = new Image(f.image.width, f.image.height);
     f.image.pixels.forEach((v, i) => {
+      if ((v & 255) !== 255) alphaDropped++;
       image.pixels[i] = (v | 255) >>> 0;
     });
     return { image, durationMs: f.durationMs };
   });
+  return { frames: out, alphaDropped };
 }
 
 function rendered(studio: Studio, sprite: Sprite): AnimationFrame[] {
@@ -161,8 +171,13 @@ export function saveSprite(studio: Studio, sprite: Sprite, file: string): Writte
     written = writeAseprite(sprite, file);
   } else {
     const frames = rendered(studio, sprite);
-    const out = drawsBackground(sprite.layers) ? opaqueFrames(frames) : frames;
-    written = { files: writeFrames(out, sprite.colorMode === "indexed" ? sprite.palette : [], file), adjustedDurations: [], adjustedBackgroundOpacity: [] };
+    const out = drawsBackground(sprite.layers) ? opaqueFrames(frames) : { frames, alphaDropped: 0 };
+    written = {
+      files: writeFrames(out.frames, sprite.colorMode === "indexed" ? sprite.palette : [], file),
+      adjustedDurations: [],
+      adjustedBackgroundOpacity: [],
+      alphaDropped: out.alphaDropped,
+    };
   }
   sprite.filename = path.resolve(file);
   sprite.modified = false;

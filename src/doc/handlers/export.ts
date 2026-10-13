@@ -40,12 +40,7 @@ interface ExportView {
   layers: Layer[];
 }
 
-/**
- * `intoNewSprite` renders as the Lua handler's png op and Aseprite's sheet
- * texture did, drawing into a fresh image of the sprite's colour mode: an
- * indexed sprite's transparent index stays clear even on a Background.
- */
-function exportView(studio: Studio, s: Sprite, args: Record<string, unknown>, scale: number, intoNewSprite = false): ExportView {
+function exportView(studio: Studio, s: Sprite, args: Record<string, unknown>, scale: number): ExportView {
   const tagNames = names(args.tags, "tags");
   const layerNames = names(args.layers, "layers");
   // Resolved before rendering, so an unknown name is refused rather than exporting everything.
@@ -63,7 +58,7 @@ function exportView(studio: Studio, s: Sprite, args: Record<string, unknown>, sc
     : s.layers.filter((l) => l.visible);
   const frames = kept.map((n) => ({
     image: scaleNearest(
-      studio.composite(s, n, { ...(layerNames ? { layers, includeHidden: true } : {}), clearTransparentIndex: intoNewSprite }),
+      layerNames ? studio.composite(s, n, { layers, includeHidden: true }) : studio.composite(s, n),
       scale,
     ),
     durationMs: s.frames[n - 1]!.durationMs,
@@ -145,10 +140,11 @@ function writeSheet(view: ExportView, s: Sprite, file: string, args: Record<stri
  * are not passed through here: the Lua handler flattened png into a fresh
  * sprite and Aseprite renders a sheet into a new texture, neither with a
  * Background, so a hole in it stays transparent there even though
- * sprite.manage save writes it opaque.
+ * sprite.manage save writes it opaque. What the Background itself shows is
+ * written as drawn on every path.
  */
-function savedFrames(view: ExportView): AnimationFrame[] {
-  return view.layers.some((l) => l.background) ? opaqueFrames(view.frames) : view.frames;
+function savedFrames(view: ExportView): { frames: AnimationFrame[]; alphaDropped: number } {
+  return view.layers.some((l) => l.background) ? opaqueFrames(view.frames) : { frames: view.frames, alphaDropped: 0 };
 }
 
 /** png and frames were saveCopyAs in the Lua handler: a GIF there keeps an RGB sprite's colours. */
@@ -167,13 +163,14 @@ function exportRun(studio: Studio, args: Record<string, unknown>) {
   let atlas: string | undefined;
   let adjustedDurations: Written["adjustedDurations"] = [];
   let adjustedBackgroundOpacity: Written["adjustedBackgroundOpacity"] = [];
+  let alphaDropped = 0;
 
   if (op === "png") {
     if (names(args.tags, "tags")) {
       throw new ToolError("invalid_args", "'png' writes one frame, picked with `frame`; `tags` applies to gif, frames and spritesheet.");
     }
     frame = studio.resolveFrame(s, args.frame);
-    const view = exportView(studio, s, args, scale, true);
+    const view = exportView(studio, s, args, scale);
     files = writeFrames([view.frames[frame - 1]!], ownPalette(s), file);
   } else if (op === "aseprite") {
     if (filtered) {
@@ -187,13 +184,16 @@ function exportRun(studio: Studio, args: Record<string, unknown>) {
     adjustedDurations = written.adjustedDurations;
     adjustedBackgroundOpacity = written.adjustedBackgroundOpacity;
   } else if (op === "gif") {
-    const frames = savedFrames(exportView(studio, s, args, scale));
+    const saved = savedFrames(exportView(studio, s, args, scale));
+    alphaDropped = saved.alphaDropped;
     const opaque = s.palette.map((c) => (c | 255) >>> 0);
-    files = writeFrames(s.palette.length > 0 ? inPalette(frames, s.palette) : frames, opaque, file);
+    files = writeFrames(s.palette.length > 0 ? inPalette(saved.frames, s.palette) : saved.frames, opaque, file);
   } else if (op === "frames") {
-    files = writeFrames(savedFrames(exportView(studio, s, args, scale)), ownPalette(s), file);
+    const saved = savedFrames(exportView(studio, s, args, scale));
+    alphaDropped = saved.alphaDropped;
+    files = writeFrames(saved.frames, ownPalette(s), file);
   } else if (op === "spritesheet") {
-    files = writeSheet(exportView(studio, s, args, scale, true), s, file, args);
+    files = writeSheet(exportView(studio, s, args, scale), s, file, args);
     if (args.includeJson !== false) atlas = files[0];
   } else {
     throw new ToolError("unsupported_command", `export op '${String(op)}' is not supported.`);
@@ -210,6 +210,7 @@ function exportRun(studio: Studio, args: Record<string, unknown>) {
     atlas,
     ...(adjustedDurations.length > 0 ? { adjustedDurations } : {}),
     ...(adjustedBackgroundOpacity.length > 0 ? { adjustedBackgroundOpacity } : {}),
+    ...(alphaDropped > 0 ? { alphaDropped } : {}),
   };
 }
 

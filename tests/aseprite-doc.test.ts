@@ -993,9 +993,9 @@ test("the sprite_manage tool's reply text names a misplaced Background layer, an
     const res = await client.callTool({ name: "sprite_manage", arguments: { op: "open", path: high } });
     assert.ok(!res.isError, text(res));
     assert.deepEqual((res.structuredContent as Reply).misplacedBackground, ["Paper"]);
-    assert.match(text(res), /Background layers not alone at the bottom: 'Paper'/);
+    assert.match(text(res), /Moved Background layers to the bottom, where they are drawn: 'Paper'\./);
     const fine = write(dir, "fine.aseprite", encodeAse(aseFile([aseLayer("Paper", { background: true })])));
-    assert.doesNotMatch(text(await client.callTool({ name: "sprite_manage", arguments: { op: "open", path: fine } })), /Background layers not alone/);
+    assert.doesNotMatch(text(await client.callTool({ name: "sprite_manage", arguments: { op: "open", path: fine } })), /Moved Background layers/);
     await server.close();
   });
 });

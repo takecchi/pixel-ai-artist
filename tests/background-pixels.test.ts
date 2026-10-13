@@ -1,8 +1,13 @@
 import { strict as assert } from "node:assert";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { test } from "node:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { Image, createStudio, rgba } from "../dist/doc/index.js";
+import { encodeAse } from "../dist/lib/ase.js";
+import type { AseFile, AseLayer } from "../dist/lib/ase.js";
 import { decodePng } from "../dist/lib/png.js";
 import { createServer } from "../dist/server.js";
 
@@ -196,30 +201,59 @@ test("changing an indexed sprite without a Background to rgb leaves the transpar
 
 // ── merge order ─────────────────────────────────────────────────────────
 
-test("merging a Background that sits above a plain layer keeps the composite, which draws the Background first, in rgb", async () => {
-  const BLUE = rgba(0, 0, 255);
-  const studio = createStudio();
-  const sprite = studio.addSprite({ width: 2, height: 1 });
-  studio.ensureCel(sprite, sprite.layers[0]!, 1).image = img(2, 1, [RED, 0]);
-  const paper = studio.addLayer(sprite, "Paper");
-  paper.background = true;
-  studio.ensureCel(sprite, paper, 1).image = img(2, 1, [BLUE, BLUE]);
-  assert.deepEqual(composite(studio, sprite), [RED, BLUE]);
-  await studio.call<Reply>("layer.apply", { op: "merge", name: "Paper" });
-  assert.deepEqual(sprite.layers.map((l) => l.name), ["Layer 1"]);
-  assert.deepEqual(composite(studio, sprite), [RED, BLUE]);
+// The tools cannot stack a Background above a plain layer, so the file is the only way to get one; opening moves it to the bottom.
+async function openedPaperAboveInk(colorMode: "rgba" | "indexed") {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "pixel-ai-artist-"));
+  try {
+    const layer = (name: string, background: boolean): AseLayer => ({
+      name, type: "image", childLevel: 0, visible: true, editable: true, background, lockMovement: false,
+      preferLinkedCels: false, collapsed: false, reference: false, blendMode: 0, opacity: 255,
+    });
+    const rgbaBytes = (...pixels: number[]) => Uint8Array.from(pixels.flatMap((p) => [p >>> 24, (p >>> 16) & 255, (p >>> 8) & 255, p & 255]));
+    const cel = (layerIndex: number, width: number, pixels: Uint8Array) => ({ layer: layerIndex, x: 0, y: 0, opacity: 255, zIndex: 0, image: { width, height: 1, pixels } });
+    const indexedMode = colorMode === "indexed";
+    const file: AseFile = {
+      width: 2,
+      height: 1,
+      colorMode,
+      transparentIndex: 0,
+      palette: rgbaBytes(WHITE, RED, GREEN),
+      layers: [layer("Ink", false), layer("Paper", true)],
+      frames: [
+        {
+          durationMs: 100,
+          cels: indexedMode
+            ? [cel(0, 2, Uint8Array.of(1, 0)), cel(1, 2, Uint8Array.of(2, 2))]
+            : [cel(0, 2, rgbaBytes(RED, 0)), cel(1, 2, rgbaBytes(GREEN, GREEN))],
+        },
+      ],
+      tags: [],
+    };
+    const target = path.join(dir, "paper-above.aseprite");
+    writeFileSync(target, encodeAse(file));
+    const studio = createStudio();
+    const reply = await studio.call<Reply>("sprite.manage", { op: "open", path: target });
+    return { studio, sprite: studio.activeSprite()!, reply };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test("merging a Background that was above a plain layer in the file keeps the composite, in rgb", async () => {
+  const { studio, sprite, reply } = await openedPaperAboveInk("rgba");
+  assert.deepEqual(reply.misplacedBackground, ["Paper"]);
+  assert.deepEqual(sprite.layers.map((l) => l.name), ["Paper", "Ink"]);
+  assert.deepEqual(composite(studio, sprite), [RED, GREEN]);
+  await studio.call<Reply>("layer.apply", { op: "merge", name: "Ink" });
+  assert.deepEqual(sprite.layers.map((l) => l.name), ["Paper"]);
+  assert.deepEqual(composite(studio, sprite), [RED, GREEN]);
 });
 
-test("merging a Background that sits above a plain layer keeps the composite, which draws the Background first, in indexed", async () => {
-  const studio = createStudio();
-  const sprite = studio.addSprite({ width: 2, height: 1, colorMode: "indexed", palette: [WHITE, RED, GREEN] });
-  sprite.transparentIndex = 0;
-  studio.ensureCel(sprite, sprite.layers[0]!, 1).image = img(2, 1, [1, 0]);
-  const paper = studio.addLayer(sprite, "Paper");
-  paper.background = true;
-  studio.ensureCel(sprite, paper, 1).image = img(2, 1, [2, 2]);
+test("merging a Background that was above a plain layer in the file keeps the composite, in indexed", async () => {
+  const { studio, sprite } = await openedPaperAboveInk("indexed");
+  assert.deepEqual(sprite.layers.map((l) => l.name), ["Paper", "Ink"]);
   assert.deepEqual(composite(studio, sprite), [RED, GREEN]);
-  await studio.call<Reply>("layer.apply", { op: "merge", name: "Paper" });
+  await studio.call<Reply>("layer.apply", { op: "merge", name: "Ink" });
   assert.deepEqual(composite(studio, sprite), [RED, GREEN]);
   assert.deepEqual([...sprite.layers[0]!.cels.get(1)!.image.pixels], [1, 2]);
 });

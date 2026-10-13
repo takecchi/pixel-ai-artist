@@ -258,14 +258,12 @@ export class Studio {
    * The canvas as it looks at `frame`, as RGBA whatever the colour mode:
    * visible layers bottom to top, each at its layer × cel opacity,
    * source-over. `layers` restricts which layers take part (visibility still
-   * applies unless `includeHidden`). `clearTransparentIndex` renders as
-   * Aseprite does into an indexed image: the transparent index stays clear
-   * even on a Background.
+   * applies unless `includeHidden`).
    */
   composite(
     sprite: Sprite,
     frame: number,
-    opts: { layers?: readonly Layer[]; includeHidden?: boolean; clearTransparentIndex?: boolean } = {},
+    opts: { layers?: readonly Layer[]; includeHidden?: boolean } = {},
   ): Image {
     const out = new Image(sprite.width, sprite.height);
     const only = opts.layers ? new Set(opts.layers.map((l) => l.id)) : null;
@@ -284,7 +282,7 @@ export class Studio {
           if (!out.contains(tx, ty)) continue;
           const i = ty * out.width + tx;
           const value = cel.image.pixels[y * cel.image.width + x]!;
-          out.pixels[i] = over(out.pixels[i]!, pixelToRgba(sprite, value, opts.clearTransparentIndex ? undefined : layer), opacity);
+          out.pixels[i] = over(out.pixels[i]!, pixelToRgba(sprite, value, layer), opacity);
         }
       }
     }

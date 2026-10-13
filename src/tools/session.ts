@@ -204,11 +204,16 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
         misplacedBackground: z
           .array(z.string())
           .optional()
-          .describe("Op 'open': the Background layers, when one is not the bottom layer or there are several. They are drawn first all the same, and a Background cannot be moved off the bottom."),
+          .describe("Op 'open': Background layers that were not at the bottom of the file's stack and were moved there, keeping their order. Backgrounds are drawn first, so the picture is unchanged, and they stay at the bottom."),
         adjustedBackgroundOpacity: z
           .array(z.object({ layer: z.string(), from: z.number().int(), to: z.literal(255) }))
           .optional()
-          .describe("Ops 'save'/'save_as' to .aseprite: Background layers whose opacity was written as 255, because Aseprite ignores a Background's opacity when it reads the file."),
+          .describe("Ops 'save'/'save_as' to .aseprite (and export op 'aseprite', which answers the same): Background layers whose opacity was written as 255, because Aseprite ignores a Background's opacity when it reads the file."),
+        alphaDropped: z
+          .number()
+          .int()
+          .optional()
+          .describe("Ops 'save'/'save_as' to .png or .gif: pixels written opaque with their colour kept, because a visible Background leaves PNG and GIF with no transparency (as Aseprite's PNG saver drops alpha). A Background below 255 opacity and holes in it come out solid."),
       },
       annotations: {
         readOnlyHint: false,
@@ -246,11 +251,12 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
         const lost = kinds("lostOnSave") ? ` Saving will not keep: ${kinds("lostOnSave")}.` : "";
         const skipped = kinds("skippedOnOpen") ? ` Not read from the file: ${kinds("skippedOnOpen")}.` : "";
         const misplaced = (data.misplacedBackground as string[] | undefined) ?? [];
-        const misplacedNote = misplaced.length > 0 ? ` Background layers not alone at the bottom: ${misplaced.map((n) => `'${n}'`).join(", ")}; they are drawn first.` : "";
+        const misplacedNote = misplaced.length > 0 ? ` Moved Background layers to the bottom, where they are drawn: ${misplaced.map((n) => `'${n}'`).join(", ")}.` : "";
+        const dropped = typeof data.alphaDropped === "number" ? ` ${data.alphaDropped} pixel(s) written opaque because a visible Background leaves the file no transparency (alphaDropped).` : "";
         const adjusted = ((data.adjustedDurations as unknown[] | undefined) ?? []).length > 0 ? " Some frame durations were brought into 1..65535 ms (adjustedDurations)." : "";
         const background = (data.adjustedBackgroundOpacity as { layer: string; from: number }[] | undefined) ?? [];
         const backgrounds = background.length > 0 ? ` Background opacity was written as 255 (Aseprite ignores it): ${background.map((b) => `'${b.layer}' ${b.from}`).join(", ")} (adjustedBackgroundOpacity).` : "";
-        return ok(merged, `${args.op}: ${String(data.sprite ?? "ok")}.${hint}${renames}${lost}${skipped}${misplacedNote}${adjusted}${backgrounds}`);
+        return ok(merged, `${args.op}: ${String(data.sprite ?? "ok")}.${hint}${renames}${lost}${skipped}${misplacedNote}${adjusted}${backgrounds}${dropped}`);
       } catch (err) {
         return fail(err);
       }

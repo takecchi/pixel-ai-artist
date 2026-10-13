@@ -21,18 +21,24 @@ export const REFERENCE_MARK = "pixel-ai-artist:reference";
 
 const isMarkLine = (line: string) => line.replace(/\r?\n$/, "").replace(/\r$/, "") === REFERENCE_MARK;
 
-function splitMark(text: string | undefined): { marked: boolean; rest: string | undefined } {
+function splitMark(text: string | undefined): { marked: boolean; rest: string | undefined; ends?: { end: string; sep: string } } {
   if (text === undefined) return { marked: false, rest: undefined };
   // Lines keep their own terminator, so what stays is byte for byte as it was, whether it used \r\n or \n.
   const lines = text.split(/(?<=\n)/);
   if (text.endsWith("\n")) lines.push("");
   if (!lines.some(isMarkLine)) return { marked: false, rest: text };
+  const markLine = lines.find(isMarkLine)!;
+  const end = /\r?\n$/.exec(markLine)?.[0] ?? "";
   const kept = lines.filter((line) => !isMarkLine(line));
-  if (kept.length === 0) return { marked: true, rest: undefined };
+  if (kept.length === 0) return { marked: true, rest: undefined, ends: { end, sep: "" } };
   let rest = kept.join("");
+  let sep = "";
   // The mark was the last line, so the terminator of the line before it ended nothing.
-  if (!lines.at(-1)!.endsWith("\n") && isMarkLine(lines.at(-1)!)) rest = rest.replace(/\r?\n$/, "");
-  return { marked: true, rest };
+  if (!lines.at(-1)!.endsWith("\n") && isMarkLine(lines.at(-1)!)) {
+    sep = /\r?\n$/.exec(rest)?.[0] ?? "";
+    rest = rest.slice(0, rest.length - sep.length);
+  }
+  return { marked: true, rest, ends: { end, sep } };
 }
 
 const MODE_FROM_ASE: Record<AseDecoded["colorMode"], ColorMode> = { rgba: "rgb", grayscale: "grayscale", indexed: "indexed" };
@@ -122,10 +128,7 @@ export interface AseOpenNotes {
   lostOnSave: Record<string, number>;
   /** Left out when the file was read, as Aseprite leaves them out. */
   skippedOnOpen: Record<string, number>;
-  /**
-   * Background layers when one is not the bottom layer or there are several:
-   * Aseprite opens such a file as it is, and they are still drawn first.
-   */
+  /** Background layers that were not at the bottom of the file's stack and were moved there, keeping their order. */
   misplacedBackground: string[];
 }
 
@@ -191,7 +194,7 @@ export function spriteFromAse(studio: Studio, file: AseDecoded, filename: string
     layer.editable = l.editable;
     layer.opacity = l.opacity;
     if (l.background) layer.background = true;
-    const { marked, rest } = splitMark(l.userData?.text);
+    const { marked, rest, ends } = splitMark(l.userData?.text);
     // The Lua handler's reference layers are ordinary layers; Aseprite's own are marked too, and keep their flag.
     if (marked || l.reference) layer.reference = true;
     let userData: AseUserData | undefined;
@@ -206,6 +209,7 @@ export function spriteFromAse(studio: Studio, file: AseDecoded, filename: string
       ...(l.reference ? { referenceFlag: true } : {}),
       ...(l.otherFlags ? { otherFlags: l.otherFlags } : {}),
       ...(userData ? { userData } : {}),
+      ...(ends && (ends.end || ends.sep) ? { markLineEnds: ends } : {}),
     };
     if (Object.keys(extra).length > 0) layer.aseprite = extra;
     return layer;
@@ -231,11 +235,13 @@ export function spriteFromAse(studio: Studio, file: AseDecoded, filename: string
       layers[cel.layer]!.cels.set(fi + 1, out);
     }
   });
-  sprite.activeLayerId = layers.at(-1)?.id ?? null;
+  // Composite draws Background layers first; moving them under the rest keeps that picture, and the stack then says what is drawn.
+  const backgrounds = layers.filter((l) => l.background);
+  const misplaced = !layers.slice(0, backgrounds.length).every((l) => l.background);
+  if (misplaced) sprite.layers = [...backgrounds, ...layers.filter((l) => !l.background)];
+  sprite.activeLayerId = sprite.layers.at(-1)?.id ?? null;
   sprite.activeFrame = 1;
   sprite.modified = false;
-  const backgrounds = layers.filter((l) => l.background);
-  const misplaced = backgrounds.length > 1 || (backgrounds.length === 1 && layers[0] !== backgrounds[0]);
   return {
     sprite,
     renamedLayers: renamed,
@@ -279,8 +285,13 @@ function layerUserData(l: Layer): AseUserData | undefined {
   if (!markLine) return kept;
   const eol = kept?.text?.includes("\r\n") ? "\r\n" : "\n";
   const before = kept?.text ?? "";
-  // Text that already ends a line takes the mark as its next line, ended the same way, so a CRLF file reads back as it was.
-  const text = before === "" ? REFERENCE_MARK : before.endsWith("\n") ? `${before}${REFERENCE_MARK}${eol}` : `${before}${eol}${REFERENCE_MARK}`;
+  // A mark read from the file goes back with the line endings it had there; a new one follows the text's own.
+  const ends = l.aseprite?.markLineEnds;
+  let text: string;
+  if (before === "") text = REFERENCE_MARK + (ends?.end ?? "");
+  else if (before.endsWith("\n")) text = before + REFERENCE_MARK + (ends ? ends.end : eol);
+  // A mark that sat mid-text moves to the end, its own line ending now separating it from the line before.
+  else text = before + (ends?.sep || ends?.end || eol) + REFERENCE_MARK;
   return { ...kept, text };
 }
 

@@ -1,5 +1,5 @@
 import { ToolError, need } from "../errors.js";
-import { Image, TRANSPARENT, displayName, pixelToRgba, rgbaToPixel, type Cel, type Layer, type Sprite } from "../model.js";
+import { Image, displayName, pixelToRgba, rgbaToPixel, type Cel, type Layer, type Sprite } from "../model.js";
 import { over, type HandlerTable, type Studio } from "../studio.js";
 import { layerInfo } from "./sprite.js";
 
@@ -45,12 +45,12 @@ function restack(sprite: Sprite, layer: Layer, index: unknown): void {
   const n = Math.floor(Number(index));
   if (!Number.isFinite(n)) throw new ToolError("invalid_args", `index must be a number, got ${String(index)}.`);
   const target = Math.min(Math.max(n, 1), sprite.layers.length) - 1;
-  // Aseprite only treats the bottom layer as the Background, so it keeps it there.
-  if (layer.background && target !== 0) {
+  // Backgrounds stay together at the bottom, where composite draws them first anyway, so the stack and the picture agree.
+  const backgrounds = sprite.layers.filter((l) => l !== layer && l.background).length;
+  if (layer.background && target > backgrounds) {
     throw new ToolError("invalid_args", "The background layer cannot be moved.");
   }
-  const bottom = sprite.layers.find((l) => l !== layer);
-  if (!layer.background && target === 0 && bottom?.background) {
+  if (!layer.background && target < backgrounds) {
     throw new ToolError("invalid_args", "You cannot move or copy something below the background layer.");
   }
   sprite.layers.splice(sprite.layers.indexOf(layer), 1);
@@ -125,8 +125,6 @@ function mergeDown(studio: Studio, sprite: Sprite, layer: Layer): void {
   const at = sprite.layers.indexOf(layer);
   const below = sprite.layers[at - 1];
   if (!below) throw new ToolError("invalid_args", `'${layer.name}' is the bottom layer; there is nothing to merge it into.`);
-  // A Background above a plain layer is drawn under it, as composite draws Backgrounds first; the merge keeps that picture.
-  const backgroundFirst = layer.background === true && !below.background;
   for (const [frame, upper] of layer.cels) {
     const lower = studio.ensureCel(sprite, below, frame, { x: upper.x, y: upper.y, width: upper.image.width, height: upper.image.height });
     // The batch snapshot shares image buffers; write to a fresh one so a later failure can roll back.
@@ -137,9 +135,7 @@ function mergeDown(studio: Studio, sprite: Sprite, layer: Layer): void {
         const lx = upper.x + x - lower.x;
         const ly = upper.y + y - lower.y;
         if (!lower.image.contains(lx, ly)) continue;
-        const lowerColor = pixelToRgba(sprite, lower.image.get(lx, ly), below);
-        const upperColor = pixelToRgba(sprite, upper.image.get(x, y), layer);
-        const mixed = backgroundFirst ? over(over(TRANSPARENT, upperColor, opacity), lowerColor) : over(lowerColor, upperColor, opacity);
+        const mixed = over(pixelToRgba(sprite, lower.image.get(lx, ly), below), pixelToRgba(sprite, upper.image.get(x, y), layer), opacity);
         lower.image.set(lx, ly, (mixed & 255) === 0 ? lower.image.get(lx, ly) : rgbaToPixel(sprite, mixed));
       }
     }
@@ -148,7 +144,13 @@ function mergeDown(studio: Studio, sprite: Sprite, layer: Layer): void {
   if (sprite.activeLayerId === layer.id) sprite.activeLayerId = below.id;
 }
 
-function applyOp(studio: Studio, sprite: Sprite, op: Op, duplicated: Duplicated[]): void {
+/** A Background whose opacity was set below 255: drawn faint here, but solid in PNG or GIF with it visible and 255 in .aseprite. */
+interface FaintBackground {
+  layer: string;
+  opacity: number;
+}
+
+function applyOp(studio: Studio, sprite: Sprite, op: Op, duplicated: Duplicated[], faint: FaintBackground[]): void {
   const kind = op.op;
   if (kind === "create") {
     let name: string;
@@ -200,7 +202,10 @@ function applyOp(studio: Studio, sprite: Sprite, op: Op, duplicated: Duplicated[
       if (op.newName !== undefined) refuseTaken(sprite, String(op.newName), layer);
       if (op.visible !== undefined) layer.visible = Boolean(op.visible);
       if (op.editable !== undefined) layer.editable = Boolean(op.editable);
-      if (op.opacity !== undefined) layer.opacity = opacityArg(op.opacity);
+      if (op.opacity !== undefined) {
+        layer.opacity = opacityArg(op.opacity);
+        if (layer.background && layer.opacity < 255) faint.push({ layer: layer.name, opacity: layer.opacity });
+      }
       if (op.newName !== undefined) layer.name = String(op.newName);
       break;
     default:
@@ -224,9 +229,10 @@ function layerApply(studio: Studio, args: Record<string, unknown>) {
 
   const ops = batch ?? [args];
   const duplicated: Duplicated[] = [];
+  const faint: FaintBackground[] = [];
   const undo = studio.sprites().map(snapshot);
   try {
-    for (const op of ops) applyOp(studio, sprite, op, duplicated);
+    for (const op of ops) applyOp(studio, sprite, op, duplicated, faint);
   } catch (err) {
     for (const restore of undo) restore();
     throw err;
@@ -236,6 +242,7 @@ function layerApply(studio: Studio, args: Record<string, unknown>) {
     ...report(studio, sprite),
     applied: ops.length,
     duplicated: duplicated.length > 0 ? duplicated : undefined,
+    faintBackground: faint.length > 0 ? faint : undefined,
   };
 }
 

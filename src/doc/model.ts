@@ -138,6 +138,8 @@ export interface Layer {
     preferLinkedCels?: boolean;
     collapsed?: boolean;
     referenceFlag?: boolean;
+    /** How the reference mark line ended in the file, and what separated it from the line before when it was last; kept to write it back the same. */
+    markLineEnds?: { end: string; sep: string };
     otherFlags?: number;
     userData?: AseUserData;
   };
