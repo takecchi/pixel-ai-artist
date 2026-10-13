@@ -15,9 +15,11 @@ workflow it names and follow that — do not do the step from memory.
 
 1. **`preflight`.** The documents live in this server's memory, with no
    window: the user sees only the `look` previews you show them and the files
-   you write. Show previews as you go, and save (`sprite_manage` op `save_as`)
-   or export before reporting — nothing is on disk until you do, and it is
-   lost when the server stops. Never write sprite files by any other route.
+   you write. Show previews as you go, and save (`sprite_manage` op `save_as`
+   to an `.aseprite` path — a `.png` or `.gif` keeps only the picture, not the
+   layers, frames or tags) or export before reporting — nothing is on disk
+   until you do, and it is lost when the server stops. Never write sprite
+   files by any other route.
 
 2. **Read the room.** `sprite_manage op="list"`, then `sprite_info` on whatever
    is open — and if the user points at a file ("fix my knight.png"), `open` it
@@ -78,7 +80,10 @@ workflow it names and follow that — do not do the step from memory.
      every layer you will change — `export op="aseprite"` to a scratch path,
      or the layer's rows from `look op="ascii"`. Restoring means writing those
      rows back as a `grid` at the same x/y, or opening the copy and
-     `layer op="duplicate" toSprite=<document>`.
+     `layer op="duplicate" toSprite=<document>`. The duplicate lands on top
+     of the document as `<name> 2`, next to the changed layer: delete the
+     changed one, rename the copy back and `reorder` it to the old `index`
+     from `sprite_info`, then `close` the copy.
    - **Fix, don't redraw.** A fix changes the pixels the finding points at —
      read that region with `look op="ascii"`, change those rows, write them
      back as a `grid` — or recolours a mass that is too dark (`recolor`; on a

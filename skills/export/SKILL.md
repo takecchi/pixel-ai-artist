@@ -66,11 +66,17 @@ numbered file per frame) or `spritesheet`.
 
 ## Save the source
 
-Exporting does not save the working document.
+Exporting does not save the working document. `sprite_manage op="save"` writes
+it back to its own file — but only an `.aseprite` file keeps the layers,
+frames, durations and tags:
 
 ```
-sprite_manage op="save"
+sprite_manage op="save"                                   ← already an .aseprite
+sprite_manage op="save_as" path="…/knight.aseprite"       ← never saved, or opened from .png/.gif/.jpg
 ```
+
+`save` refuses a sprite that was never saved, and writes one opened from a
+picture back as that flat picture, every layer merged into it.
 
 The `.aseprite` file is the asset. The PNG is a build artifact.
 
