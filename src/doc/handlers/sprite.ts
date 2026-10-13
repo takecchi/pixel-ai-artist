@@ -165,7 +165,7 @@ function changeColorMode(sprite: Sprite, target: ColorMode): void {
     for (const cel of layer.cels.values()) {
       const converted = new Image(cel.image.width, cel.image.height);
       cel.image.pixels.forEach((v, i) => {
-        converted.pixels[i] = encode(pixelToRgba(before, v));
+        converted.pixels[i] = encode(pixelToRgba(before, v, layer));
       });
       cel.image = converted;
     }
@@ -193,8 +193,17 @@ function spriteManage(studio: Studio, args: Record<string, unknown>) {
   }
 
   if (op === "open") {
-    const s = openSprite(studio, String(need(args.path, "path")));
-    return { sprite: displayName(s), id: s.id, width: s.width, height: s.height };
+    const { sprite: s, renamedLayers, lostOnSave, skippedOnOpen, misplacedBackground } = openSprite(studio, String(need(args.path, "path")));
+    return {
+      sprite: displayName(s),
+      id: s.id,
+      width: s.width,
+      height: s.height,
+      ...(renamedLayers.length > 0 ? { renamedLayers } : {}),
+      ...(Object.keys(lostOnSave).length > 0 ? { lostOnSave } : {}),
+      ...(Object.keys(skippedOnOpen).length > 0 ? { skippedOnOpen } : {}),
+      ...(misplacedBackground.length > 0 ? { misplacedBackground } : {}),
+    };
   }
 
   const s = studio.resolveSprite(args.sprite);
@@ -208,13 +217,29 @@ function spriteManage(studio: Studio, args: Record<string, unknown>) {
     if (!s.filename) {
       throw new ToolError("invalid_args", "This sprite has never been saved. Use op 'save_as' with a path.");
     }
-    const files = saveSprite(studio, s, s.filename);
-    return { sprite: displayName(s), id: s.id, path: s.filename, files };
+    const { files, adjustedDurations, adjustedBackgroundOpacity, alphaDropped } = saveSprite(studio, s, s.filename);
+    return {
+      sprite: displayName(s),
+      id: s.id,
+      path: s.filename,
+      files,
+      ...(adjustedDurations.length > 0 ? { adjustedDurations } : {}),
+      ...(adjustedBackgroundOpacity.length > 0 ? { adjustedBackgroundOpacity } : {}),
+      ...(alphaDropped > 0 ? { alphaDropped } : {}),
+    };
   }
 
   if (op === "save_as") {
-    const files = saveSprite(studio, s, String(need(args.path, "path")));
-    return { sprite: displayName(s), id: s.id, path: s.filename, files };
+    const { files, adjustedDurations, adjustedBackgroundOpacity, alphaDropped } = saveSprite(studio, s, String(need(args.path, "path")));
+    return {
+      sprite: displayName(s),
+      id: s.id,
+      path: s.filename,
+      files,
+      ...(adjustedDurations.length > 0 ? { adjustedDurations } : {}),
+      ...(adjustedBackgroundOpacity.length > 0 ? { adjustedBackgroundOpacity } : {}),
+      ...(alphaDropped > 0 ? { alphaDropped } : {}),
+    };
   }
 
   if (op === "close") {

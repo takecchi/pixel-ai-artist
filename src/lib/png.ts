@@ -1,5 +1,5 @@
 import { crc32, deflateSync, inflateSync } from "node:zlib";
-import type { Image } from "../doc/model.js";
+import { Image } from "../doc/model.js";
 import { fromRgbaBytes, toRgbaBytes } from "./image.js";
 
 const SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
@@ -122,6 +122,23 @@ function unfilter(data: Uint8Array, pos: number, rowBytes: number, height: numbe
 }
 
 export function decodePng(bytes: Uint8Array): Image {
+  const { width, height, data } = decodeRaw(bytes);
+  return fromRgbaBytes(width, height, data);
+}
+
+/**
+ * A palette PNG as its palette indices, one per pixel value of the Image, and
+ * its PLTE with tRNS alphas; null for other colour types.
+ */
+export function decodeIndexedPng(bytes: Uint8Array): { image: Image; palette: number[] } | null {
+  const { width, height, indices } = decodeRaw(bytes);
+  if (!indices) return null;
+  const image = new Image(width, height);
+  image.pixels.set(indices);
+  return { image, palette: decodePngPalette(bytes)! };
+}
+
+function decodeRaw(bytes: Uint8Array): { width: number; height: number; data: Uint8Array; indices: Uint8Array | null } {
   if (bytes.length < 8 || SIGNATURE.some((v, i) => bytes[i] !== v)) {
     throw new Error("not a PNG: bad signature");
   }
@@ -252,6 +269,7 @@ export function decodePng(bytes: Uint8Array): Image {
   }
 
   const data = new Uint8Array(width * height * 4);
+  const indices = colorType === 3 ? new Uint8Array(width * height) : null;
   const maxSample = (1 << depth) - 1;
   let rawPos = 0;
   for (let p = 0; p < passes.length; p++) {
@@ -278,6 +296,7 @@ export function decodePng(bytes: Uint8Array): Image {
           const v = sample(y, n);
           if (v * 4 >= palette.length) throw new Error(`palette index ${v} is outside the ${palette.length / 4}-color palette`);
           data.set(palette.subarray(v * 4, v * 4 + 4), o);
+          indices![o / 4] = v;
         } else if (colorType === 0 || colorType === 4) {
           const v = sample(y, n);
           const g = to8(v);
@@ -297,7 +316,7 @@ export function decodePng(bytes: Uint8Array): Image {
     }
   }
 
-  return fromRgbaBytes(width, height, data);
+  return { width, height, data, indices };
 }
 
 /**

@@ -130,6 +130,19 @@ export function registerAssetTools(server: McpServer, studio: Studio): void {
         frameCount: z.number().int().optional(),
         frame: z.number().int().optional().describe("Which frame a single-frame export wrote. Defaults to the active frame, which is not always the one you drew on."),
         atlas: z.string().nullish().optional(),
+        adjustedDurations: z
+          .array(z.object({ frame: z.number().int(), from: z.number(), to: z.number().int() }))
+          .optional()
+          .describe("Op 'aseprite': frame durations brought into the format's 1..65535 ms."),
+        adjustedBackgroundOpacity: z
+          .array(z.object({ layer: z.string(), from: z.number().int(), to: z.literal(255) }))
+          .optional()
+          .describe("Op 'aseprite': Background layers whose opacity was written as 255, because Aseprite ignores a Background's opacity when it reads the file."),
+        alphaDropped: z
+          .number()
+          .int()
+          .optional()
+          .describe("Ops 'gif' and 'frames': pixels written opaque with their colour kept, because a visible Background leaves PNG and GIF with no transparency (as Aseprite's PNG saver drops alpha). A Background below 255 opacity and holes in it come out solid."),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
     },
@@ -139,7 +152,11 @@ export function registerAssetTools(server: McpServer, studio: Studio): void {
           expect: ["files"],
         });
         const files = (data.files as string[]) ?? [];
-        return ok(data, `Wrote ${files.length} file(s): ${files.join(", ")}`);
+        const durations = ((data.adjustedDurations as unknown[] | undefined) ?? []).length > 0 ? " Some frame durations were brought into 1..65535 ms (adjustedDurations)." : "";
+        const background = (data.adjustedBackgroundOpacity as { layer: string; from: number }[] | undefined) ?? [];
+        const backgrounds = background.length > 0 ? ` Background opacity was written as 255 (Aseprite ignores it): ${background.map((b) => `'${b.layer}' ${b.from}`).join(", ")} (adjustedBackgroundOpacity).` : "";
+        const dropped = typeof data.alphaDropped === "number" ? ` ${data.alphaDropped} pixel(s) written opaque because a visible Background leaves the file no transparency (alphaDropped).` : "";
+        return ok(data, `Wrote ${files.length} file(s): ${files.join(", ")}${durations}${backgrounds}${dropped}`);
       } catch (err) {
         return fail(err);
       }

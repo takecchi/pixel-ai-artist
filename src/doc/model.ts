@@ -13,6 +13,7 @@
  */
 
 import { deltaE, rgbToLab } from "../lib/color.js";
+import type { AseUserData } from "../lib/ase.js";
 import { presets } from "../lib/palettes.js";
 import { ToolError } from "./errors.js";
 
@@ -107,6 +108,8 @@ export interface Cel {
   image: Image;
   /** 0–255. */
   opacity: number;
+  /** What an opened .aseprite carried for this cel and the model does not use, written back on save. */
+  aseprite?: { userData?: AseUserData; extra?: Uint8Array };
 }
 
 export interface Layer {
@@ -119,6 +122,27 @@ export interface Layer {
   opacity: number;
   /** Set on layers made by reference op 'import'; the name says nothing, since import takes any. */
   reference?: true;
+  /**
+   * Aseprite's Background layer: composited before the other layers, an
+   * indexed sprite's transparent index shows as its palette colour on it, and
+   * while it is visible a saved PNG or GIF has no transparency.
+   */
+  background?: true;
+  /**
+   * What an opened .aseprite carried for this layer and the model does not
+   * use, written back on save. `referenceFlag` is Aseprite's own reference
+   * layer flag; the user data text here never holds the reference mark.
+   */
+  aseprite?: {
+    lockMovement?: boolean;
+    preferLinkedCels?: boolean;
+    collapsed?: boolean;
+    referenceFlag?: boolean;
+    /** How the reference mark line ended in the file, and what separated it from the line before when it was last; kept to write it back the same. */
+    markLineEnds?: { end: string; sep: string };
+    otherFlags?: number;
+    userData?: AseUserData;
+  };
   /** Keyed by 1-based frame number. */
   cels: Map<number, Cel>;
 }
@@ -138,6 +162,8 @@ export interface Tag {
   /** 0 = forever. */
   repeats: number;
   color: Rgba;
+  /** An opened .aseprite tag's user data text and properties, written back on save. */
+  aseprite?: { userData?: AseUserData };
 }
 
 /** One byte per canvas pixel, non-zero = selected. */
@@ -171,6 +197,13 @@ export interface Sprite {
   activeFrame: number;
   /** Next value for `Layer.id`. */
   nextLayerId: number;
+  /** What an opened .aseprite carried for the whole sprite and the model does not use, written back on save. */
+  aseprite?: {
+    userData?: AseUserData;
+    colorProfile?: Uint8Array;
+    externalFiles?: Uint8Array;
+    grid?: { x: number; y: number; w: number; h: number };
+  };
 }
 
 /** What results call a sprite: its file's base name, "Sprite" until it has one. */
@@ -187,24 +220,26 @@ export function transparentPixel(s: Sprite): number {
 /**
  * What a raw pixel looks like. An indexed pixel is its palette colour, always
  * opaque — the alpha in a palette entry does not reach indexed pixels, and an
- * index past the palette's end is no paint.
+ * index past the palette's end is no paint. On an indexed Background `layer`
+ * the transparent index is paint too, its palette colour, as Aseprite renders
+ * it. This is the only place that rule lives.
  */
-export function pixelToRgba(s: Sprite, value: number): Rgba {
+export function pixelToRgba(s: Sprite, value: number, layer?: Layer): Rgba {
   if (s.colorMode !== "indexed") return value >>> 0;
-  if (value === s.transparentIndex || value >= s.palette.length) return TRANSPARENT;
+  if (value >= s.palette.length) return TRANSPARENT;
+  if (value === s.transparentIndex && !layer?.background) return TRANSPARENT;
   return ((s.palette[value]! & 0xffffff00) | 255) >>> 0;
 }
 
 /** `pixelToRgba` as hex; null where there is no paint. Grayscale never shows its alpha. */
-export function pixelToHex(s: Sprite, value: number): string | null {
-  const c = pixelToRgba(s, value);
+export function pixelToHex(s: Sprite, value: number, layer?: Layer): string | null {
+  const c = pixelToRgba(s, value, layer);
   if ((c & 255) === 0) return null;
   return rgbaToHex(c, s.colorMode === "rgb");
 }
 
-export function isOpaque(s: Sprite, value: number): boolean {
-  if (s.colorMode === "indexed") return value !== s.transparentIndex && value < s.palette.length;
-  return (value & 255) !== 0;
+export function isOpaque(s: Sprite, value: number, layer?: Layer): boolean {
+  return (pixelToRgba(s, value, layer) & 255) !== 0;
 }
 
 /**

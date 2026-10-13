@@ -260,10 +260,16 @@ export class Studio {
    * source-over. `layers` restricts which layers take part (visibility still
    * applies unless `includeHidden`).
    */
-  composite(sprite: Sprite, frame: number, opts: { layers?: readonly Layer[]; includeHidden?: boolean } = {}): Image {
+  composite(
+    sprite: Sprite,
+    frame: number,
+    opts: { layers?: readonly Layer[]; includeHidden?: boolean } = {},
+  ): Image {
     const out = new Image(sprite.width, sprite.height);
     const only = opts.layers ? new Set(opts.layers.map((l) => l.id)) : null;
-    for (const layer of sprite.layers) {
+    // Aseprite draws Background layers first, wherever they sit in the stack.
+    const order = [...sprite.layers.filter((l) => l.background), ...sprite.layers.filter((l) => !l.background)];
+    for (const layer of order) {
       if (only && !only.has(layer.id)) continue;
       if (!layer.visible && !opts.includeHidden) continue;
       const cel = layer.cels.get(frame);
@@ -275,7 +281,8 @@ export class Studio {
           const ty = cel.y + y;
           if (!out.contains(tx, ty)) continue;
           const i = ty * out.width + tx;
-          out.pixels[i] = over(out.pixels[i]!, pixelToRgba(sprite, cel.image.pixels[y * cel.image.width + x]!), opacity);
+          const value = cel.image.pixels[y * cel.image.width + x]!;
+          out.pixels[i] = over(out.pixels[i]!, pixelToRgba(sprite, value, layer), opacity);
         }
       }
     }

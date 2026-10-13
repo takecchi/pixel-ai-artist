@@ -4,6 +4,10 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { crc32, deflateSync } from "node:zlib";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { createServer } from "../dist/server.js";
 import { Image, ToolError, createStudio, rgba } from "../dist/doc/index.js";
 import { encodeGif, decodeGif } from "../dist/lib/gif.js";
 import { decodePng, encodePng } from "../dist/lib/png.js";
@@ -94,7 +98,7 @@ test("open resolves a relative path against the working directory and reports it
   });
 });
 
-test("open keeps an animated GIF's frame count and durations, and gives a zero delay 100 ms", async () => {
+test("open keeps an animated GIF's frame count and durations, and gives a zero delay 1 ms, as Aseprite does", async () => {
   await inTempDir(async (dir) => {
     const file = path.join(dir, "walk.gif");
     const bytes = encodeGif([
@@ -112,11 +116,13 @@ test("open keeps an animated GIF's frame count and durations, and gives a zero d
     const opened = await manage(studio, { op: "open", path: file });
     assert.equal(opened.sprite, "walk.gif");
     const sprite = studio.activeSprite()!;
-    assert.deepEqual(sprite.frames.map((f) => f.durationMs), [40, 100, 250]);
+    assert.deepEqual(sprite.frames.map((f) => f.durationMs), [40, 1, 250]);
     const cels = sprite.layers[0]!.cels;
     assert.deepEqual([...cels.keys()], [1, 2, 3]);
-    assert.deepEqual([...cels.get(2)!.image.pixels], [BLUE, RED]);
-    assert.deepEqual((await studio.call<Reply>("sprite.info")).frames.map((f: Reply) => f.durationMs), [40, 100, 250]);
+    // A GIF with only a global colour table opens indexed, so the cel holds palette indices.
+    assert.equal(sprite.colorMode, "indexed");
+    assert.deepEqual([...cels.get(2)!.image.pixels].map((i) => sprite.palette[i]), [BLUE, RED]);
+    assert.deepEqual((await studio.call<Reply>("sprite.info")).frames.map((f: Reply) => f.durationMs), [40, 1, 250]);
   });
 });
 
@@ -196,16 +202,137 @@ test("open answers io_error for a missing file or one that is not an image, and 
   });
 });
 
-test("open answers unsupported_command for an .aseprite file, whatever its name, and opens nothing", async () => {
+test("open reads an .aseprite file, whatever its name, and a header with nothing after it is io_error", async () => {
   await inTempDir(async (dir) => {
-    const file = path.join(dir, "art.png");
+    const source = await drawn([RED, GREEN]);
+    const real = path.join(dir, "art.aseprite");
+    await manage(source.studio, { op: "save_as", path: real });
+    const disguised = path.join(dir, "art.png");
+    writeFileSync(disguised, readFileSync(real));
+    const studio = createStudio();
+    const opened = await manage(studio, { op: "open", path: disguised });
+    assert.deepEqual([opened.sprite, opened.width, opened.height], ["art.png", 2, 1]);
+    assert.deepEqual([...studio.activeSprite()!.layers[0]!.cels.get(1)!.image.pixels], [RED, GREEN]);
+
     const header = new Uint8Array(128);
     header[4] = 0xe0;
     header[5] = 0xa5;
-    writeFileSync(file, header);
+    const empty = path.join(dir, "empty.aseprite");
+    writeFileSync(empty, header);
+    await rejectsWith(manage(studio, { op: "open", path: empty }), "io_error");
+    assert.equal(studio.sprites().length, 1);
+  });
+});
+
+test("open names an opened image's layer Background when it has no transparency, and Layer when it has", async () => {
+  await inTempDir(async (dir) => {
+    const opaque = fileURLPath("./fixtures/jpeg/baseline-444.jpg");
+    const clear = writePng(path.join(dir, "clear.png"), img(2, 1, [RED, 0]));
     const studio = createStudio();
-    await rejectsWith(manage(studio, { op: "open", path: file }), "unsupported_command", /aseprite/i);
-    assert.equal(studio.sprites().length, 0);
+    await manage(studio, { op: "open", path: opaque });
+    assert.equal(studio.activeSprite()!.layers[0]!.name, "Background");
+    await manage(studio, { op: "open", path: clear });
+    assert.equal(studio.activeSprite()!.layers[0]!.name, "Layer");
+  });
+});
+
+/** A palette PNG of 8-bit indices; `trns` adds a tRNS chunk. */
+function indexedPng(width: number, height: number, plte: number[][], indices: number[], trns?: number[]): Uint8Array {
+  const chunk = (type: string, body: number[] | Uint8Array): Uint8Array => {
+    const out = new Uint8Array(12 + body.length);
+    const view = new DataView(out.buffer);
+    view.setUint32(0, body.length);
+    for (let i = 0; i < 4; i++) out[4 + i] = type.charCodeAt(i);
+    out.set(body, 8);
+    view.setUint32(8 + body.length, crc32(out.subarray(4, 8 + body.length)));
+    return out;
+  };
+  const ihdr = new Uint8Array(13);
+  const view = new DataView(ihdr.buffer);
+  view.setUint32(0, width);
+  view.setUint32(4, height);
+  ihdr[8] = 8;
+  ihdr[9] = 3;
+  const rows = Array.from({ length: height }, (_, y) => [0, ...indices.slice(y * width, (y + 1) * width)]);
+  const parts = [
+    Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a),
+    chunk("IHDR", ihdr),
+    chunk("PLTE", plte.flat()),
+    ...(trns ? [chunk("tRNS", trns)] : []),
+    chunk("IDAT", deflateSync(Uint8Array.from(rows.flat()))),
+    chunk("IEND", []),
+  ];
+  return Uint8Array.from(parts.flatMap((p) => [...p]));
+}
+
+const BLACK = rgba(0, 0, 0);
+
+test("open of an indexed PNG with no transparency makes a Background layer, and index 0 shows as an opaque colour", async () => {
+  await inTempDir(async (dir) => {
+    const file = path.join(dir, "opaque.png");
+    writeFileSync(file, indexedPng(2, 1, [[0, 0, 0], [255, 0, 0]], [0, 1]));
+    const studio = createStudio();
+    await manage(studio, { op: "open", path: file });
+    const sprite = studio.activeSprite()!;
+    assert.deepEqual([sprite.colorMode, sprite.layers[0]!.background], ["indexed", true]);
+    assert.deepEqual([...studio.composite(sprite, 1).pixels], [BLACK, RED]);
+    const read = await studio.call<Reply>("pixels.read", {});
+    assert.deepEqual([read.colors, read.grid], [["#00000000", "#000000", "#ff0000"], [1, 2]]);
+  });
+});
+
+test("an indexed Background's transparent index is written as its palette colour by export png and by save_as alike", async () => {
+  await inTempDir(async (dir) => {
+    const file = path.join(dir, "opaque.png");
+    writeFileSync(file, indexedPng(2, 1, [[0, 0, 0], [255, 0, 0]], [0, 1]));
+    const studio = createStudio();
+    await manage(studio, { op: "open", path: file });
+    const exported = path.join(dir, "exported.png");
+    await studio.call("export.run", { op: "png", path: exported });
+    assert.deepEqual([...readPng(exported).pixels], [BLACK, RED]);
+    const saved = path.join(dir, "saved.png");
+    await manage(studio, { op: "save_as", path: saved });
+    assert.deepEqual([...readPng(saved).pixels], [BLACK, RED]);
+  });
+});
+
+test("open of an indexed PNG with a fully transparent tRNS entry makes no Background, and that index is clear", async () => {
+  await inTempDir(async (dir) => {
+    const file = path.join(dir, "clear.png");
+    writeFileSync(file, indexedPng(2, 1, [[0, 0, 0], [255, 0, 0]], [0, 1], [0]));
+    const studio = createStudio();
+    await manage(studio, { op: "open", path: file });
+    const sprite = studio.activeSprite()!;
+    assert.equal(sprite.layers[0]!.background, undefined);
+    assert.equal(sprite.transparentIndex, 0);
+    assert.deepEqual([...studio.composite(sprite, 1).pixels], [0, RED]);
+  });
+});
+
+test("open of a GIF with only a global colour table and no transparent index makes a Background, and the background colour index shows as a colour", async () => {
+  await inTempDir(async (dir) => {
+    const file = path.join(dir, "opaque.gif");
+    // The encoder's table starts with the first colour used and the logical screen's background index is 0, so RED is index 0.
+    writeFileSync(file, encodeGif([{ image: img(2, 1, [RED, BLUE]), durationMs: 100 }]));
+    const studio = createStudio();
+    await manage(studio, { op: "open", path: file });
+    const sprite = studio.activeSprite()!;
+    assert.deepEqual([sprite.colorMode, sprite.transparentIndex, sprite.layers[0]!.background], ["indexed", 0, true]);
+    assert.deepEqual([...studio.composite(sprite, 1).pixels], [RED, BLUE]);
+    const read = await studio.call<Reply>("pixels.read", {});
+    assert.deepEqual(read.grid, [1, 2]);
+  });
+});
+
+test("open of a GIF with a transparent index makes no Background, and that index is clear", async () => {
+  await inTempDir(async (dir) => {
+    const file = path.join(dir, "clear.gif");
+    writeFileSync(file, encodeGif([{ image: img(2, 1, [RED, 0]), durationMs: 100 }]));
+    const studio = createStudio();
+    await manage(studio, { op: "open", path: file });
+    const sprite = studio.activeSprite()!;
+    assert.equal(sprite.layers[0]!.background, undefined);
+    assert.deepEqual([...studio.composite(sprite, 1).pixels], [RED, 0]);
   });
 });
 
@@ -335,10 +462,10 @@ test("save_as creates the missing directories of the path", async () => {
   });
 });
 
-test("save_as of .jpg, .aseprite or no extension answers unsupported_command, writes nothing and keeps the filename", async () => {
+test("save_as of .jpg or no extension answers unsupported_command, writes nothing and keeps the filename", async () => {
   await inTempDir(async (dir) => {
     const { studio, sprite } = await drawn([RED, GREEN]);
-    for (const name of ["x.jpg", "x.aseprite", "x"]) {
+    for (const name of ["x.jpg", "x"]) {
       await rejectsWith(manage(studio, { op: "save_as", path: path.join(dir, name) }), "unsupported_command");
       assert.equal(existsSync(path.join(dir, name)), false, name);
       assert.equal(sprite.filename, null, name);
@@ -384,5 +511,49 @@ test("save after save_as overwrites that file with what was drawn since", async 
     assert.equal(reply.path, file);
     assert.deepEqual([...readPng(file).pixels], [BLUE, GREEN]);
     assert.equal(sprite.modified, false);
+  });
+});
+
+async function connected() {
+  const { server, studio } = createServer();
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const client = new Client({ name: "test", version: "0" });
+  await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
+  return { client, studio, close: async () => { await server.close(); } };
+}
+
+const textOf = (result: { content?: unknown }): string => ((result.content as { type: string; text?: string }[]).find((c) => c.type === "text")?.text) ?? "";
+
+test("sprite_manage save and save_as to .aseprite name adjustedBackgroundOpacity in the reply and its text", async () => {
+  await inTempDir(async (dir) => {
+    const { client, studio, close } = await connected();
+    const bg = studio.addSprite({ width: 1, height: 1 });
+    bg.layers[0]!.name = "Backdrop";
+    bg.layers[0]!.background = true;
+    bg.layers[0]!.opacity = 30;
+    const file = path.join(dir, "bg.aseprite");
+    const saveAs = await client.callTool({ name: "sprite_manage", arguments: { op: "save_as", path: file } });
+    assert.ok(!saveAs.isError, textOf(saveAs));
+    assert.deepEqual((saveAs.structuredContent as Record<string, any>).adjustedBackgroundOpacity, [{ layer: "Backdrop", from: 30, to: 255 }]);
+    assert.match(textOf(saveAs), /Background opacity was written as 255 .*'Backdrop' 30.*\(adjustedBackgroundOpacity\)/);
+    bg.layers[0]!.opacity = 200;
+    const save = await client.callTool({ name: "sprite_manage", arguments: { op: "save" } });
+    assert.deepEqual((save.structuredContent as Record<string, any>).adjustedBackgroundOpacity, [{ layer: "Backdrop", from: 200, to: 255 }]);
+    assert.match(textOf(save), /'Backdrop' 200/);
+    await close();
+  });
+});
+
+test("sprite_manage save_as to .png says nothing of Background opacity", async () => {
+  await inTempDir(async (dir) => {
+    const { client, studio, close } = await connected();
+    const sprite = studio.addSprite({ width: 1, height: 1 });
+    sprite.layers[0]!.background = true;
+    sprite.layers[0]!.opacity = 30;
+    const res = await client.callTool({ name: "sprite_manage", arguments: { op: "save_as", path: path.join(dir, "bg.png") } });
+    assert.ok(!res.isError, textOf(res));
+    assert.equal("adjustedBackgroundOpacity" in (res.structuredContent as object), false);
+    assert.doesNotMatch(textOf(res), /Background opacity/);
+    await close();
   });
 });

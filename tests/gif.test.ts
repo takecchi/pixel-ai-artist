@@ -395,6 +395,74 @@ test("decodeGif rejects data whose signature is not GIF87a or GIF89a", () => {
   assert.equal(decodeGif(ok).frames.length, 1);
 });
 
+const COLOR_TABLE = [0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255];
+const LOCAL_FLAGS = 0x81;
+
+function frameWithLocalTable(pixels: number[], table: number[]): number[] {
+  return [0x2c, ...u16(0), ...u16(0), ...u16(2), ...u16(2), LOCAL_FLAGS, ...table, ...lzwLiteral(pixels)];
+}
+
+function screen(packed: number, background: number, table: number[]): number[] {
+  return [...Array.from("GIF89a", (c) => c.charCodeAt(0)), ...u16(2), ...u16(2), packed, background, 0, ...table];
+}
+
+test("decodeGif returns the global colour table as opaque 0xRRGGBBAA words", () => {
+  const d = decodeGif(handGif([HAND_HEADER, gce(1, 1, -1), frame(0, 0, 4, 4, new Array(16).fill(1)), [0x3b]]));
+  assert.deepEqual(d.globalPalette, [0x000000ff, 0xff0000ff, 0x00ff00ff, 0x0000ffff]);
+});
+
+test("decodeGif returns a null global palette when the screen has no global colour table", () => {
+  const gif = handGif([screen(0, 0, []), gce(1, 1, -1), frameWithLocalTable([0, 1, 2, 3], COLOR_TABLE), [0x3b]]);
+  assert.equal(decodeGif(gif).globalPalette, null);
+});
+
+test("decodeGif returns the logical screen's background colour index", () => {
+  const gif = handGif([screen(0x81, 2, COLOR_TABLE), gce(1, 1, -1), frame(0, 0, 2, 2, [0, 1, 2, 3]), [0x3b]]);
+  assert.equal(decodeGif(gif).backgroundIndex, 2);
+  assert.equal(decodeGif(handGif([HAND_HEADER, frame(0, 0, 4, 4, new Array(16).fill(1)), [0x3b]])).backgroundIndex, 0);
+});
+
+test("decodeGif returns the first frame's transparent colour index, or -1 without one", () => {
+  const body = (g: number[]): Uint8Array => handGif([screen(0x81, 0, COLOR_TABLE), g, frame(0, 0, 2, 2, [0, 1, 2, 3]), [0x3b]]);
+  assert.equal(decodeGif(body(gce(1, 1, 2))).transparentIndex, 2);
+  assert.equal(decodeGif(body(gce(1, 1, -1))).transparentIndex, -1);
+  assert.equal(decodeGif(body([])).transparentIndex, -1);
+});
+
+test("decodeGif ignores the transparent colour index of frames after the first", () => {
+  const gif = handGif([
+    screen(0x81, 0, COLOR_TABLE),
+    gce(1, 1, -1), frame(0, 0, 2, 2, [0, 1, 2, 3]),
+    gce(1, 1, 3), frame(0, 0, 2, 2, [0, 1, 2, 3]),
+    [0x3b],
+  ]);
+  assert.equal(decodeGif(gif).transparentIndex, -1);
+});
+
+test("decodeGif reports whether any frame carries its own colour table", () => {
+  const plain = handGif([HAND_HEADER, gce(1, 1, -1), frame(0, 0, 2, 2, [0, 1, 2, 3]), [0x3b]]);
+  assert.equal(decodeGif(plain).localColorTables, false);
+  const second = handGif([
+    HAND_HEADER,
+    gce(1, 1, -1), frame(0, 0, 2, 2, [0, 1, 2, 3]),
+    gce(1, 1, -1), frameWithLocalTable([0, 1, 2, 3], COLOR_TABLE),
+    [0x3b],
+  ]);
+  assert.equal(decodeGif(second).localColorTables, true);
+});
+
+test("decodeGif gives a frame with no graphic control extension a duration of 10 ms", () => {
+  const gif = handGif([
+    HAND_HEADER,
+    frame(0, 0, 2, 2, [0, 1, 2, 3]),
+    gce(1, 0, -1), frame(0, 0, 2, 2, [0, 1, 2, 3]),
+    gce(1, 4, -1), frame(0, 0, 2, 2, [0, 1, 2, 3]),
+    frame(0, 0, 2, 2, [0, 1, 2, 3]),
+    [0x3b],
+  ]);
+  assert.deepEqual(decodeGif(gif).frames.map((f) => f.durationMs), [10, 0, 40, 10]);
+});
+
 test("decodeGif rejects screens wider or taller than 16384 with RangeError", () => {
   const mk = (w: number, h: number): Uint8Array =>
     handGif([Array.from("GIF89a", (c) => c.charCodeAt(0)), u16(w), u16(h), [0, 0, 0], [0x3b]]);

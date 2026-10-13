@@ -41,7 +41,7 @@ function celCanvas(sprite: Sprite, layer: Layer, frame: number, celOpacity = fal
   if (!cel) return out;
   for (let y = 0; y < cel.image.height; y++) {
     for (let x = 0; x < cel.image.width; x++) {
-      const c = pixelToRgba(sprite, cel.image.get(x, y));
+      const c = pixelToRgba(sprite, cel.image.get(x, y), layer);
       out.set(cel.x + x, cel.y + y, celOpacity ? over(TRANSPARENT, c, cel.opacity) : c);
     }
   }

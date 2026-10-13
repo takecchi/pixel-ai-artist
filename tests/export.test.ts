@@ -4,7 +4,11 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { createServer } from "../dist/server.js";
 import { Image, ToolError, createStudio, rgba } from "../dist/doc/index.js";
+import { decodeAse } from "../dist/lib/ase.js";
 import { decodeGif } from "../dist/lib/gif.js";
 import { decodePng } from "../dist/lib/png.js";
 
@@ -248,15 +252,35 @@ test("png with a frame outside 1..frameCount is invalid_args and writes nothing"
 
 // ── aseprite ────────────────────────────────────────────────────────────
 
-test("aseprite with layers or tags is invalid_args, and otherwise unsupported_command", async () => {
+test("aseprite with layers or tags is invalid_args, and so is a path that is not .aseprite or .ase", async () => {
   await inTempDir(async (dir) => {
     const { studio } = await fixture();
     const file = path.join(dir, "x.aseprite");
     const whole = /'aseprite' saves the whole document; `layers` and `tags` apply to png, gif, frames and spritesheet\./;
     await rejectsWith(run(studio, { op: "aseprite", path: file, layers: ["Back"] }), "invalid_args", whole);
     await rejectsWith(run(studio, { op: "aseprite", path: file, tags: ["walk"] }), "invalid_args", whole);
-    await rejectsWith(run(studio, { op: "aseprite", path: file }), "unsupported_command");
+    await rejectsWith(run(studio, { op: "aseprite", path: path.join(dir, "x.png") }), "invalid_args", /\.aseprite or \.ase/);
+    await rejectsWith(run(studio, { op: "aseprite", path: path.join(dir, "x") }), "invalid_args");
     assert.deepEqual(readdirSync(dir), []);
+  });
+});
+
+test("aseprite writes every layer, hidden ones too, with frames and tags, to an .aseprite or .ase path", async () => {
+  await inTempDir(async (dir) => {
+    const { studio, sprite } = await fixture();
+    const modified = sprite.modified;
+    for (const name of ["a.aseprite", "b.ase"]) {
+      const file = path.join(dir, name);
+      const reply = await run(studio, { op: "aseprite", path: file });
+      assert.deepEqual(reply.files, [file]);
+      assert.equal(reply.op, "aseprite");
+      const written = decodeAse(new Uint8Array(readFileSync(file)));
+      assert.deepEqual(written.layers.map((l) => [l.name, l.visible, l.opacity]), [["Back", true, 255], ["Front", true, 128], ["Ghost", false, 255]]);
+      assert.deepEqual(written.frames.map((f) => f.durationMs), [100, 200, 300]);
+      assert.deepEqual(written.tags.map((t) => [t.name, t.from, t.to]), [["walk", 0, 1], ["idle", 2, 2], ["late", 1, 2]]);
+    }
+    assert.equal(sprite.filename, null);
+    assert.equal(sprite.modified, modified);
   });
 });
 
@@ -524,5 +548,46 @@ test("a visible reference layer is drawn into an export like any other layer, an
     ref.visible = false;
     await run(studio, { op: "png", path: path.join(dir, "hidden.png") });
     assert.deepEqual([...readPng(path.join(dir, "hidden.png")).pixels], [RED, 0]);
+  });
+});
+
+async function connected() {
+  const { server, studio } = createServer();
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const client = new Client({ name: "test", version: "0" });
+  await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
+  return { client, studio, close: async () => { await server.close(); } };
+}
+
+const textOf = (result: { content?: unknown }): string => ((result.content as { type: string; text?: string }[]).find((c) => c.type === "text")?.text) ?? "";
+
+test("the export tool's reply text names adjustedDurations and adjustedBackgroundOpacity, and both are in the structured reply", async () => {
+  await inTempDir(async (dir) => {
+    const { client, studio, close } = await connected();
+    const { sprite } = await fixture(studio);
+    sprite.frames[1]!.durationMs = 70000;
+    sprite.layers[0]!.background = true;
+    sprite.layers[0]!.opacity = 90;
+    const file = path.join(dir, "a.aseprite");
+    const res = await client.callTool({ name: "export", arguments: { op: "aseprite", path: file } });
+    assert.ok(!res.isError, textOf(res));
+    const data = res.structuredContent as Reply;
+    assert.deepEqual(data.adjustedDurations, [{ frame: 2, from: 70000, to: 65535 }]);
+    assert.deepEqual(data.adjustedBackgroundOpacity, [{ layer: "Back", from: 90, to: 255 }]);
+    assert.match(textOf(res), /Wrote 1 file\(s\): .*a\.aseprite/);
+    assert.match(textOf(res), /frame durations were brought into 1\.\.65535 ms \(adjustedDurations\)/);
+    assert.match(textOf(res), /Background opacity was written as 255 .*'Back' 90.*\(adjustedBackgroundOpacity\)/);
+    await close();
+  });
+});
+
+test("the export tool's reply text says nothing of adjustments when none were made", async () => {
+  await inTempDir(async (dir) => {
+    const { client, studio, close } = await connected();
+    await fixture(studio);
+    const res = await client.callTool({ name: "export", arguments: { op: "aseprite", path: path.join(dir, "a.aseprite") } });
+    assert.ok(!res.isError, textOf(res));
+    assert.doesNotMatch(textOf(res), /adjusted/);
+    await close();
   });
 });

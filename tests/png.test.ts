@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { crc32, deflateSync } from "node:zlib";
-import { decodePng, encodePng } from "../dist/lib/png.js";
+import { decodeIndexedPng, decodePng, decodePngPalette, encodePng } from "../dist/lib/png.js";
 import { fromRgbaBytes, toRgbaBytes } from "../dist/lib/image.js";
 
 function chunk(type: string, body: number[] | Uint8Array): Uint8Array {
@@ -314,4 +314,38 @@ test("decodePng throws Error for a palette image without PLTE", () => {
 
 test("decodePng throws Error for an invalid filter type", () => {
   assert.throws(() => decodePng(buildPng(1, 1, 8, 0, [9, 0])), /filter type 9/);
+});
+
+const PLTE_COLORS = [[10, 20, 30], [40, 50, 60], [70, 80, 90], [100, 110, 120], [130, 140, 150]];
+const word = (c: number[], a = 255): number => ((c[0]! << 24) | (c[1]! << 16) | (c[2]! << 8) | a) >>> 0;
+
+for (const depth of [1, 2, 4, 8]) {
+  test(`decodeIndexedPng returns the palette numbers of a ${depth}-bit palette image as pixel values`, () => {
+    const colors = Math.min(1 << depth, 5);
+    const idx = [0, 1, 2, 3, 4, 4, 3, 2, 1, 0].map((v) => v % colors);
+    const png = buildPng(5, 2, depth, 3, packRows([idx.slice(0, 5), idx.slice(5)], depth), [chunk("PLTE", PLTE_COLORS.slice(0, colors).flat())]);
+    const got = decodeIndexedPng(png)!;
+    assert.equal(got.image.width, 5);
+    assert.equal(got.image.height, 2);
+    assert.deepEqual([...got.image.pixels], idx);
+  });
+}
+
+test("decodeIndexedPng returns every PLTE entry with its tRNS alpha, including entries no pixel uses", () => {
+  const png = buildPng(2, 1, 8, 3, packRows([[0, 1]], 8), [chunk("PLTE", PLTE_COLORS.flat()), chunk("tRNS", [0, 128])]);
+  const palette = decodeIndexedPng(png)!.palette;
+  assert.deepEqual(palette, [word(PLTE_COLORS[0]!, 0), word(PLTE_COLORS[1]!, 128), ...PLTE_COLORS.slice(2).map((c) => word(c))]);
+  assert.deepEqual(decodePngPalette(png), palette);
+});
+
+test("decodeIndexedPng returns null for every colour type but 3", () => {
+  assert.equal(decodeIndexedPng(buildPng(1, 1, 8, 0, [0, 5])), null);
+  assert.equal(decodeIndexedPng(buildPng(1, 1, 8, 2, [0, 1, 2, 3])), null);
+  assert.equal(decodeIndexedPng(buildPng(1, 1, 8, 4, [0, 1, 2])), null);
+  assert.equal(decodeIndexedPng(buildPng(1, 1, 8, 6, [0, 1, 2, 3, 4])), null);
+  assert.equal(decodeIndexedPng(encodePng(blank(2, 2, 0x01020304))), null);
+});
+
+test("decodePngPalette returns null for a PNG that is not a palette image", () => {
+  assert.equal(decodePngPalette(encodePng(blank(1, 1))), null);
 });

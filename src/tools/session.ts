@@ -143,7 +143,7 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
           .string()
           .optional()
           .describe(
-            "File path for 'open' (a PNG, GIF or JPEG, read by its content) and 'save_as' (.png — one file per frame, numbered as Aseprite numbers them, when there are several — or .gif in the sprite's palette).",
+            "File path for 'open' (.aseprite, PNG, GIF or JPEG, read by its content) and 'save_as' (.aseprite with every layer; .png — one file per frame, numbered as Aseprite numbers them, when there are several; or .gif). An .aseprite that uses layer groups, tilemaps, blend modes, z-index, slices or palette changes over time is refused. Layers that share a name open renamed with ' 2', ' 3' (reported in renamedLayers). An Aseprite reference layer, or one this server marked, opens as a reference layer here, but it is drawn and exported like any other layer: hide or remove it before exporting.",
           ),
         width: z.number().int().positive().optional(),
         height: z.number().int().positive().optional(),
@@ -185,6 +185,35 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
           .describe("For 'save' and 'save_as': every file written. A PNG of several frames is one numbered file per frame, none of them at `path`."),
         width: z.number().int().optional(),
         height: z.number().int().optional(),
+        renamedLayers: z
+          .array(z.object({ from: z.string(), to: z.string() }))
+          .optional()
+          .describe("Op 'open': layers that shared a name in the file and were renamed so each can be addressed."),
+        lostOnSave: z
+          .record(z.number().int())
+          .optional()
+          .describe("Op 'open': what the file holds that saving will not write back the same way, counted by kind (linkedCels are saved as separate images; layerUuids and unknownChunks are dropped)."),
+        skippedOnOpen: z
+          .record(z.number().int())
+          .optional()
+          .describe("Op 'open': what the file holds that was not read, as Aseprite does not read it either (cels linked to nothing or duplicated on one layer and frame; bytes after a frame's last chunk)."),
+        adjustedDurations: z
+          .array(z.object({ frame: z.number().int(), from: z.number(), to: z.number().int() }))
+          .optional()
+          .describe("Ops 'save'/'save_as' to .aseprite: frame durations brought into the format's 1..65535 ms."),
+        misplacedBackground: z
+          .array(z.string())
+          .optional()
+          .describe("Op 'open': Background layers that were moved down to the bottom of the stack, keeping their order; one that was already in place is not listed. Backgrounds are drawn first, so the picture is unchanged, and they stay at the bottom."),
+        adjustedBackgroundOpacity: z
+          .array(z.object({ layer: z.string(), from: z.number().int(), to: z.literal(255) }))
+          .optional()
+          .describe("Ops 'save'/'save_as' to .aseprite (and export op 'aseprite', which answers the same): Background layers whose opacity was written as 255, because Aseprite ignores a Background's opacity when it reads the file."),
+        alphaDropped: z
+          .number()
+          .int()
+          .optional()
+          .describe("Ops 'save'/'save_as' to .png or .gif: pixels written opaque with their colour kept, because a visible Background leaves PNG and GIF with no transparency (as Aseprite's PNG saver drops alpha). A Background below 255 opacity and holes in it come out solid."),
       },
       annotations: {
         readOnlyHint: false,
@@ -216,7 +245,18 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
         // is "Sprite" for every unsaved sprite at once, so an agent that feeds
         // the name straight back can address the wrong one.
         const hint = data.id === undefined ? "" : ` Refer to it as '#${String(data.id)}'.`;
-        return ok(merged, `${args.op}: ${String(data.sprite ?? "ok")}.${hint}`);
+        const renamed = (data.renamedLayers as { from: string; to: string }[] | undefined) ?? [];
+        const renames = renamed.length === 0 ? "" : ` Renamed layers that shared a name: ${renamed.map((r) => `'${r.from}' → '${r.to}'`).join(", ")}.`;
+        const kinds = (key: string) => Object.entries((data[key] as Record<string, number> | undefined) ?? {}).map(([k, n]) => `${k} ${n}`).join(", ");
+        const lost = kinds("lostOnSave") ? ` Saving will not keep: ${kinds("lostOnSave")}.` : "";
+        const skipped = kinds("skippedOnOpen") ? ` Not read from the file: ${kinds("skippedOnOpen")}.` : "";
+        const misplaced = (data.misplacedBackground as string[] | undefined) ?? [];
+        const misplacedNote = misplaced.length > 0 ? ` Moved these Background layers down to the bottom, where they are drawn: ${misplaced.map((n) => `'${n}'`).join(", ")}.` : "";
+        const dropped = typeof data.alphaDropped === "number" ? ` ${data.alphaDropped} pixel(s) written opaque because a visible Background leaves the file no transparency (alphaDropped).` : "";
+        const adjusted = ((data.adjustedDurations as unknown[] | undefined) ?? []).length > 0 ? " Some frame durations were brought into 1..65535 ms (adjustedDurations)." : "";
+        const background = (data.adjustedBackgroundOpacity as { layer: string; from: number }[] | undefined) ?? [];
+        const backgrounds = background.length > 0 ? ` Background opacity was written as 255 (Aseprite ignores it): ${background.map((b) => `'${b.layer}' ${b.from}`).join(", ")} (adjustedBackgroundOpacity).` : "";
+        return ok(merged, `${args.op}: ${String(data.sprite ?? "ok")}.${hint}${renames}${lost}${skipped}${misplacedNote}${adjusted}${backgrounds}${dropped}`);
       } catch (err) {
         return fail(err);
       }

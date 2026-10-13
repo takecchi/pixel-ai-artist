@@ -12,6 +12,14 @@ export interface DecodedGif {
   height: number;
   loop: number | null;
   frames: AnimationFrame[];
+  /** The global colour table as opaque 0xRRGGBBAA, null when there is none. */
+  globalPalette: number[] | null;
+  /** The logical screen's background colour index. */
+  backgroundIndex: number;
+  /** The first frame's transparent colour index, -1 when it has none. */
+  transparentIndex: number;
+  /** Whether any frame carries its own colour table. */
+  localColorTables: boolean;
 }
 
 const MAX_DIMENSION = 16384;
@@ -340,16 +348,23 @@ export function decodeGif(bytes: Uint8Array): DecodedGif {
   let width: number;
   let height: number;
   let globalTable: Uint8Array = new Uint8Array(0);
+  let hasGlobalTable = false;
+  let backgroundIndex = 0;
+  let transparentIndex = -1;
+  let localColorTables = false;
   try {
     width = r.u16();
     height = r.u16();
     const packed = r.u8();
-    r.u8();
+    backgroundIndex = r.u8();
     r.u8();
     if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
       throw new RangeError(`GIF ${width}x${height} exceeds ${MAX_DIMENSION}`);
     }
-    if (packed & 0x80) globalTable = r.take(3 * (2 << (packed & 7)));
+    if (packed & 0x80) {
+      globalTable = r.take(3 * (2 << (packed & 7)));
+      hasGlobalTable = true;
+    }
   } catch (e) {
     if (e instanceof Truncated) throw new Error("GIF header is truncated");
     throw e;
@@ -404,6 +419,7 @@ export function decodeGif(bytes: Uint8Array): DecodedGif {
       const fw = r.u16();
       const fh = r.u16();
       const packed = r.u8();
+      if (packed & 0x80) localColorTables = true;
       const table = packed & 0x80 ? r.take(3 * (2 << (packed & 7))) : globalTable;
       const minCode = r.u8();
       if (minCode < 1 || minCode > 8) throw new Error(`invalid LZW minimum code size ${minCode}`);
@@ -413,6 +429,7 @@ export function decodeGif(bytes: Uint8Array): DecodedGif {
 
       const disposal = gce?.disposal ?? 0;
       const transparent = gce?.transparent ?? -1;
+      if (frames.length === 0) transparentIndex = transparent;
       const saved = disposal === 3 ? canvas.slice() : null;
       const interlaced = (packed & 0x40) !== 0;
       const rowOrder: number[] = [];
@@ -442,7 +459,8 @@ export function decodeGif(bytes: Uint8Array): DecodedGif {
       }
       frames.push({
         image: fromRgbaBytes(width, height, canvas),
-        durationMs: (gce?.delay ?? 0) * 10,
+        // Aseprite gives a frame with no graphic control extension a delay of one centisecond.
+        durationMs: (gce ? gce.delay : 1) * 10,
       });
       if (disposal === 2) {
         for (let y = top; y < Math.min(height, top + fh); y++) {
@@ -458,5 +476,18 @@ export function decodeGif(bytes: Uint8Array): DecodedGif {
     if (!(e instanceof Truncated)) throw e;
   }
   if (frames.length === 0) throw new Error("GIF contains no readable frame");
-  return { width, height, loop, frames };
+  const globalPalette: number[] | null = [];
+  for (let i = 0; i + 2 < globalTable.length; i += 3) {
+    globalPalette.push(((globalTable[i]! << 24) | (globalTable[i + 1]! << 16) | (globalTable[i + 2]! << 8) | 255) >>> 0);
+  }
+  return {
+    width,
+    height,
+    loop,
+    frames,
+    globalPalette: hasGlobalTable ? globalPalette : null,
+    backgroundIndex,
+    transparentIndex,
+    localColorTables,
+  };
 }

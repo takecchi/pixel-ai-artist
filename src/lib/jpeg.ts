@@ -711,3 +711,22 @@ export function decodeJpeg(bytes: Uint8Array): Image {
   }
   return Image.from(width, height, pixels);
 }
+
+/** Whether the frame header declares one component, which Aseprite opens as a grayscale sprite. */
+export function isGrayscaleJpeg(bytes: Uint8Array): boolean {
+  for (let pos = 2; pos + 9 < bytes.length; ) {
+    if (bytes[pos] !== 0xff) return false;
+    const marker = bytes[pos + 1]!;
+    if (marker === 0xff) {
+      pos++;
+      continue;
+    }
+    if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) return bytes[pos + 9] === 1;
+    if (marker === 0xd8 || (marker >= 0xd0 && marker <= 0xd7) || marker === 0x01) {
+      pos += 2;
+      continue;
+    }
+    pos += 2 + ((bytes[pos + 2]! << 8) | bytes[pos + 3]!);
+  }
+  return false;
+}

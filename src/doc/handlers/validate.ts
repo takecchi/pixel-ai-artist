@@ -1,4 +1,4 @@
-import { displayName, isOpaque, pixelToHex, type Image, type Sprite } from "../model.js";
+import { displayName, isOpaque, pixelToHex, type Image, type Layer, type Sprite } from "../model.js";
 import { paletteStats } from "../stats.js";
 import type { HandlerTable, Studio } from "../studio.js";
 
@@ -29,8 +29,8 @@ function finding(
   list.push({ check, severity, message, ...present });
 }
 
-function cellIsEmpty(image: Image, sprite: Sprite): boolean {
-  return !image.pixels.some((v) => isOpaque(sprite, v));
+function cellIsEmpty(image: Image, sprite: Sprite, layer: Layer): boolean {
+  return !image.pixels.some((v) => isOpaque(sprite, v, layer));
 }
 
 function validateRun(studio: Studio, args: Record<string, unknown>) {
@@ -89,9 +89,9 @@ function validateRun(studio: Studio, args: Record<string, unknown>) {
         let first: { x: number; y: number } | undefined;
         for (let y = 0; y < img.height; y++) {
           for (let x = 0; x < img.width; x++) {
-            if (!isOpaque(sprite, img.get(x, y))) continue;
+            if (!isOpaque(sprite, img.get(x, y), layer)) continue;
             const neighbours = FOUR.filter(
-              ([dx, dy]) => img.contains(x + dx, y + dy) && isOpaque(sprite, img.get(x + dx, y + dy)),
+              ([dx, dy]) => img.contains(x + dx, y + dy) && isOpaque(sprite, img.get(x + dx, y + dy), layer),
             ).length;
             if (neighbours === 0) {
               strays++;
@@ -148,10 +148,10 @@ function validateRun(studio: Studio, args: Record<string, unknown>) {
           const counts = new Map<string, number>();
           for (let y = 0; y < img.height; y++) {
             for (let x = 0; x < img.width; x++) {
-              const hex = pixelToHex(sprite, img.get(x, y));
+              const hex = pixelToHex(sprite, img.get(x, y), layer);
               if (hex === null) continue;
               const exposed = FOUR.some(
-                ([dx, dy]) => !img.contains(x + dx, y + dy) || !isOpaque(sprite, img.get(x + dx, y + dy)),
+                ([dx, dy]) => !img.contains(x + dx, y + dy) || !isOpaque(sprite, img.get(x + dx, y + dy), layer),
               );
               if (!exposed) continue;
               counts.set(hex, (counts.get(hex) ?? 0) + 1);
@@ -202,8 +202,8 @@ function validateRun(studio: Studio, args: Record<string, unknown>) {
             let below: string | null = null;
             let runX = 0;
             for (let x = 0; x < img.width; x++) {
-              const a = pixelToHex(sprite, img.get(x, y));
-              const b = pixelToHex(sprite, img.get(x, y + 1));
+              const a = pixelToHex(sprite, img.get(x, y), layer);
+              const b = pixelToHex(sprite, img.get(x, y + 1), layer);
               if (a !== null && b !== null && a !== b && a === above && b === below) {
                 run++;
               } else {
@@ -280,7 +280,7 @@ function validateRun(studio: Studio, args: Record<string, unknown>) {
       }
       for (let fn = 1; fn <= sprite.frames.length; fn++) {
         const cel = layer.cels.get(fn);
-        const nonEmpty = cel !== undefined && !cellIsEmpty(cel.image, sprite);
+        const nonEmpty = cel !== undefined && !cellIsEmpty(cel.image, sprite, layer);
         if (inRange.has(fn)) {
           if (!nonEmpty) {
             finding(
@@ -318,8 +318,8 @@ function validateRun(studio: Studio, args: Record<string, unknown>) {
         for (let y = oy0; y < oy1 && !at; y++) {
           for (let x = ox0; x < ox1; x++) {
             if (
-              isOpaque(sprite, celA.image.get(x - celA.x, y - celA.y)) &&
-              isOpaque(sprite, celB.image.get(x - celB.x, y - celB.y))
+              isOpaque(sprite, celA.image.get(x - celA.x, y - celA.y), la) &&
+              isOpaque(sprite, celB.image.get(x - celB.x, y - celB.y), lb)
             ) {
               at = { x, y };
               break;

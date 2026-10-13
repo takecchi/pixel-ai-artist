@@ -45,6 +45,14 @@ function restack(sprite: Sprite, layer: Layer, index: unknown): void {
   const n = Math.floor(Number(index));
   if (!Number.isFinite(n)) throw new ToolError("invalid_args", `index must be a number, got ${String(index)}.`);
   const target = Math.min(Math.max(n, 1), sprite.layers.length) - 1;
+  // Backgrounds stay together at the bottom, where composite draws them first anyway, so the stack and the picture agree.
+  const backgrounds = sprite.layers.filter((l) => l !== layer && l.background).length;
+  if (layer.background && target > backgrounds) {
+    throw new ToolError("invalid_args", "The background layer cannot be moved.");
+  }
+  if (!layer.background && target < backgrounds) {
+    throw new ToolError("invalid_args", "You cannot move or copy something below the background layer.");
+  }
   sprite.layers.splice(sprite.layers.indexOf(layer), 1);
   sprite.layers.splice(target, 0, layer);
 }
@@ -72,7 +80,11 @@ function cloneCel(cel: Cel): Cel {
   return { ...cel, image: cel.image.clone() };
 }
 
-/** Aseprite's DuplicateLayer: a copy named "<name> Copy" directly above, with every cel. */
+/**
+ * Aseprite's DuplicateLayer: a copy named "<name> Copy" directly above, with
+ * every cel. The copy is never a Background, so a Background's copy goes
+ * above the whole Background block, which stays together at the bottom.
+ */
 function duplicateHere(studio: Studio, sprite: Sprite, layer: Layer): void {
   const active = sprite.activeLayerId;
   const copy = studio.addLayer(sprite, freeLayerName(sprite, `${layer.name} Copy`));
@@ -80,7 +92,8 @@ function duplicateHere(studio: Studio, sprite: Sprite, layer: Layer): void {
   if (layer.reference) copy.reference = true;
   for (const [frame, cel] of layer.cels) copy.cels.set(frame, cloneCel(cel));
   sprite.layers.pop();
-  sprite.layers.splice(sprite.layers.indexOf(layer) + 1, 0, copy);
+  const backgrounds = sprite.layers.filter((l) => l.background).length;
+  sprite.layers.splice(Math.max(sprite.layers.indexOf(layer) + 1, backgrounds), 0, copy);
   sprite.activeLayerId = active;
 }
 
@@ -101,7 +114,7 @@ function duplicateInto(studio: Studio, source: Sprite, layer: Layer, target: Spr
     // Pixels are raw colour-mode values; a sprite in another mode needs them re-encoded.
     const image = new Image(cel.image.width, cel.image.height);
     cel.image.pixels.forEach((v, i) => {
-      image.pixels[i] = rgbaToPixel(target, pixelToRgba(source, v));
+      image.pixels[i] = rgbaToPixel(target, pixelToRgba(source, v, layer));
     });
     copy.cels.set(frame, { x: cel.x, y: cel.y, image, opacity: 255 });
   }
@@ -127,7 +140,7 @@ function mergeDown(studio: Studio, sprite: Sprite, layer: Layer): void {
         const lx = upper.x + x - lower.x;
         const ly = upper.y + y - lower.y;
         if (!lower.image.contains(lx, ly)) continue;
-        const mixed = over(pixelToRgba(sprite, lower.image.get(lx, ly)), pixelToRgba(sprite, upper.image.get(x, y)), opacity);
+        const mixed = over(pixelToRgba(sprite, lower.image.get(lx, ly), below), pixelToRgba(sprite, upper.image.get(x, y), layer), opacity);
         lower.image.set(lx, ly, (mixed & 255) === 0 ? lower.image.get(lx, ly) : rgbaToPixel(sprite, mixed));
       }
     }
@@ -136,7 +149,13 @@ function mergeDown(studio: Studio, sprite: Sprite, layer: Layer): void {
   if (sprite.activeLayerId === layer.id) sprite.activeLayerId = below.id;
 }
 
-function applyOp(studio: Studio, sprite: Sprite, op: Op, duplicated: Duplicated[]): void {
+/** A Background whose opacity was set below 255: drawn faint here, but solid in PNG or GIF with it visible and 255 in .aseprite. */
+interface FaintBackground {
+  layer: string;
+  opacity: number;
+}
+
+function applyOp(studio: Studio, sprite: Sprite, op: Op, duplicated: Duplicated[], opacitySet: Set<number>): void {
   const kind = op.op;
   if (kind === "create") {
     let name: string;
@@ -188,7 +207,10 @@ function applyOp(studio: Studio, sprite: Sprite, op: Op, duplicated: Duplicated[
       if (op.newName !== undefined) refuseTaken(sprite, String(op.newName), layer);
       if (op.visible !== undefined) layer.visible = Boolean(op.visible);
       if (op.editable !== undefined) layer.editable = Boolean(op.editable);
-      if (op.opacity !== undefined) layer.opacity = opacityArg(op.opacity);
+      if (op.opacity !== undefined) {
+        layer.opacity = opacityArg(op.opacity);
+        opacitySet.add(layer.id);
+      }
       if (op.newName !== undefined) layer.name = String(op.newName);
       break;
     default:
@@ -212,18 +234,24 @@ function layerApply(studio: Studio, args: Record<string, unknown>) {
 
   const ops = batch ?? [args];
   const duplicated: Duplicated[] = [];
+  const opacitySet = new Set<number>();
   const undo = studio.sprites().map(snapshot);
   try {
-    for (const op of ops) applyOp(studio, sprite, op, duplicated);
+    for (const op of ops) applyOp(studio, sprite, op, duplicated, opacitySet);
   } catch (err) {
     for (const restore of undo) restore();
     throw err;
   }
   for (const target of new Set(duplicated.map((d) => d.toSprite))) studio.resolveSprite(target).modified = true;
+  // Built from where the batch ended, so a Background set back to 255, deleted, hidden or renamed later in it is reported as it is now.
+  const faint: FaintBackground[] = sprite.layers
+    .filter((l) => opacitySet.has(l.id) && l.background && l.visible && l.opacity < 255)
+    .map((l) => ({ layer: l.name, opacity: l.opacity }));
   return {
     ...report(studio, sprite),
     applied: ops.length,
     duplicated: duplicated.length > 0 ? duplicated : undefined,
+    faintBackground: faint.length > 0 ? faint : undefined,
   };
 }
 

@@ -5,7 +5,7 @@ import { encodePng } from "../../lib/png.js";
 import { buildSpriteSheet, type SheetTag, type SheetType } from "../../lib/spritesheet.js";
 import { packageVersion } from "../../lib/version.js";
 import { ToolError, need } from "../errors.js";
-import { writeBytes, writeFrames } from "../files.js";
+import { isAsepritePath, opaqueFrames, writeAseprite, writeBytes, writeFrames, type Written } from "../files.js";
 import { Image, channels, displayName, type Layer, type Rgba, type Sprite } from "../model.js";
 import type { HandlerTable, Studio } from "../studio.js";
 
@@ -134,6 +134,19 @@ function writeSheet(view: ExportView, s: Sprite, file: string, args: Record<stri
   return files;
 }
 
+/**
+ * gif and frames were saved from the sprite, or a copy of it, which keeps a
+ * Background; Aseprite writes those with no transparency. png and spritesheet
+ * are not passed through here: the Lua handler flattened png into a fresh
+ * sprite and Aseprite renders a sheet into a new texture, neither with a
+ * Background, so a hole in it stays transparent there even though
+ * sprite.manage save writes it opaque. What the Background itself shows is
+ * written as drawn on every path.
+ */
+function savedFrames(view: ExportView): { frames: AnimationFrame[]; alphaDropped: number } {
+  return view.layers.some((l) => l.background) ? opaqueFrames(view.frames) : { frames: view.frames, alphaDropped: 0 };
+}
+
 /** png and frames were saveCopyAs in the Lua handler: a GIF there keeps an RGB sprite's colours. */
 function ownPalette(s: Sprite): readonly Rgba[] {
   return s.colorMode === "indexed" ? s.palette : [];
@@ -148,6 +161,9 @@ function exportRun(studio: Studio, args: Record<string, unknown>) {
   let files: string[];
   let frame: number | undefined;
   let atlas: string | undefined;
+  let adjustedDurations: Written["adjustedDurations"] = [];
+  let adjustedBackgroundOpacity: Written["adjustedBackgroundOpacity"] = [];
+  let alphaDropped = 0;
 
   if (op === "png") {
     if (names(args.tags, "tags")) {
@@ -160,13 +176,22 @@ function exportRun(studio: Studio, args: Record<string, unknown>) {
     if (filtered) {
       throw new ToolError("invalid_args", "'aseprite' saves the whole document; `layers` and `tags` apply to png, gif, frames and spritesheet.");
     }
-    throw new ToolError("unsupported_command", "Writing .aseprite files is not supported yet; export png, gif, frames or spritesheet.");
+    if (!isAsepritePath(file)) {
+      throw new ToolError("invalid_args", "'aseprite' writes an .aseprite or .ase file; give the path one of those extensions.");
+    }
+    const written: Written = writeAseprite(s, file);
+    files = written.files;
+    adjustedDurations = written.adjustedDurations;
+    adjustedBackgroundOpacity = written.adjustedBackgroundOpacity;
   } else if (op === "gif") {
-    const frames = exportView(studio, s, args, scale).frames;
+    const saved = savedFrames(exportView(studio, s, args, scale));
+    alphaDropped = saved.alphaDropped;
     const opaque = s.palette.map((c) => (c | 255) >>> 0);
-    files = writeFrames(s.palette.length > 0 ? inPalette(frames, s.palette) : frames, opaque, file);
+    files = writeFrames(s.palette.length > 0 ? inPalette(saved.frames, s.palette) : saved.frames, opaque, file);
   } else if (op === "frames") {
-    files = writeFrames(exportView(studio, s, args, scale).frames, ownPalette(s), file);
+    const saved = savedFrames(exportView(studio, s, args, scale));
+    alphaDropped = saved.alphaDropped;
+    files = writeFrames(saved.frames, ownPalette(s), file);
   } else if (op === "spritesheet") {
     files = writeSheet(exportView(studio, s, args, scale), s, file, args);
     if (args.includeJson !== false) atlas = files[0];
@@ -183,6 +208,9 @@ function exportRun(studio: Studio, args: Record<string, unknown>) {
     frameCount: s.frames.length,
     frame,
     atlas,
+    ...(adjustedDurations.length > 0 ? { adjustedDurations } : {}),
+    ...(adjustedBackgroundOpacity.length > 0 ? { adjustedBackgroundOpacity } : {}),
+    ...(alphaDropped > 0 ? { alphaDropped } : {}),
   };
 }
 

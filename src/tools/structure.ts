@@ -86,13 +86,19 @@ export function registerStructureTools(server: McpServer, studio: Studio): void 
           )
           .optional()
           .describe("Present when a 'duplicate' op in this call used `toSprite`."),
+        faintBackground: z
+          .array(z.object({ layer: z.string(), opacity: z.number().int() }))
+          .optional()
+          .describe("A Background layer set below 255 opacity in this call. It draws faint here, but PNG and GIF written while it is visible come out solid (alphaDropped), and .aseprite stores 255."),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
     },
     async (args) => {
       try {
         const data = await studio.call<Record<string, unknown>>("layer.apply", args);
-        return ok(data, describeLayers(data));
+        const faint = (data.faintBackground as { layer: string; opacity: number }[] | undefined) ?? [];
+        const note = faint.length > 0 ? ` Background opacity below 255 (${faint.map((b) => `'${b.layer}' ${b.opacity}`).join(", ")}) draws faint here, but saved PNG and GIF come out solid and .aseprite stores 255 (faintBackground).` : "";
+        return ok(data, describeLayers(data) + note);
       } catch (err) {
         return fail(err);
       }
