@@ -12,6 +12,7 @@
   },
   "files": [
     "dist",
+    "!dist/**/*.map",
     "skills",
     "rules",
     "agents",
@@ -23,6 +24,7 @@
     "examples",
     "bin",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "repository": {

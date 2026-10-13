@@ -23,10 +23,6 @@ display. That makes it work the same on a laptop, over SSH, or in CI.
 For Claude Code, omp, OpenCode, Codex CLI, Gemini CLI, Cursor, VS Code and
 Windsurf. Node 22.6+ on macOS, Linux or Windows.
 
-> **Work in progress.** The tools are being ported command by command; a
-> command that is not ported yet answers `unsupported_command` rather than
-> pretending to work.
-
 ## Derived from aseprite-ai-artist
 
 This is a port of
@@ -50,8 +46,32 @@ See [docs/INSTALL.md](docs/INSTALL.md). In short, for Claude Code:
 /plugin install pixel-ai-artist@pixel-ai-artist
 ```
 
-For any other MCP client, start it straight from GitHub — the package is
-**not on npm yet**, and npm clones and builds it on first use:
+For any other MCP client, run the server with npx. From 0.1.0 it is on npm:
+
+```
+npx -y pixel-ai-artist@latest serve
+```
+
+```json
+{
+  "mcpServers": {
+    "pixel-ai-artist": {
+      "command": "npx",
+      "args": ["-y", "pixel-ai-artist@latest", "serve"]
+    }
+  }
+}
+```
+
+`npx pixel-ai-artist install codex` (or `gemini`, `cursor`, `opencode`,
+`--all`) writes that config for you.
+
+Until the release is out, or to run an unreleased commit, start it straight
+from GitHub; npm clones and builds it on first use:
+
+```
+npx -y github:takecchi/pixel-ai-artist serve
+```
 
 ```json
 {
@@ -64,13 +84,11 @@ For any other MCP client, start it straight from GitHub — the package is
 }
 ```
 
-The first start takes about ten seconds (clone, install, build); later starts
-reuse npm's cache and take two or three. Pin a branch, tag or commit with
-`github:takecchi/pixel-ai-artist#<ref>`. Working from a checkout instead?
-`npm ci`, then `node dist/cli.js install <client> --local` points the client at
-it. Once the package is published,
-`npx pixel-ai-artist install codex` (or `gemini`, `cursor`, `opencode`,
-`--all`) writes the config for you.
+The first start from GitHub takes about ten seconds (clone, install, build);
+later starts reuse npm's cache and take two or three. Pin a branch, tag or
+commit with `github:takecchi/pixel-ai-artist#<ref>`. Working from a checkout
+instead? `npm ci`, then `node dist/cli.js install <client> --local` points the
+client at it.
 
 ## How it draws
 
