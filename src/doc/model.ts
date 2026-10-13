@@ -227,7 +227,7 @@ export function transparentPixel(s: Sprite): number {
 export function pixelToRgba(s: Sprite, value: number, layer?: Layer): Rgba {
   if (s.colorMode !== "indexed") return value >>> 0;
   if (value >= s.palette.length) return TRANSPARENT;
-  if (value === s.transparentIndex && !layer?.background) return TRANSPARENT;
+  if (value === s.transparentIndex) return TRANSPARENT;
   return ((s.palette[value]! & 0xffffff00) | 255) >>> 0;
 }
 
