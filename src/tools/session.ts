@@ -204,7 +204,7 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
         misplacedBackground: z
           .array(z.string())
           .optional()
-          .describe("Op 'open': Background layers that were not at the bottom of the file's stack and were moved there, keeping their order. Backgrounds are drawn first, so the picture is unchanged, and they stay at the bottom."),
+          .describe("Op 'open': Background layers that were moved down to the bottom of the stack, keeping their order; one that was already in place is not listed. Backgrounds are drawn first, so the picture is unchanged, and they stay at the bottom."),
         adjustedBackgroundOpacity: z
           .array(z.object({ layer: z.string(), from: z.number().int(), to: z.literal(255) }))
           .optional()
@@ -251,7 +251,7 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
         const lost = kinds("lostOnSave") ? ` Saving will not keep: ${kinds("lostOnSave")}.` : "";
         const skipped = kinds("skippedOnOpen") ? ` Not read from the file: ${kinds("skippedOnOpen")}.` : "";
         const misplaced = (data.misplacedBackground as string[] | undefined) ?? [];
-        const misplacedNote = misplaced.length > 0 ? ` Moved Background layers to the bottom, where they are drawn: ${misplaced.map((n) => `'${n}'`).join(", ")}.` : "";
+        const misplacedNote = misplaced.length > 0 ? ` Moved these Background layers down to the bottom, where they are drawn: ${misplaced.map((n) => `'${n}'`).join(", ")}.` : "";
         const dropped = typeof data.alphaDropped === "number" ? ` ${data.alphaDropped} pixel(s) written opaque because a visible Background leaves the file no transparency (alphaDropped).` : "";
         const adjusted = ((data.adjustedDurations as unknown[] | undefined) ?? []).length > 0 ? " Some frame durations were brought into 1..65535 ms (adjustedDurations)." : "";
         const background = (data.adjustedBackgroundOpacity as { layer: string; from: number }[] | undefined) ?? [];

@@ -128,7 +128,7 @@ export interface AseOpenNotes {
   lostOnSave: Record<string, number>;
   /** Left out when the file was read, as Aseprite leaves them out. */
   skippedOnOpen: Record<string, number>;
-  /** Background layers that were not at the bottom of the file's stack and were moved there, keeping their order. */
+  /** Background layers whose place in the stack changed because they were moved down to the bottom, keeping their order; one already in place is not listed. */
   misplacedBackground: string[];
 }
 
@@ -237,15 +237,14 @@ export function spriteFromAse(studio: Studio, file: AseDecoded, filename: string
   });
   // Composite draws Background layers first; moving them under the rest keeps that picture, and the stack then says what is drawn.
   const backgrounds = layers.filter((l) => l.background);
-  const misplaced = !layers.slice(0, backgrounds.length).every((l) => l.background);
-  if (misplaced) sprite.layers = [...backgrounds, ...layers.filter((l) => !l.background)];
+  if (!layers.slice(0, backgrounds.length).every((l) => l.background)) sprite.layers = [...backgrounds, ...layers.filter((l) => !l.background)];
   sprite.activeLayerId = sprite.layers.at(-1)?.id ?? null;
   sprite.activeFrame = 1;
   sprite.modified = false;
   return {
     sprite,
     renamedLayers: renamed,
-    misplacedBackground: misplaced ? backgrounds.map((l) => l.name) : [],
+    misplacedBackground: backgrounds.filter((l, i) => layers.indexOf(l) !== i).map((l) => l.name),
     lostOnSave: counts([
       ["linkedCels", linkedCels],
       ["layerUuids", file.features.layerUuids],
@@ -288,7 +287,7 @@ function layerUserData(l: Layer): AseUserData | undefined {
   // A mark read from the file goes back with the line endings it had there; a new one follows the text's own.
   const ends = l.aseprite?.markLineEnds;
   let text: string;
-  if (before === "") text = REFERENCE_MARK + (ends?.end ?? "");
+  if (before === "") text = (ends?.sep ?? "") + REFERENCE_MARK + (ends?.end ?? "");
   else if (before.endsWith("\n")) text = before + REFERENCE_MARK + (ends ? ends.end : eol);
   // A mark that sat mid-text moves to the end, its own line ending now separating it from the line before.
   else text = before + (ends?.sep || ends?.end || eol) + REFERENCE_MARK;

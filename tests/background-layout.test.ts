@@ -346,3 +346,89 @@ test("a mark line that sat mid-text is written at the end, ended as it was in th
     assert.equal(await savedLayerText(dir, `a\r\n${MARK}\nb`), `a\r\nb\n${MARK}`);
   });
 });
+
+// ── a Background copy goes above the Background block ──────────────────
+
+const HALF_BLUE = rgba(0, 0, 255, 128);
+const backgroundsAtBottom = (sprite: NonNullable<ReturnType<Studio["activeSprite"]>>) => {
+  const flags = sprite.layers.map((l) => l.background === true);
+  return flags.indexOf(false) === -1 || !flags.slice(flags.indexOf(false)).includes(true);
+};
+
+test("duplicating a Background puts the copy above every Background, so a merge afterwards keeps the composite", async () => {
+  await inTempDir(async (dir) => {
+    const file = rgbaFile(
+      [aseLayer("BG1", { background: true }), aseLayer("BG2", { background: true }), aseLayer("L1")],
+      [[0, 0, 2, [RED, RED]], [1, 0, 2, [HALF_BLUE, HALF_BLUE]], [2, 0, 2, [HALF_GREEN, HALF_GREEN]]],
+    );
+    const { studio, sprite } = await openFile(dir, file);
+    await layerApply(studio, { op: "duplicate", name: "BG1" });
+    assert.deepEqual(layerNames(sprite), ["BG1", "BG2", "BG1 Copy", "L1"]);
+    const before = composite(studio, sprite);
+    await layerApply(studio, { op: "merge", name: "BG2" });
+    assert.deepEqual(layerNames(sprite), ["BG1", "BG1 Copy", "L1"]);
+    assert.deepEqual(composite(studio, sprite), before);
+  });
+});
+
+test("no layer op leaves a plain layer under a Background", async () => {
+  await inTempDir(async (dir) => {
+    const file = rgbaFile(
+      [aseLayer("BG1", { background: true }), aseLayer("BG2", { background: true }), aseLayer("L1")],
+      [[0, 0, 2, [RED, RED]]],
+    );
+    const { studio, sprite } = await openFile(dir, file);
+    const ops: Record<string, unknown>[] = [
+      { op: "duplicate", name: "BG1" },
+      { op: "duplicate", name: "BG2" },
+      { op: "duplicate", name: "L1" },
+      { op: "create", name: "top" },
+      { op: "reorder", name: "BG2", index: 1 },
+      { op: "reorder", name: "top", index: 3 },
+      { op: "merge", name: "BG1 Copy" },
+      { op: "delete", name: "BG1" },
+    ];
+    for (const op of ops) {
+      await layerApply(studio, op);
+      assert.ok(backgroundsAtBottom(sprite), `after ${JSON.stringify(op)}: ${layerNames(sprite).join(", ")}`);
+    }
+  });
+});
+
+// ── faintBackground reports where the batch ended ───────────────────────
+
+test("faintBackground reports each Background once, by its final name, and not one set back to 255, hidden or deleted", async () => {
+  const { studio, sprite } = faintPaper();
+  sprite.layers[0]!.opacity = 255;
+  studio.addLayer(sprite, "Ink");
+  const run = (batch: Record<string, unknown>[]) => layerApply(studio, { batch });
+  const once = await run([{ op: "set", name: "Paper", opacity: 100 }, { op: "set", name: "Paper", opacity: 120 }, { op: "set", name: "Paper", newName: "Card" }]);
+  assert.deepEqual(once.faintBackground, [{ layer: "Card", opacity: 120 }]);
+  assert.equal((await run([{ op: "set", name: "Card", opacity: 90 }, { op: "set", name: "Card", opacity: 255 }])).faintBackground, undefined);
+  assert.equal((await run([{ op: "set", name: "Card", opacity: 90 }, { op: "set", name: "Card", visible: false }])).faintBackground, undefined);
+  assert.equal((await run([{ op: "set", name: "Card", opacity: 90 }, { op: "delete", name: "Card" }])).faintBackground, undefined);
+});
+
+// ── the reference mark after an empty or a CRLF line ───────────────────
+
+test("a mark after an empty CRLF line keeps that line, and one after a CRLF line is written back as it was", async () => {
+  await inTempDir(async (dir) => {
+    assert.equal(await savedLayerText(dir, `\r\n${MARK}`), `\r\n${MARK}`);
+    assert.equal(await savedLayerText(dir, `a\r\n${MARK}`), `a\r\n${MARK}`);
+  });
+});
+
+// ── an indexed palette with alpha below 255 ─────────────────────────────
+
+test("export gif of an indexed sprite whose palette carries alpha below 255 writes its pixels opaque", async () => {
+  await inTempDir(async (dir) => {
+    const studio = createStudio();
+    await manage(studio, { op: "new", width: 2, height: 1, colorMode: "indexed" });
+    const sprite = studio.activeSprite()!;
+    sprite.palette = [rgba(0, 0, 0, 0), rgba(255, 0, 0, 128), rgba(0, 0, 255, 128)];
+    studio.ensureCel(sprite, sprite.layers[0]!, 1).image = img(2, 1, [1, 2]);
+    const file = path.join(dir, "faint.gif");
+    await exportRun(studio, { op: "gif", path: file });
+    assert.deepEqual(readGif(file), [RED, BLUE]);
+  });
+});

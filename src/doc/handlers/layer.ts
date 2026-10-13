@@ -80,7 +80,11 @@ function cloneCel(cel: Cel): Cel {
   return { ...cel, image: cel.image.clone() };
 }
 
-/** Aseprite's DuplicateLayer: a copy named "<name> Copy" directly above, with every cel. */
+/**
+ * Aseprite's DuplicateLayer: a copy named "<name> Copy" directly above, with
+ * every cel. The copy is never a Background, so a Background's copy goes
+ * above the whole Background block, which stays together at the bottom.
+ */
 function duplicateHere(studio: Studio, sprite: Sprite, layer: Layer): void {
   const active = sprite.activeLayerId;
   const copy = studio.addLayer(sprite, freeLayerName(sprite, `${layer.name} Copy`));
@@ -88,7 +92,8 @@ function duplicateHere(studio: Studio, sprite: Sprite, layer: Layer): void {
   if (layer.reference) copy.reference = true;
   for (const [frame, cel] of layer.cels) copy.cels.set(frame, cloneCel(cel));
   sprite.layers.pop();
-  sprite.layers.splice(sprite.layers.indexOf(layer) + 1, 0, copy);
+  const backgrounds = sprite.layers.filter((l) => l.background).length;
+  sprite.layers.splice(Math.max(sprite.layers.indexOf(layer) + 1, backgrounds), 0, copy);
   sprite.activeLayerId = active;
 }
 
@@ -150,7 +155,7 @@ interface FaintBackground {
   opacity: number;
 }
 
-function applyOp(studio: Studio, sprite: Sprite, op: Op, duplicated: Duplicated[], faint: FaintBackground[]): void {
+function applyOp(studio: Studio, sprite: Sprite, op: Op, duplicated: Duplicated[], opacitySet: Set<number>): void {
   const kind = op.op;
   if (kind === "create") {
     let name: string;
@@ -204,7 +209,7 @@ function applyOp(studio: Studio, sprite: Sprite, op: Op, duplicated: Duplicated[
       if (op.editable !== undefined) layer.editable = Boolean(op.editable);
       if (op.opacity !== undefined) {
         layer.opacity = opacityArg(op.opacity);
-        if (layer.background && layer.opacity < 255) faint.push({ layer: layer.name, opacity: layer.opacity });
+        opacitySet.add(layer.id);
       }
       if (op.newName !== undefined) layer.name = String(op.newName);
       break;
@@ -229,15 +234,19 @@ function layerApply(studio: Studio, args: Record<string, unknown>) {
 
   const ops = batch ?? [args];
   const duplicated: Duplicated[] = [];
-  const faint: FaintBackground[] = [];
+  const opacitySet = new Set<number>();
   const undo = studio.sprites().map(snapshot);
   try {
-    for (const op of ops) applyOp(studio, sprite, op, duplicated, faint);
+    for (const op of ops) applyOp(studio, sprite, op, duplicated, opacitySet);
   } catch (err) {
     for (const restore of undo) restore();
     throw err;
   }
   for (const target of new Set(duplicated.map((d) => d.toSprite))) studio.resolveSprite(target).modified = true;
+  // Built from where the batch ended, so a Background set back to 255, deleted, hidden or renamed later in it is reported as it is now.
+  const faint: FaintBackground[] = sprite.layers
+    .filter((l) => opacitySet.has(l.id) && l.background && l.visible && l.opacity < 255)
+    .map((l) => ({ layer: l.name, opacity: l.opacity }));
   return {
     ...report(studio, sprite),
     applied: ops.length,

@@ -965,11 +965,23 @@ test("open answers misplacedBackground with the name of a Background that is not
   });
 });
 
-test("open answers misplacedBackground with every Background when there are several, even at the bottom", async () => {
+test("open of [Base*, Ink, Paper*] moves Paper under Ink, names only Paper, and merging Paper into Base keeps the composite", async () => {
   await inTempDir(async (dir) => {
-    const file = aseFile([aseLayer("Base", { background: true }), aseLayer("Ink"), aseLayer("Paper", { background: true })]);
-    const reply = await manage(createStudio(), { op: "open", path: write(dir, "two.aseprite", encodeAse(file)) });
-    assert.deepEqual(reply.misplacedBackground, ["Base", "Paper"]);
+    const cel = (layer: number, rgba: number[]) => ({ layer, x: 0, y: 0, opacity: 255, zIndex: 0, image: { width: 1, height: 1, pixels: Uint8Array.from(rgba) } });
+    const file = aseFile([aseLayer("Base", { background: true }), aseLayer("Ink"), aseLayer("Paper", { background: true })], {
+      width: 1,
+      height: 1,
+      frames: [{ durationMs: 100, cels: [cel(0, [255, 0, 0, 255]), cel(1, [0, 255, 0, 128]), cel(2, [0, 0, 255, 128])] }],
+    });
+    const studio = createStudio();
+    const reply = await manage(studio, { op: "open", path: write(dir, "two.aseprite", encodeAse(file)) });
+    const sprite = studio.activeSprite()!;
+    assert.deepEqual(reply.misplacedBackground, ["Paper"]);
+    assert.deepEqual(sprite.layers.map((l) => l.name), ["Base", "Paper", "Ink"]);
+    const before = [...studio.composite(sprite, 1).pixels];
+    await studio.call("layer.apply", { op: "merge", name: "Paper" });
+    assert.deepEqual(sprite.layers.map((l) => l.name), ["Base", "Ink"]);
+    assert.deepEqual([...studio.composite(sprite, 1).pixels], before);
   });
 });
 
@@ -993,9 +1005,9 @@ test("the sprite_manage tool's reply text names a misplaced Background layer, an
     const res = await client.callTool({ name: "sprite_manage", arguments: { op: "open", path: high } });
     assert.ok(!res.isError, text(res));
     assert.deepEqual((res.structuredContent as Reply).misplacedBackground, ["Paper"]);
-    assert.match(text(res), /Moved Background layers to the bottom, where they are drawn: 'Paper'\./);
+    assert.match(text(res), /Moved these Background layers down to the bottom, where they are drawn: 'Paper'\./);
     const fine = write(dir, "fine.aseprite", encodeAse(aseFile([aseLayer("Paper", { background: true })])));
-    assert.doesNotMatch(text(await client.callTool({ name: "sprite_manage", arguments: { op: "open", path: fine } })), /Moved Background layers/);
+    assert.doesNotMatch(text(await client.callTool({ name: "sprite_manage", arguments: { op: "open", path: fine } })), /Moved these Background layers/);
     await server.close();
   });
 });
