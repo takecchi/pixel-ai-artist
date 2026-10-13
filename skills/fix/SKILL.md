@@ -24,9 +24,15 @@ For a targeted edit, also `look op="ascii"` on the region. You cannot edit
 pixels precisely from a description.
 
 **Never assume layer names, frame counts or the palette.** Drawing into the
-wrong layer is the most common way an agent damages someone's file. When two
-layers share a name, the name is refused rather than guessed — ask the user
-which one they mean before renaming either.
+wrong layer is the most common way an agent damages someone's file. Layer
+names are unique: when a file has two layers with one name, `open` renames the
+later ones (`Ink 2`, `Ink 3`) and lists them in `renamedLayers` — tell the user
+which name now means which layer before you edit either.
+
+A picture with no transparency (most JPEGs, a PNG without alpha) opens as one
+layer called `Background`, which always stays at the bottom: a new layer can go
+above it, never below. Read the `open` reply too — `lostOnSave` and
+`skippedOnOpen` name what this file holds that a save will not keep.
 
 ### 2. Say what you are about to change
 
