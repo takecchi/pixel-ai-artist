@@ -197,8 +197,11 @@ function applyOp(studio: Studio, sprite: Sprite, op: Op, duplicated: Duplicated[
       sprite.activeLayerId = layer.id;
       return;
     case "duplicate":
-      if (op.toSprite !== undefined) duplicated.push(duplicateInto(studio, sprite, layer, studio.resolveSprite(op.toSprite)));
-      else duplicateHere(studio, sprite, layer);
+      if (op.toSprite !== undefined) {
+        duplicated.push(duplicateInto(studio, sprite, layer, studio.resolveSprite(op.toSprite)));
+        return;
+      }
+      duplicateHere(studio, sprite, layer);
       break;
     case "merge":
       mergeDown(studio, sprite, layer);

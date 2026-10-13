@@ -137,6 +137,18 @@ test("duplicate puts a '<name> Copy' with its own copy of every cel directly abo
   assert.equal(base.cels.get(2)!.image.get(0, 0), RED, "the copy's pixels are its own");
 });
 
+test("duplicating a layer into another sprite leaves the source sprite unmodified", async () => {
+  const { studio, sprite } = setup();
+  studio.ensureCel(sprite, sprite.layers[0]!, 1).image.set(0, 0, RED);
+  const target = studio.addSprite({ width: 2, height: 1 });
+  studio.activate(sprite);
+  sprite.modified = false;
+  target.modified = false;
+  await apply(studio, { op: "duplicate", name: "Layer 1", toSprite: `#${target.id}` });
+  assert.equal(sprite.modified, false, "copying out of a sprite does not change it");
+  assert.equal(target.modified, true);
+});
+
 test("duplicate toSprite copies cels by frame into another sprite, renaming on a clash and reporting dropped frames", async () => {
   const { studio, sprite } = setup();
   sprite.frames.push({ durationMs: 100 });
