@@ -91,7 +91,8 @@ function inPalette(frames: AnimationFrame[], palette: readonly Rgba[]): Animatio
       let mapped = cache.get(v);
       if (mapped === undefined) {
         const [r, g, b, a] = channels(v);
-        mapped = ((palette[asepriteBestFit({ r, g, b, a }, entries)]! | 255) >>> 0);
+        // An entry's own alpha does not reach an indexed pixel; left in, the GIF writer would read one below 128 as clear.
+        mapped = (palette[asepriteBestFit({ r, g, b, a }, entries)]! | 255) >>> 0;
         cache.set(v, mapped);
       }
       out.pixels[i] = mapped;

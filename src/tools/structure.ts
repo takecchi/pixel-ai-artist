@@ -89,7 +89,7 @@ export function registerStructureTools(server: McpServer, studio: Studio): void 
         faintBackground: z
           .array(z.object({ layer: z.string(), opacity: z.number().int() }))
           .optional()
-          .describe("A Background layer set below 255 opacity in this call. It draws faint here, but PNG and GIF written while it is visible come out solid (alphaDropped), and .aseprite stores 255."),
+          .describe("A visible Background layer whose opacity this call left below 255, by its name at the end of the call; a hidden one is not listed. It draws faint here, but PNG and GIF written while it is visible come out solid (alphaDropped), and .aseprite stores 255."),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
     },
