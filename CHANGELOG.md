@@ -9,7 +9,8 @@ the server process.
 
 ### Tools
 
-Seventeen MCP tools, with the original's names, arguments and results:
+Seventeen MCP tools, with the original's names, arguments and results, except
+where *Differences from the original* below says otherwise:
 
 - `preflight`, `sprite_info`, `sprite_manage`
 - `layer`, `frame`, `tag`, `cel`
@@ -51,7 +52,64 @@ Seventeen MCP tools, with the original's names, arguments and results:
   a server with no editor. Plugins for Claude Code, omp and OpenCode, and
   `install` for Codex CLI, Gemini CLI, Cursor, VS Code and Windsurf.
 
+### Differences from the original
+
+- Layer names are unique. `layer` create, rename and `set` `newName` refuse a
+  name another layer has (`invalid_args`); names the server picks (`Layer N`,
+  `<name> Copy`, `reference`) take the next free one, and `reference` import
+  returns the name it used.
+- `sprite_manage` `save` and `save_as` return `files`, the files actually
+  written (`walk1.png`, `walk2.png`, … for frames saved as PNG); `path` stays
+  the name passed in.
+- Saving to `.png` or `.gif` returns `lostOnSave`, what the file could not
+  keep: layers drawn into one picture, tags, and for PNG the frames (written
+  as numbered files without durations) and an indexed sprite's palette.
+- `sprite_info` and the layer list mark a Background layer with
+  `background: true`.
+- `export` returns `outputWidth`, `outputHeight` and `scale`: the size of the
+  image written, next to `width` and `height`, which stay the sprite's.
+- `draw` counts in `pixelsChanged` each pixel whose value differs after the
+  batch, once; the original counted writes. A filled rect with an outline is
+  not counted twice, drawing the same thing again counts 0, and `clear`
+  counts only the pixels it cleared. A `clear` with no `rect` has `bounds`
+  around those pixels, where the original counted the whole cel.
+- `draw` kind `text` refuses a character the font has no glyph for
+  (`invalid_args`, naming it and its U+ code), `measureOnly` too; the
+  original skipped it and reported success. Newlines are accepted.
+- `export` refuses an argument its op does not read, when it is not the
+  default (`invalid_args`, naming the ops that read it): `scale` for
+  `aseprite`; `sheetType`, `byTag`, `padding`, `trim` and `includeJson`
+  outside `spritesheet`; `frame` outside `png`.
+- Writing a GIF still rounds partial alpha to opaque or clear, and now says
+  how many pixels it rounded (`alphaRounded`, counted per frame), from
+  `export` `gif`, `png` or `frames` to a `.gif`, and `sprite_manage` `save` /
+  `save_as`. `validate`'s antialiasing check takes layer and cel opacity
+  into account, as the picture does.
+- `reference` `sample_palette` lists the top eight colours with their share
+  (`#rrggbb 12%`) in its reply text, and how many more there are.
+- The text of `validate`, `sprite_manage` `list`, `tag` and `cel` `move` /
+  `set` replies says what to do next (a warning is no longer called clean;
+  findings past the fifteenth are counted). Their structured results are the
+  original's.
+- `install`:
+  - a Codex reinstall replaces only `[mcp_servers.pixel-ai-artist]` and its
+    sub-tables, and finds that header when it ends in a comment;
+  - Codex's user config is `$CODEX_HOME/config.toml` when `CODEX_HOME` is set;
+  - a file that would not change is not rewritten or backed up;
+  - `--dry-run` shows each entry under the key it goes in;
+  - an unknown option is refused, and `--agents` and `--dir` never take a
+    client name as their value (`--agents=<path>` and `--dir=<path>` do);
+  - a client that fails is reported on stderr, the command exits 1, and the
+    restart advice is not printed.
+
 ### Not ported
 
 Tilesets, slices, layer groups, linked cels (opened as copies), blend modes and
-`run_lua`. Requests for them answer `unsupported_command`.
+`run_lua`. There is no tool for tilesets or `run_lua`. The slice ops of
+`sprite_manage` and `cel` `link` / `unlink` answer `unsupported_command`, saying
+what to do instead. Arguments that asked for these, or for other dropped
+features, answer `invalid_args`, naming the argument, instead of being ignored:
+`draw` `label`, `transform` `allowLossy`, `preflight` `mode`, `sprite_info`
+`includeSlices`, `layer` `parent`, `blendMode` and `names`, `frame` `linkCels`
+and `cel` `frames`. A value that asks for nothing missing (`false`,
+`"normal"`, empty) is accepted.
