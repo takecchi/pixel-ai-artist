@@ -176,7 +176,8 @@ async function runInstall(positional: string[], flags: Flags): Promise<void> {
   if (flags.agents !== undefined) {
     const target = typeof flags.agents === "string" && flags.agents !== "" ? flags.agents : `${projectDir}/AGENTS.md`;
     const res = mergeAgentsFile(target, dryRun);
-    process.stdout.write(`${res.written ? "✓" : "·"} AGENTS.md ${res.file}\n`);
+    const why = res.written ? "" : dryRun ? " (dry run, not written)" : " (already up to date)";
+    process.stdout.write(`${res.written ? "✓" : "·"} AGENTS.md ${res.file}${why}\n`);
   }
 
   if (failed) {

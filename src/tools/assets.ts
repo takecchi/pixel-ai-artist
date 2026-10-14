@@ -103,7 +103,8 @@ export function registerAssetTools(server: McpServer, studio: Studio): void {
         path: z
           .string()
           .describe(
-            "Output file path. For 'frames', a pattern containing {frame}, e.g. 'walk_{frame}.png' — one file per frame, numbered from 0.",
+            "Output file path. For 'frames', a pattern containing {frame}, e.g. 'walk_{frame}.png' — one file per frame, numbered from 0. " +
+              "{frame1} numbers from 1 and {frame01} pads to two digits; without {frame}, the number goes at the end of the name, from 1 (walk.png → walk1.png, walk2.png…) or from a number the name already ends in (walk05.png → walk05.png, walk06.png…), and a single frame keeps the path as given.",
           ),
         frame: targetShape.frame.describe("For 'png': the frame written. Omit for the active frame. The other ops write every frame, or the frames `tags` cover."),
         scale: z.number().int().min(1).max(16).default(1).describe("Integer upscale, nearest-neighbour."),
