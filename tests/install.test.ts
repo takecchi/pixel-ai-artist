@@ -273,6 +273,14 @@ test("replacing a codex sub-table says so and names the backup that keeps it", (
   assert.doesNotMatch(cli(["install", "codex", "--project"], scratch()).stdout, /replaced/);
 });
 
+test("the AGENTS.md line says why it wrote nothing, as the client lines do", () => {
+  const dir = scratch();
+  const agentsLine = (stdout: string) => stdout.split("\n").find((l) => l.includes("AGENTS.md")) ?? "";
+  assert.match(agentsLine(cli(["install", "codex", "--project", "--agents"], dir).stdout), /^✓ AGENTS\.md \S+$/);
+  assert.match(agentsLine(cli(["install", "codex", "--project", "--agents"], dir).stdout), /^· AGENTS\.md \S+ \(already up to date\)$/);
+  assert.match(agentsLine(cli(["install", "codex", "--project", "--agents", "--dry-run"], scratch()).stdout), /^· AGENTS\.md \S+ \(dry run, not written\)$/);
+});
+
 test("refuses to edit a config that is not JSON", () => {
   const dir = scratch();
   const file = path.join(dir, ".opencode", "opencode.json");
