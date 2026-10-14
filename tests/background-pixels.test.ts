@@ -308,10 +308,10 @@ test("blit with skipTransparent copies a Background's transparent-index pixel, w
   assert.deepEqual([...cel.image.pixels], [0, 0, 0, 1]);
 });
 
-test("validate outline counts a Background's transparent-index pixel as a white edge colour, and as no hole beside the inner pixel", async () => {
+test("validate outline counts a Background's transparent-index pixel as a white edge colour, and the inner colour running out past it as the gap", async () => {
   const { studio } = backgroundOf([[0, 0, 0], [0, 1, 0], [1, 1, 0]]);
   const found = await findings(studio, { checks: ["outline"] });
-  assert.deepEqual(found.map((f) => [f.check, f.severity, f.count]), [["outline", "warning", 2]]);
+  assert.deepEqual(found.map((f) => [f.check, f.severity, f.count, f.at]), [["outline", "warning", 1, { x: 1, y: 2 }]]);
 });
 
 test("validate outline sees an inner pixel of a Background as enclosed by the transparent-index pixels around it", async () => {

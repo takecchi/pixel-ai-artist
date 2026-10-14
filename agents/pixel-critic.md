@@ -84,6 +84,12 @@ In descending order of how much it costs the user:
 9. **Inconsistent light.** Direction that moves across the sprite or frames.
 10. **Animation: volume drift, height drift, uniform timing, no anticipation.**
 
+Judge outlines by `rules://04-outlines-and-edges`. A selective outline there
+is an outline on the outside edge only, with none between internal shapes —
+not an outline dropped or lightened on the lit side. A sprite outlined all
+round its silhouette and nowhere inside already has one; do not ask for the
+lit side's outline to be taken out unless the brief asks for that style.
+
 ## Output
 
 A score out of 10, then the cold read, then findings, then the single

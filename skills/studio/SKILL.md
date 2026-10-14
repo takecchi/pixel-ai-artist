@@ -99,7 +99,23 @@ workflow it names and follow that — do not do the step from memory.
      read anything into (`a.png`, `b.png`, coin-flipped), asking which is the
      better sprite for the brief and whether the BLOCKING finding is gone.
      Keep the fix only if it picks the new one; otherwise restore. Two
-     rounds in a row that the comparison rejects end the loop.
+     rounds in a row that the comparison rejects end the loop. A claim
+     about movement or position — the body bobs, an arm sits lower — comes
+     with numbers: `changedBounds` and `percentChanged` from `look op="diff"`
+     between the frames, or the rows from `look op="ascii"`, never an
+     estimate by eye. Check a claim the critic makes that way before you act
+     on it.
+
+   A BLOCKING finding that no quarter-of-a-layer fix can reach — the subject
+   faces the wrong way, the composition or the pose is wrong — is a design
+   problem: go back to `pixel-ai-artist:concept` or `pixel-ai-artist:draw`
+   and redraw. That round is outside the quarter guard; say so in its report.
+   The snapshot and the comparison still decide whether the redraw stays.
+
+   If BLOCKING findings remain when the three fix rounds are spent, or when
+   rejected comparisons end the loop, stop: show the user the remaining
+   BLOCKING findings and the critic's critique as it was written, and ask
+   whether to go on.
 
    Do not change pixels after the last critique; anything you edit afterwards
    goes back to the critic. A critique whose cold read did not name your

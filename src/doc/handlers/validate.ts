@@ -1,4 +1,4 @@
-import { displayName, isOpaque, pixelToHex, type Image, type Layer, type Sprite } from "../model.js";
+import { displayName, isOpaque, pixelToHex, rgbaToHex, type Image, type Layer, type Sprite } from "../model.js";
 import { paletteStats } from "../stats.js";
 import type { HandlerTable, Studio } from "../studio.js";
 
@@ -31,6 +31,71 @@ function finding(
 
 function cellIsEmpty(image: Image, sprite: Sprite, layer: Layer): boolean {
   return !image.pixels.some((v) => isOpaque(sprite, v, layer));
+}
+
+const GAPS_NAMED = 5;
+
+/**
+ * The outline as the frame shows it: visible layers composited, references
+ * left out. Checked per layer, the extension took a rigged body's edge against
+ * its arm layer for silhouette, and any edge colour but the commonest for a
+ * gap, which flagged selective and coloured outlines too. A gap here is an
+ * edge pixel whose colour carries on inward — the fill reaching the
+ * background through the outline. An edge pixel in a colour of its own is a
+ * different stretch of outline, not a hole.
+ */
+function outlineFindings(studio: Studio, sprite: Sprite, frame: number, findings: Finding[]): void {
+  const img = studio.composite(sprite, frame, { layers: sprite.layers.filter((l) => !l.reference) });
+  const hexAt = (x: number, y: number): string | null => {
+    if (!img.contains(x, y)) return null;
+    const c = img.get(x, y);
+    return (c & 255) === 0 ? null : rgbaToHex(c, sprite.colorMode === "rgb");
+  };
+  const isEdge = (x: number, y: number) => FOUR.some(([dx, dy]) => hexAt(x + dx, y + dy) === null);
+
+  const edge: { x: number; y: number; hex: string }[] = [];
+  const counts = new Map<string, number>();
+  for (let y = 0; y < img.height; y++) {
+    for (let x = 0; x < img.width; x++) {
+      const hex = hexAt(x, y);
+      if (hex === null || !isEdge(x, y)) continue;
+      counts.set(hex, (counts.get(hex) ?? 0) + 1);
+      edge.push({ x, y, hex });
+    }
+  }
+  if (edge.length === 0) return;
+
+  let best = "";
+  let bestN = 0;
+  for (const [hex, n] of counts) {
+    if (n > bestN) [best, bestN] = [hex, n];
+  }
+  const share = bestN / edge.length;
+  if (share < 0.6) {
+    finding(
+      findings,
+      "outline",
+      "note",
+      `No single colour owns the silhouette edge on frame ${frame}, so this sprite is not outlined. That is a valid style — just keep it consistent.`,
+      { frame },
+    );
+    return;
+  }
+
+  const gaps = edge.filter(
+    (e) => e.hex !== best && FOUR.some(([dx, dy]) => hexAt(e.x + dx, e.y + dy) === e.hex && !isEdge(e.x + dx, e.y + dy)),
+  );
+  if (gaps.length === 0) return;
+  const named = gaps.slice(0, GAPS_NAMED).map((g) => `(${g.x},${g.y})`).join(", ");
+  const more = gaps.length > GAPS_NAMED ? ` and ${gaps.length - GAPS_NAMED} more` : "";
+  finding(
+    findings,
+    "outline",
+    "warning",
+    `Outline is ${Math.floor(share * 100 + 0.5)}% '${best}' on frame ${frame}, but the fill runs out through it at ${gaps.length} edge pixel(s): ${named}${more}. ` +
+      "A broken outline reads as a hole in the silhouette.",
+    { frame, at: { x: gaps[0]!.x, y: gaps[0]!.y }, count: gaps.length },
+  );
 }
 
 function validateRun(studio: Studio, args: Record<string, unknown>) {
@@ -139,103 +204,55 @@ function validateRun(studio: Studio, args: Record<string, unknown>) {
     }
   }
 
-  if (wanted.has("outline") || wanted.has("banding")) {
+  if (wanted.has("outline")) {
+    for (let frame = 1; frame <= sprite.frames.length; frame++) outlineFindings(studio, sprite, frame, findings);
+  }
+
+  if (wanted.has("banding")) {
     for (const layer of sprite.layers) {
       if (!layer.visible) continue;
       for (const frame of [...layer.cels.keys()].sort((a, b) => a - b)) {
         const cel = layer.cels.get(frame)!;
         const img = cel.image;
 
-        if (wanted.has("outline")) {
-          // Silhouette edge = an opaque pixel touching transparency. If one
-          // colour owns most of that edge the sprite is outlined, and the
-          // stragglers are gaps in it; if none does, the sprite simply is not
-          // outlined, which is a legitimate style and only worth a note.
-          const edge: { x: number; y: number; hex: string }[] = [];
-          const counts = new Map<string, number>();
-          for (let y = 0; y < img.height; y++) {
-            for (let x = 0; x < img.width; x++) {
-              const hex = pixelToHex(sprite, img.get(x, y), layer);
-              if (hex === null) continue;
-              const exposed = FOUR.some(
-                ([dx, dy]) => !img.contains(x + dx, y + dy) || !isOpaque(sprite, img.get(x + dx, y + dy), layer),
-              );
-              if (!exposed) continue;
-              counts.set(hex, (counts.get(hex) ?? 0) + 1);
-              edge.push({ x: x + cel.x, y: y + cel.y, hex });
+        // Banding is a long straight boundary between two colours: the eye
+        // reads it as a contour line instead of a curved surface.
+        const threshold = Math.max(8, Math.floor(img.width / 3));
+        let worst = 0;
+        let worstAt: { x: number; y: number } | undefined;
+        let worstPair: [string, string] | undefined;
+        for (let y = 0; y < img.height - 1; y++) {
+          let run = 0;
+          let above: string | null = null;
+          let below: string | null = null;
+          let runX = 0;
+          for (let x = 0; x < img.width; x++) {
+            const a = pixelToHex(sprite, img.get(x, y), layer);
+            const b = pixelToHex(sprite, img.get(x, y + 1), layer);
+            if (a !== null && b !== null && a !== b && a === above && b === below) {
+              run++;
+            } else {
+              above = a;
+              below = b;
+              run = a !== null && b !== null && a !== b ? 1 : 0;
+              runX = x;
             }
-          }
-
-          const total = edge.length;
-          if (total > 0) {
-            let best = "";
-            let bestN = 0;
-            for (const [hex, n] of counts) {
-              if (n > bestN) [best, bestN] = [hex, n];
-            }
-            const share = bestN / total;
-            if (share >= 0.6 && share < 1.0) {
-              const stray = edge.find((e) => e.hex !== best);
-              finding(
-                findings,
-                "outline",
-                "warning",
-                `Outline is ${Math.floor(share * 100 + 0.5)}% '${best}' but ${total - bestN} edge pixel(s) use a different colour on '${layer.name}'. ` +
-                  "A broken outline reads as a hole in the silhouette.",
-                { layer: layer.name, frame, at: stray && { x: stray.x, y: stray.y }, count: total - bestN },
-              );
-            } else if (share < 0.6) {
-              finding(
-                findings,
-                "outline",
-                "note",
-                `No single colour owns the silhouette edge on '${layer.name}', so this sprite is not outlined. That is a valid style — just keep it consistent.`,
-                { layer: layer.name, frame },
-              );
+            if (run > worst) {
+              worst = run;
+              worstAt = { x: runX + cel.x, y: y + cel.y };
+              worstPair = [above!, below!];
             }
           }
         }
-
-        if (wanted.has("banding")) {
-          // Banding is a long straight boundary between two colours: the eye
-          // reads it as a contour line instead of a curved surface.
-          const threshold = Math.max(8, Math.floor(img.width / 3));
-          let worst = 0;
-          let worstAt: { x: number; y: number } | undefined;
-          let worstPair: [string, string] | undefined;
-          for (let y = 0; y < img.height - 1; y++) {
-            let run = 0;
-            let above: string | null = null;
-            let below: string | null = null;
-            let runX = 0;
-            for (let x = 0; x < img.width; x++) {
-              const a = pixelToHex(sprite, img.get(x, y), layer);
-              const b = pixelToHex(sprite, img.get(x, y + 1), layer);
-              if (a !== null && b !== null && a !== b && a === above && b === below) {
-                run++;
-              } else {
-                above = a;
-                below = b;
-                run = a !== null && b !== null && a !== b ? 1 : 0;
-                runX = x;
-              }
-              if (run > worst) {
-                worst = run;
-                worstAt = { x: runX + cel.x, y: y + cel.y };
-                worstPair = [above!, below!];
-              }
-            }
-          }
-          if (worst >= threshold && worstPair) {
-            finding(
-              findings,
-              "banding",
-              "note",
-              `A ${worst}-pixel straight boundary between ${worstPair[0]} and ${worstPair[1]} on '${layer.name}'. ` +
-                "Let the edge wander, or dither part of it, so it reads as a surface rather than a contour line.",
-              { layer: layer.name, frame, at: worstAt, count: worst },
-            );
-          }
+        if (worst >= threshold && worstPair) {
+          finding(
+            findings,
+            "banding",
+            "note",
+            `A ${worst}-pixel straight boundary between ${worstPair[0]} and ${worstPair[1]} on '${layer.name}'. ` +
+              "Let the edge wander, or dither part of it, so it reads as a surface rather than a contour line.",
+            { layer: layer.name, frame, at: worstAt, count: worst },
+          );
         }
       }
     }
