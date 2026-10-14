@@ -439,12 +439,38 @@ test("a dithered gradient breaks the band boundary with the Bayer matrix instead
 
 // ── clear and blit ──────────────────────────────────────────────────────────
 
-test("clear without a region empties the whole cel and counts every pixel of it", async () => {
+test("clear without a region empties the whole cel and counts the pixels it erased", async () => {
   const { studio, sprite, draw } = setup(3, 2);
   await draw([{ kind: "rect", fill: R, rect: { x: 0, y: 0, width: 3, height: 2 } }]);
   const res = await draw([{ kind: "clear" }]);
   assert.deepEqual(picture(studio, sprite), ["...", "..."]);
   assert.equal(res.pixelsChanged, 6);
+});
+
+test("clear without a region counts only the painted pixels it erased, and bounds them", async () => {
+  const { studio, sprite, draw } = setup(16, 16);
+  await draw([{ kind: "rect", fill: R, rect: { x: 4, y: 5, width: 3, height: 2 } }]);
+  const res = await draw([{ kind: "clear" }]);
+  assert.equal(picture(studio, sprite).join(""), ".".repeat(256));
+  assert.equal(res.pixelsChanged, 6);
+  assert.deepEqual(res.bounds, { x: 4, y: 5, width: 3, height: 2 });
+});
+
+test("clear without a region on an empty cel changes nothing and bounds nothing", async () => {
+  const { draw } = setup(4, 4);
+  await draw([{ kind: "rect", fill: R, rect: { x: 0, y: 0, width: 1, height: 1 } }]);
+  await draw([{ kind: "clear" }]);
+  const again = await draw([{ kind: "clear" }]);
+  assert.equal(again.pixelsChanged, 0);
+  assert.equal(again.bounds, undefined);
+});
+
+test("clear with a region still counts every pixel it writes in that region, painted or not, as the extension did", async () => {
+  const { draw } = setup(4, 1);
+  await draw([{ kind: "pixels", color: R, points: [{ x: 1, y: 0 }] }]);
+  const res = await draw([{ kind: "clear", region: { x: 0, y: 0, width: 3, height: 1 } }]);
+  assert.equal(res.pixelsChanged, 3);
+  assert.deepEqual(res.bounds, { x: 0, y: 0, width: 3, height: 1 });
 });
 
 test("clear with a region erases only that region", async () => {

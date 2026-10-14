@@ -17,7 +17,7 @@ routes, and none needs a release:
 | Route | For | How |
 |-------|-----|-----|
 | **Plugin** | Claude Code, omp | `/plugin marketplace add takecchi/pixel-ai-artist` — see [Claude Code](#claude-code) and [omp](#omp-oh-my-pi). Brings the skills, subagents and hook too. |
-| **From GitHub** | Any MCP client | Name `npx -y github:takecchi/pixel-ai-artist serve` as the server. npm clones and builds it on first start (about ten seconds), then caches it (two or three). Pin a version with `#<branch, tag or commit>`. |
+| **From GitHub** | Any MCP client | Name `npx -y github:takecchi/pixel-ai-artist serve` as the server. npm clones and builds it on first start (ten to thirty seconds, depending on the machine and the network), then caches it (two or three). Pin a version with `#<branch, tag or commit>`. |
 | **A checkout** | Working on the server itself | `git clone`, then `npm ci` (which builds); the server is `node /path/to/pixel-ai-artist/dist/cli.js serve`, and `node dist/cli.js install <client> --local` writes it into a client's config. |
 
 The GitHub route, in a JSON client config:

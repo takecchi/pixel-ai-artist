@@ -131,7 +131,7 @@ frame where both layers' opaque pixels intersect.
 | Tool | Ops | Notes |
 |------|-----|-------|
 | `reference` | `import` `sample_palette` `list` `remove` | Imports on a locked, semi-transparent layer. `region` crops one panel of the source (source pixels, also for `sample_palette`); `grid` `{columns, rows, count?, gap?}` cuts a storyboard into panels and puts panel i on frame `frame`+i-1 of one layer — the sprite needs the frames first. |
-| `export` | `png` `gif` `spritesheet` `frames` `aseprite` | `spritesheet` writes a JSON atlas, in Aseprite's format, beside the PNG. `layers` (png, gif, frames, spritesheet) exports only those layers; `tags` (gif, frames, spritesheet) only the frames they cover. `aseprite` refuses both, and an unknown name is refused rather than exported as everything. Named layers export visible even if hidden; with `tags`, `frames` filenames count from the first kept frame. |
+| `export` | `png` `gif` `spritesheet` `frames` `aseprite` | `spritesheet` writes a JSON atlas, in Aseprite's format, beside the PNG; `sheetType` `packed` places frames with identical pictures once (their atlas entries share one rectangle) — use `rows` to cut the sheet as a fixed grid. `layers` (png, gif, frames, spritesheet) exports only those layers; `tags` (gif, frames, spritesheet) only the frames they cover. `aseprite` refuses both, and an unknown name is refused rather than exported as everything. Named layers export visible even if hidden; with `tags`, `frames` filenames count from the first kept frame. The result's `width`/`height` are the sprite's; `outputWidth`/`outputHeight` and `scale` describe the image written. |
 
 Tilesets, slices, layer groups, linked cels, blend modes and aseprite-ai-artist's
 `run_lua` escape hatch are not ported.

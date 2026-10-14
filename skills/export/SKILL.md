@@ -42,6 +42,11 @@ export op="spritesheet" path="…/knight.png" sheetType="packed" byTag=true padd
 line of the neighbouring frame along a sprite's edge. Use 1 unless the engine
 says otherwise.
 
+`packed` places frames whose pictures are identical only once, as Aseprite
+does: their atlas entries share one rectangle. That is right for an engine
+reading the atlas. If the consumer cuts the sheet as a fixed grid instead —
+one cell per frame, no atlas — use `sheetType="rows"`.
+
 The JSON atlas is written beside the PNG and carries per-frame rectangles and
 per-tag ranges.
 
@@ -84,8 +89,9 @@ The `.aseprite` file is the asset. The PNG is a build artifact.
 
 List the files you wrote (the result's `files`), their dimensions, the frame
 count and the tags. That is what the person wiring them into the engine needs.
-A PNG or GIF is the sprite's size times `scale`; a sheet's size is the atlas's
-`meta.size`. The atlas numbers frames from 0, while `tag` and `sprite_info`
+The image written is the result's `outputWidth` × `outputHeight` (the
+sprite's size times `scale`, or the whole texture for a sheet); `width` and
+`height` stay the sprite's own. The atlas numbers frames from 0, while `tag` and `sprite_info`
 number them from 1 — say which when you hand over tag ranges.
 
 ## Related

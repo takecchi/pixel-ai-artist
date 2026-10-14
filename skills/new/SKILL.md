@@ -37,18 +37,17 @@ things right and the rest of the work is drawing.
    Or build one: `palette op="ramp" base="#c04030" steps=5` per material. See
    `rules://01-palette-and-color`.
 
-4. **Build the layer structure** in one batch, applied all or nothing. The new
-   sprite already has one empty layer, `Layer 1`; make it the bottom layer by
-   renaming it, so no empty layer is left behind for `validate` to flag:
+4. **Name the layer you will draw on.** The new sprite has one empty layer,
+   `Layer 1`; `pixel-ai-artist:draw` blocks in on `base`, so rename it:
 
    ```
-   layer batch=[
-     {op:"rename", name:"Layer 1", newName:"sketch"},
-     {op:"create", name:"base"},
-     {op:"create", name:"shading"},
-     {op:"create", name:"outline"},
-   ]
+   layer op="rename" name="Layer 1" newName="base"
    ```
+
+   Add any other layer at the moment you first draw on it — a `sketch` under
+   `base` (`layer op="create" name="sketch" index=1`), `shading` or `outline`
+   above it. A layer made ahead of time and never drawn on is flagged by
+   `validate` as empty on every run.
 
    For anything that will be animated, build the full character rig instead —
    see `pixel-ai-artist:rig`. Splitting baked pixels apart later is real work.

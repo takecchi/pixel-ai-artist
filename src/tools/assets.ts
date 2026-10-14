@@ -96,7 +96,9 @@ export function registerAssetTools(server: McpServer, studio: Studio): void {
         sheetType: z
           .enum(["horizontal", "vertical", "rows", "columns", "packed"])
           .default("horizontal")
-          .describe("Spritesheet layout."),
+          .describe(
+            "Spritesheet layout. 'packed' places frames whose pictures are identical only once — their atlas entries share one rectangle, as Aseprite's packed sheets do; to cut the sheet as a fixed grid with one cell per frame, use 'rows'.",
+          ),
         byTag: z
           .boolean()
           .default(false)
@@ -127,6 +129,13 @@ export function registerAssetTools(server: McpServer, studio: Studio): void {
         files: z.array(z.string()),
         width: z.number().int().optional().describe("The sprite's own width — not the written file's, which scale and spritesheet change."),
         height: z.number().int().optional().describe("The sprite's own height — not the written file's."),
+        outputWidth: z
+          .number()
+          .int()
+          .optional()
+          .describe("Width of the image written: the sprite's width × scale, or for 'spritesheet' the whole texture."),
+        outputHeight: z.number().int().optional().describe("Height of the image written, as outputWidth."),
+        scale: z.number().int().optional().describe("The upscale applied. 'aseprite' writes the document unscaled, so 1."),
         frameCount: z.number().int().optional(),
         frame: z.number().int().optional().describe("Which frame a single-frame export wrote. Defaults to the active frame, which is not always the one you drew on."),
         atlas: z.string().nullish().optional(),
@@ -156,7 +165,8 @@ export function registerAssetTools(server: McpServer, studio: Studio): void {
         const background = (data.adjustedBackgroundOpacity as { layer: string; from: number }[] | undefined) ?? [];
         const backgrounds = background.length > 0 ? ` Background opacity was written as 255 (Aseprite ignores it): ${background.map((b) => `'${b.layer}' ${b.from}`).join(", ")} (adjustedBackgroundOpacity).` : "";
         const dropped = typeof data.alphaDropped === "number" ? ` ${data.alphaDropped} pixel(s) written opaque because a visible Background leaves the file no transparency (alphaDropped).` : "";
-        return ok(data, `Wrote ${files.length} file(s): ${files.join(", ")}${durations}${backgrounds}${dropped}`);
+        const size = typeof data.outputWidth === "number" ? ` Image ${data.outputWidth}×${String(data.outputHeight)} (scale ${String(data.scale)}).` : "";
+        return ok(data, `Wrote ${files.length} file(s): ${files.join(", ")}.${size}${durations}${backgrounds}${dropped}`);
       } catch (err) {
         return fail(err);
       }
