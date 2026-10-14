@@ -75,6 +75,8 @@ export interface Written {
   adjustedBackgroundOpacity: AdjustedBackgroundOpacity[];
   /** Pixels written opaque, colour kept, because a visible Background leaves the file no transparency. */
   alphaDropped: number;
+  /** Pixels of partial alpha a GIF wrote fully opaque or fully clear; 0 for other formats. */
+  alphaRounded: number;
   /** What a flat PNG or GIF could not hold of the sprite, counted by kind; empty for .aseprite. */
   lostOnSave: Record<string, number>;
 }
@@ -84,7 +86,24 @@ export function writeAseprite(sprite: Sprite, file: string): Written {
   const full = path.resolve(file);
   const { file: ase, adjustedDurations, adjustedBackgroundOpacity } = aseFromSprite(sprite);
   writeBytes(full, encodeAse(ase));
-  return { files: [full], adjustedDurations, adjustedBackgroundOpacity, alphaDropped: 0, lostOnSave: {} };
+  return { files: [full], adjustedDurations, adjustedBackgroundOpacity, alphaDropped: 0, alphaRounded: 0, lostOnSave: {} };
+}
+
+/**
+ * How many pixels of `frames` writing them to `file` rounds, counted once per
+ * frame: GIF transparency is on or off, so a GIF has no place for partial
+ * alpha and writes it fully opaque or fully clear. Other formats keep it.
+ */
+export function alphaRounded(frames: readonly AnimationFrame[], file: string): number {
+  if (path.extname(file).toLowerCase() !== ".gif") return 0;
+  let rounded = 0;
+  for (const f of frames) {
+    for (const v of f.image.pixels) {
+      const a = v & 255;
+      if (a > 0 && a < 255) rounded++;
+    }
+  }
+  return rounded;
 }
 
 /** Whether a visible Background is among `layers`, which makes Aseprite write PNG and GIF with no transparency. */
@@ -195,6 +214,7 @@ export function saveSprite(studio: Studio, sprite: Sprite, file: string): Writte
       adjustedDurations: [],
       adjustedBackgroundOpacity: [],
       alphaDropped: out.alphaDropped,
+      alphaRounded: alphaRounded(out.frames, file),
       lostOnSave: flatLosses(sprite, ext),
     };
   }

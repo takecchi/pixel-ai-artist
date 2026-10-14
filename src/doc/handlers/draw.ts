@@ -169,36 +169,36 @@ function drawBatch(studio: Studio, args: Record<string, unknown>) {
             if (value === undefined) {
               throw new ToolError("invalid_args", "A pixel has no colour and the op has no default `color`.");
             }
-            changed += Draw.pixel(surface, num(p.x, "points.x"), num(p.y, "points.y"), value);
+            Draw.pixel(surface, num(p.x, "points.x"), num(p.y, "points.y"), value);
           }
           break;
         }
         case "line": {
           const from = pointOf(op.from, "from");
           const to = pointOf(op.to, "to");
-          changed += Draw.line(surface, from.x, from.y, to.x, to.y, resolveNeeded(op.color, "color"), num(op.thickness ?? 1, "thickness"));
+          Draw.line(surface, from.x, from.y, to.x, to.y, resolveNeeded(op.color, "color"), num(op.thickness ?? 1, "thickness"));
           break;
         }
         case "polyline": {
           const points = pointsOf(op.points, "points");
           if (op.closed) {
-            changed += Draw.polygon(surface, points, resolve(op.color), resolve(op.fill), true);
+            Draw.polygon(surface, points, resolve(op.color), resolve(op.fill), true);
           } else {
             for (let i = 0; i < points.length - 1; i++) {
-              changed += Draw.line(surface, points[i]!.x, points[i]!.y, points[i + 1]!.x, points[i + 1]!.y, resolveNeeded(op.color, "color"), 1);
+              Draw.line(surface, points[i]!.x, points[i]!.y, points[i + 1]!.x, points[i + 1]!.y, resolveNeeded(op.color, "color"), 1);
             }
           }
           break;
         }
         case "rect":
-          changed += Draw.rect(surface, rectOf(op.rect, "rect"), resolve(op.color), resolve(op.fill));
+          Draw.rect(surface, rectOf(op.rect, "rect"), resolve(op.color), resolve(op.fill));
           break;
         case "ellipse":
-          changed += Draw.ellipse(surface, rectOf(op.rect, "rect"), resolve(op.color), resolve(op.fill));
+          Draw.ellipse(surface, rectOf(op.rect, "rect"), resolve(op.color), resolve(op.fill));
           break;
         case "fill": {
           const at = pointOf(op.at, "at");
-          changed += Draw.flood(surface, at.x, at.y, resolveNeeded(op.color, "color"), num(op.tolerance ?? 0, "tolerance"), op.contiguous !== false);
+          Draw.flood(surface, at.x, at.y, resolveNeeded(op.color, "color"), num(op.tolerance ?? 0, "tolerance"), op.contiguous !== false);
           break;
         }
         case "replace": {
@@ -212,7 +212,7 @@ function drawBatch(studio: Studio, args: Record<string, unknown>) {
               const gx = x + cel.x;
               const gy = y + cel.y;
               if (gx >= r.x && gy >= r.y && gx < r.x + r.width && gy < r.y + r.height && img.pixels[y * img.width + x] === from) {
-                changed += Draw.pixel(surface, gx, gy, to);
+                Draw.pixel(surface, gx, gy, to);
               }
             }
           }
@@ -223,7 +223,7 @@ function drawBatch(studio: Studio, args: Record<string, unknown>) {
           if (!(DITHER_PATTERNS as readonly string[]).includes(pattern)) {
             throw new ToolError("invalid_args", `Unknown dither pattern '${pattern}'.`);
           }
-          changed += Draw.dither(
+          Draw.dither(
             surface,
             rectOf(op.rect, "rect"),
             resolveNeeded(op.colorA, "colorA"),
@@ -234,7 +234,7 @@ function drawBatch(studio: Studio, args: Record<string, unknown>) {
           break;
         }
         case "gradient":
-          changed += gradient(surface, op, resolveColor);
+          gradient(surface, op, resolveColor);
           break;
         case "clear": {
           if (op.region || mask) {
@@ -243,14 +243,13 @@ function drawBatch(studio: Studio, args: Record<string, unknown>) {
             // Indexed sprites mark transparency with their own index, not 0.
             const clearValue = transparentPixel(s);
             for (let y = r.y; y < r.y + r.height; y++) {
-              for (let x = r.x; x < r.x + r.width; x++) changed += Draw.pixel(surface, x, y, clearValue);
+              for (let x = r.x; x < r.x + r.width; x++) Draw.pixel(surface, x, y, clearValue);
             }
           } else {
             const clearValue = transparentPixel(s);
             let box: Rect | undefined;
             img.pixels.forEach((value, i) => {
               if (value === clearValue) return;
-              changed++;
               const x = cel.x + (i % img.width);
               const y = cel.y + Math.floor(i / img.width);
               box = union(box, { x, y, width: 1, height: 1 });
@@ -262,7 +261,7 @@ function drawBatch(studio: Studio, args: Record<string, unknown>) {
           break;
         }
         case "blit":
-          changed += blit(studio, s, surface, op, layer, frame);
+          blit(studio, s, surface, op, layer, frame);
           break;
         default:
           throw new ToolError("unsupported_command", `Unknown draw op '${String(op.kind)}'.`);
@@ -270,6 +269,10 @@ function drawBatch(studio: Studio, args: Record<string, unknown>) {
       touched = union(touched, opBounds(s, op));
     }
 
+    // Not the primitives' counts: those are writes, so a rect's outline over
+    // its fill, or a repaint in the same colour, counted pixels that did not change.
+    const drawnOn = cel.image.pixels;
+    changed = img.pixels.reduce((n, v, i) => (v === drawnOn[i] ? n : n + 1), 0);
     cel.image = img;
   } catch (err) {
     if (!existing) layer.cels.delete(frame);

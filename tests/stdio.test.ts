@@ -55,7 +55,7 @@ test("over stdio, with no editor anywhere, a sprite goes from preflight to a sav
     await call("palette", { op: "preset", preset: "pico8", replace: true });
 
     const drawn = await call("draw", { ops: [{ kind: "grid", x: 2, y: 6, legend, rows: slime }] });
-    assert.equal(drawn.structuredContent.pixelsChanged, 96);
+    assert.equal(drawn.structuredContent.pixelsChanged, 76, "the painted cells; a '.' on a clear canvas changes nothing");
 
     const preview = await call("look", { op: "preview" });
     const image = preview.content.find((c) => c.type === "image");

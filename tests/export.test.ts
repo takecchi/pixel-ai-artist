@@ -105,7 +105,7 @@ test("export.run answers the written image's size and the scale for every op, be
     const texture = readPng(path.join(dir, "s.png"));
     assert.deepEqual(sizeOf(sheet), [2, 1, texture.width, texture.height, 2]);
     assert.deepEqual([texture.width, texture.height], [12, 2], "three 4x2 frames side by side");
-    const ase = await run(studio, { op: "aseprite", path: path.join(dir, "a.aseprite"), scale: 4 });
+    const ase = await run(studio, { op: "aseprite", path: path.join(dir, "a.aseprite") });
     assert.deepEqual(sizeOf(ase), [2, 1, 2, 1, 1], "the document is written unscaled");
   });
 });
@@ -159,6 +159,63 @@ test("export.run refuses a scale that is not an integer in 1..16 and writes noth
     assert.deepEqual(readdirSync(dir), []);
     await run(studio, { op: "png", path: path.join(dir, "s.png"), scale: 16 });
     assert.equal(readPng(path.join(dir, "s.png")).width, 32);
+  });
+});
+
+test("an argument the op does not read is refused as invalid_args naming it, and nothing is written", async () => {
+  await inTempDir(async (dir) => {
+    const { studio } = await fixture();
+    const cases: [string, string, Record<string, unknown>][] = [
+      ["aseprite", "a.aseprite", { scale: 4 }],
+      ["aseprite", "a.aseprite", { padding: 2 }],
+      ["aseprite", "a.aseprite", { frame: 1 }],
+      ["aseprite", "a.aseprite", { sheetType: "packed" }],
+      ["aseprite", "a.aseprite", { byTag: true }],
+      ["aseprite", "a.aseprite", { includeJson: false }],
+      ["png", "p.png", { padding: 2 }],
+      ["png", "p.png", { sheetType: "packed" }],
+      ["png", "p.png", { trim: true }],
+      ["gif", "g.gif", { frame: 2 }],
+      ["gif", "g.gif", { trim: true }],
+      ["frames", "f_{frame}.png", { sheetType: "rows" }],
+      ["spritesheet", "s.png", { frame: 1 }],
+    ];
+    for (const [op, name, extra] of cases) {
+      const key = Object.keys(extra)[0]!;
+      await assert.rejects(run(studio, { op, path: path.join(dir, name), ...extra }), (err: unknown) => {
+        assert.ok(err instanceof ToolError, `${op} ${key}: expected a ToolError, got ${String(err)}`);
+        assert.equal(err.code, "invalid_args", `${op} ${key}`);
+        assert.match(err.message, new RegExp(`^\`${key}\` applies to .*, not '${op}'`));
+        assert.equal(err.details.argument, key);
+        return true;
+      });
+    }
+    assert.deepEqual(readdirSync(dir), []);
+  });
+});
+
+test("every op accepts the arguments it does not read at their defaults, as the export tool fills them in", async () => {
+  await inTempDir(async (dir) => {
+    const { studio } = await fixture();
+    const defaults = { scale: 1, sheetType: "horizontal", byTag: false, padding: 0, trim: false, includeJson: true };
+    await run(studio, { op: "aseprite", path: path.join(dir, "a.aseprite"), ...defaults });
+    await run(studio, { op: "png", path: path.join(dir, "p.png"), ...defaults });
+    await run(studio, { op: "gif", path: path.join(dir, "g.gif"), ...defaults });
+    await run(studio, { op: "frames", path: path.join(dir, "f_{frame}.png"), ...defaults });
+    await run(studio, { op: "png", path: path.join(dir, "q.png"), frame: 2 });
+    const { server, studio: served } = createServer();
+    await fixture(served);
+    const [ct, st] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "test", version: "0" });
+    await Promise.all([client.connect(ct), server.connect(st)]);
+    try {
+      for (const [op, name] of [["aseprite", "t.aseprite"], ["png", "t.png"], ["gif", "t.gif"]]) {
+        const res = await client.callTool({ name: "export", arguments: { op, path: path.join(dir, name!) } });
+        assert.notEqual(res.isError, true, `${op}: ${JSON.stringify(res.content)}`);
+      }
+    } finally {
+      await server.close();
+    }
   });
 });
 
@@ -373,6 +430,81 @@ test("frames and png written as .gif keep an RGB sprite's colours, as saveCopyAs
     const pngFile = path.join(dir, "still.gif");
     await run(studio, { op: "png", path: pngFile, frame: 1 });
     assert.deepEqual([...readGif(pngFile).frames[0]!.image.pixels], [off, off]);
+  });
+});
+
+/** A 2x1 sprite of three frames, each [RED, clear] on a cel at opacity 255, 227 and 142: a fade. */
+async function fade() {
+  const studio = createStudio();
+  await studio.call("sprite.manage", { op: "new", width: 2, height: 1 });
+  const sprite = studio.activeSprite()!;
+  sprite.frames = [{ durationMs: 100 }, { durationMs: 100 }, { durationMs: 100 }];
+  [255, 227, 142].forEach((opacity, i) => {
+    const cel = studio.ensureCel(sprite, sprite.layers[0]!, i + 1);
+    cel.image = img(2, 1, [RED, 0]);
+    cel.opacity = opacity;
+  });
+  return { studio, sprite };
+}
+
+test("gif counts in alphaRounded the pixels of partial alpha it writes opaque or clear, once per frame", async () => {
+  await inTempDir(async (dir) => {
+    const { studio, sprite } = await fade();
+    const file = path.join(dir, "fade.gif");
+    const reply = await run(studio, { op: "gif", path: file });
+    assert.equal(reply.alphaRounded, 2);
+    assert.deepEqual(readGif(file).frames.map((f) => f.image.get(0, 0) & 255), [255, 255, 255]);
+    sprite.layers[0]!.cels.get(1)!.image = img(2, 1, [RED, rgba(0, 0, 255, 60)]);
+    assert.equal((await run(studio, { op: "gif", path: file })).alphaRounded, 3);
+  });
+});
+
+test("gif of opaque pixels and clear holes reports no alphaRounded", async () => {
+  await inTempDir(async (dir) => {
+    const { studio, sprite } = await fade();
+    for (const cel of sprite.layers[0]!.cels.values()) cel.opacity = 255;
+    assert.equal("alphaRounded" in (await run(studio, { op: "gif", path: path.join(dir, "solid.gif") })), false);
+  });
+});
+
+test("png and frames count alphaRounded when written as .gif, and not as .png, which keeps partial alpha", async () => {
+  await inTempDir(async (dir) => {
+    const { studio } = await fade();
+    assert.equal((await run(studio, { op: "frames", path: path.join(dir, "f.gif") })).alphaRounded, 2);
+    assert.equal((await run(studio, { op: "png", path: path.join(dir, "still.gif"), frame: 3 })).alphaRounded, 1);
+    assert.equal("alphaRounded" in (await run(studio, { op: "frames", path: path.join(dir, "f_{frame}.png") })), false);
+    assert.equal("alphaRounded" in (await run(studio, { op: "png", path: path.join(dir, "still.png"), frame: 3 })), false);
+  });
+});
+
+test("save_as .gif counts alphaRounded and save_as .png does not", async () => {
+  await inTempDir(async (dir) => {
+    const { studio } = await fade();
+    const saved = await studio.call<Reply>("sprite.manage", { op: "save_as", path: path.join(dir, "fade.gif") });
+    assert.equal(saved.alphaRounded, 2);
+    const png = await studio.call<Reply>("sprite.manage", { op: "save_as", path: path.join(dir, "fade.png") });
+    assert.equal("alphaRounded" in png, false);
+  });
+});
+
+test("the export and sprite_manage tools say in their text how many pixels a GIF rounded", async () => {
+  await inTempDir(async (dir) => {
+    const { server, studio } = createServer();
+    const [ct, st] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "test", version: "0" });
+    await Promise.all([client.connect(ct), server.connect(st)]);
+    try {
+      const { sprite } = await fade();
+      const served = studio.addSprite({ width: 2, height: 1 });
+      served.frames = sprite.frames;
+      served.layers[0]!.cels = sprite.layers[0]!.cels;
+      const textOf = (res: { content?: unknown }) => (res.content as { text: string }[]).map((c) => c.text).join(" ");
+      const said = /2 pixel\(s\) of partial alpha written fully opaque or fully clear, because GIF transparency is on or off \(alphaRounded\)\./;
+      assert.match(textOf(await client.callTool({ name: "export", arguments: { op: "gif", path: path.join(dir, "a.gif") } })), said);
+      assert.match(textOf(await client.callTool({ name: "sprite_manage", arguments: { op: "save_as", path: path.join(dir, "b.gif") } })), said);
+    } finally {
+      await server.close();
+    }
   });
 });
 

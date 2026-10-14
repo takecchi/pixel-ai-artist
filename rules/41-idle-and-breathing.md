@@ -17,7 +17,8 @@ size. This file is the recipe, with the frames to copy. Timing vocabulary lives 
 4. **Silhouette moves first, contents follow.** Shift the outline, then face and shading pixels a frame later.
    Vertical-only motion is dull: add a 1 px horizontal drift on a secondary part (hair, hand, cloth).
 5. **Mass is constant.** Opaque pixel count may vary ±2 % between frames. When the body drops, shorten the legs or
-   widen a soft body; never let the character grow. `validate` checks volume drift.
+   widen a soft body; never let the character grow. `validate` does not check volume drift; compare frames in `look` op
+   `filmstrip` or `onion`.
 6. **Time it by holds, not by frame count.** Hold the two extremes about twice as long as the transitions; the
    breath slows at the top like a jump apex. Fast-down/slow-up is a bounce or a ready stance; slow-in/fast-out is
    calming down; fast-in/slow-out is out of breath. Equal durations are the metronome (`rules://00-core-principles`).
@@ -313,8 +314,8 @@ ONNNNNNNNO
 5. `look` op `onion` with `layer` set to torso: the ghosts must sit 1 row apart, never 2.
 6. `frame` op `set_duration` with `durations` e.g. `[400,150,400,150]`. `tag` op `create` `idle`, direction `forward`
    (4 unique) or `pingpong` (3 unique).
-7. Add the blink as its own cel range or tag, not inside the breath. `look` op `filmstrip`, then `validate` with
-   `checks: ["animation"]` and fix volume drift or uniform timing.
+7. Add the blink as its own cel range or tag, not inside the breath. `look` op `filmstrip` and fix volume drift
+   you see there, then `validate` with `checks: ["animation"]` and fix uniform timing.
 
 ## Mistakes
 

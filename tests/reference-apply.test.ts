@@ -3,6 +3,9 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { createServer } from "../dist/server.js";
 import { Image, ToolError, createStudio, rgba } from "../dist/doc/index.js";
 import { encodePng } from "../dist/lib/png.js";
 
@@ -130,6 +133,26 @@ test("sample_palette reports the source's most common colours with their share, 
   assert.equal((await apply(studio, { op: "sample_palette", path: file, colors: 1 })).palette.length, 1);
   assert.equal(sprite.layers.length, 1);
   assert.equal(sprite.modified, false);
+});
+
+test("the reference tool's sample_palette text lists the top 8 colours with their share and counts the rest", async () => {
+  const { server, studio } = createServer();
+  const [ct, st] = InMemoryTransport.createLinkedPair();
+  const client = new Client({ name: "test", version: "0" });
+  await Promise.all([client.connect(ct), server.connect(st)]);
+  try {
+    studio.addSprite({ width: 4, height: 4 });
+    const text = async (rows: number[][]) => {
+      const res = await client.callTool({ name: "reference", arguments: { op: "sample_palette", path: png(`text-${rows.flat().length}.png`, rows) } });
+      return (res.content as { type: string; text?: string }[]).find((c) => c.type === "text")!.text!;
+    };
+    assert.equal(await text([[RED, RED, RED, BLUE]]), "Sampled 2 colour(s) from the 4×1 source: #ff004d 75%, #29adff 25%.");
+    const ten = Array.from({ length: 10 }, (_, i) => rgba(i * 20, 0, 0));
+    const many = await text([[...ten, ten[0]!, ten[0]!]]);
+    assert.match(many, /^Sampled 10 colour\(s\) from the 12×1 source: #000000 25%, #140000 8%, (#[0-9a-f]{6} 8%, ){5}#8c0000 8%, … and 2 more\.$/);
+  } finally {
+    await server.close();
+  }
 });
 
 test("list names the imported reference layers, and remove deletes one", async () => {

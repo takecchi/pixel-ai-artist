@@ -127,7 +127,7 @@ const drawOp = z.discriminatedUnion("kind", [
   }),
   z.object({
     kind: z.literal("text"),
-    text: z.string().min(1).describe("Multiline via \\n."),
+    text: z.string().min(1).describe("Multiline via \\n. A character the font has no glyph for is refused, measureOnly included."),
     x: z.number().int(),
     y: z.number().int(),
     color: hexColor,
@@ -207,7 +207,11 @@ export function registerDrawTools(server: McpServer, studio: Studio): void {
         layer: z.string().optional(),
         frame: z.number().int().optional(),
         opsApplied: z.number().int().optional(),
-        pixelsChanged: z.number().int().optional(),
+        pixelsChanged: z
+          .number()
+          .int()
+          .optional()
+          .describe("Pixels whose value differs from before the call, each counted once; painting a pixel its own colour counts nothing."),
         colorsSnapped: z
           .array(z.object({ from: z.string(), to: z.string(), deltaE: z.number() }))
           .optional()

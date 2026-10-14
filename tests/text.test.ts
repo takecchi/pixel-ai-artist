@@ -106,6 +106,18 @@ test("bundled pixel5x7 font covers ASCII 32-126 with consistent per-glyph geomet
   }
 });
 
+test("layoutText refuses a character the font has no glyph for, naming each one once, a character outside the BMP whole", () => {
+  assert.throws(
+    () => layoutText({ text: "AxB\nx🙂", x: 0, y: 0, color: "#ffffff", font: TINY_FONT }),
+    (err: Error & { code?: string }) => {
+      assert.equal(err.code, "invalid_args");
+      assert.equal(err.message, "Font 'tiny' has no glyph for 'x' (U+0078), '🙂' (U+1F642). Replace those characters with ones the font draws, or draw them as pixels.");
+      return true;
+    },
+  );
+  assert.equal(layoutText({ text: "AB\nBA", x: 0, y: 0, color: "#ffffff", font: TINY_FONT }).pixels.length, 12);
+});
+
 test("loadFont refuses an unknown font name instead of guessing", () => {
   assert.throws(() => loadFont("does-not-exist"), /Unknown font/);
 });
