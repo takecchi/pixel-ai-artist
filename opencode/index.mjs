@@ -7,7 +7,7 @@ import { LOOK_NUDGE, loadSkillCommands, skillPrompt } from "../hooks/shared.mjs"
 const OWN_DIR = path.dirname(fileURLToPath(import.meta.url));
 
 export function isPixelMutation(toolName) {
-  return typeof toolName === "string" && /^pixel-ai-artist_(draw|recolor|transform)$/.test(toolName);
+  return typeof toolName === "string" && /^pixel(-ai-artist)?_(draw|recolor|transform)$/.test(toolName);
 }
 
 // Sibling tree first (checkout, and git layouts that keep it); then the npm

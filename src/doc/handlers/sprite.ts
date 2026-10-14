@@ -178,6 +178,13 @@ function changeColorMode(sprite: Sprite, target: ColorMode): void {
 
 function spriteManage(studio: Studio, args: Record<string, unknown>) {
   const op = need(args.op, "op");
+  if (op === "slice_create" || op === "slice_update" || op === "slice_delete") {
+    throw new ToolError(
+      "unsupported_command",
+      `sprite.manage op '${op}' is not ported in this version. Slices are not ported: the document has nowhere to keep them, and an .aseprite that has them is refused on open. Mark the region with its own layer or a tag, and keep its bounds where the engine reads them.`,
+      { command: "sprite.manage", op },
+    );
+  }
 
   if (op === "list") {
     const active = studio.activeSprite();

@@ -5,6 +5,7 @@ import { ToolError } from "../doc/errors.js";
 import { compileGrid, type CanvasSize } from "../lib/grid.js";
 import { layoutText, loadFont, type TextAnchor } from "../lib/text.js";
 import { fail, hexColor, ok, targetShape } from "./kit.js";
+import { NOT_PORTED, notPortedShape, refuseNotPorted } from "./not-ported.js";
 
 const textAnchor = z.enum([
   "top_left", "top", "top_right",
@@ -199,6 +200,7 @@ export function registerDrawTools(server: McpServer, studio: Studio): void {
           .describe(
             "Every op must be 'text'. Returns each one's ink bounds without touching any sprite — use to size a panel or centre a label before actually drawing it.",
           ),
+        ...notPortedShape(NOT_PORTED.draw),
       },
       outputSchema: {
         sprite: z.string().optional(),
@@ -237,6 +239,7 @@ export function registerDrawTools(server: McpServer, studio: Studio): void {
     },
     async (args) => {
       try {
+        refuseNotPorted(args, NOT_PORTED.draw);
         if (args.measureOnly) {
           if (args.ops.some((op) => op.kind !== "text")) {
             return fail(
@@ -379,6 +382,7 @@ export function registerDrawTools(server: McpServer, studio: Studio): void {
           .describe(
             "For 'outline': how many pixels thick, counted the way `diagonals` says. 1 is a single-pixel ring. 'outside' grows the cel by this many pixels each way.",
           ),
+        ...notPortedShape(NOT_PORTED.transform),
       },
       outputSchema: {
         sprite: z.string(),
@@ -392,6 +396,7 @@ export function registerDrawTools(server: McpServer, studio: Studio): void {
     },
     async (args) => {
       try {
+        refuseNotPorted(args, NOT_PORTED.transform);
         const data = await studio.call<Record<string, unknown>>("transform.apply", args);
         return ok(data);
       } catch (err) {

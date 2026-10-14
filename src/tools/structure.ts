@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Studio } from "../doc/index.js";
 import { fail, ok, targetShape } from "./kit.js";
+import { NOT_PORTED, notPortedShape, refuseNotPorted } from "./not-ported.js";
 
 /**
  * Layers, frames, tags and cels — the skeleton an animator works against.
@@ -28,6 +29,7 @@ const layerOp = z.object({
     .string()
     .optional()
     .describe("For 'duplicate': copy the layer into another OPEN sprite instead of this one."),
+  ...notPortedShape(NOT_PORTED.layer),
 });
 
 export function registerStructureTools(server: McpServer, studio: Studio): void {
@@ -58,6 +60,7 @@ export function registerStructureTools(server: McpServer, studio: Studio): void 
           .max(128)
           .optional()
           .describe("Operations applied in order, all or nothing. Same shape as the single-op arguments."),
+        ...notPortedShape(NOT_PORTED.layer),
       },
       outputSchema: {
         sprite: z.string(),
@@ -96,6 +99,8 @@ export function registerStructureTools(server: McpServer, studio: Studio): void 
     },
     async (args) => {
       try {
+        refuseNotPorted(args, NOT_PORTED.layer);
+        (args.batch ?? []).forEach((op, i) => refuseNotPorted(op, NOT_PORTED.layer, `batch[${i}].`));
         const data = await studio.call<Record<string, unknown>>("layer.apply", args);
         const faint = (data.faintBackground as { layer: string; opacity: number }[] | undefined) ?? [];
         const note = faint.length > 0 ? ` Background opacity below 255 (${faint.map((b) => `'${b.layer}' ${b.opacity}`).join(", ")}) draws faint here, but saved PNG and GIF come out solid and .aseprite stores 255 (faintBackground).` : "";
@@ -131,6 +136,7 @@ export function registerStructureTools(server: McpServer, studio: Studio): void 
           .positive()
           .optional()
           .describe("For 'reorder': the 1-based position `frame` ends up at. Its cels and duration move with it; tag ranges stay where they are."),
+        ...notPortedShape(NOT_PORTED.frame),
       },
       outputSchema: {
         sprite: z.string(),
@@ -145,6 +151,7 @@ export function registerStructureTools(server: McpServer, studio: Studio): void 
     },
     async (args) => {
       try {
+        refuseNotPorted(args, NOT_PORTED.frame);
         const data = await studio.call<Record<string, unknown>>("frame.apply", args);
         const total = data.totalDurationMs;
         const summary =
@@ -210,9 +217,9 @@ export function registerStructureTools(server: McpServer, studio: Studio): void 
         "'copy' always makes the new cel fully opaque (opacity 255) — it does not carry over the source cel's opacity; set it afterwards with 'set' if it matters. " +
         "'tween' interpolates position or opacity between two frames with an easing curve; 'oscillate' adds a sinusoidal position offset over a frame range — both fill in any missing in-between cels from the start cel.",
       inputSchema: {
-        op: z.enum([
-          "list", "create", "clear", "delete", "move", "copy", "set", "tween", "oscillate",
-        ]),
+        op: z
+          .enum(["list", "create", "clear", "delete", "move", "copy", "set", "tween", "oscillate", "link", "unlink"])
+          .describe("'link' and 'unlink' are refused: linked cels are not ported."),
         ...targetShape,
         toFrame: z.number().int().positive().optional(),
         toLayer: z.string().optional(),
@@ -240,6 +247,7 @@ export function registerStructureTools(server: McpServer, studio: Studio): void 
           .optional()
           .describe("For 'oscillate', in frames. Default: the whole fromFrame..toFrame span."),
         phase: z.number().min(0).max(1).default(0).describe("For 'oscillate': 0-1 fraction of one period."),
+        ...notPortedShape(NOT_PORTED.cel),
       },
       outputSchema: {
         sprite: z.string(),
@@ -273,6 +281,7 @@ export function registerStructureTools(server: McpServer, studio: Studio): void 
     },
     async (args) => {
       try {
+        refuseNotPorted(args, NOT_PORTED.cel);
         const data = await studio.call<Record<string, unknown>>("cel.apply", args);
         if ((args.op === "move" || args.op === "set") && data.applied) {
           const site =

@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Studio } from "../doc/index.js";
 import { fail, ok, targetShape } from "./kit.js";
+import { NOT_PORTED, notPortedShape, refuseNotPorted } from "./not-ported.js";
 import { packageVersion } from "../lib/version.js";
 import { ToolError } from "../doc/errors.js";
 
@@ -12,7 +13,7 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
       title: "Preflight",
       description:
         "Report what this session holds and what to do next. Call this FIRST in any pixel-art task. Documents live in this server's memory, with no editor and no window: the user sees only what `look` shows and the files you write, and nothing is on disk until you save or export.",
-      inputSchema: {},
+      inputSchema: { ...notPortedShape(NOT_PORTED.preflight) },
       outputSchema: {
         ready: z.boolean().describe("Always true: the documents live in this process."),
         version: z.string().describe("This server's version."),
@@ -30,8 +31,9 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
       },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    async () => {
+    async (args) => {
       try {
+        refuseNotPorted(args, NOT_PORTED.preflight);
         const site = await studio.call<Record<string, unknown>>("session.site", {}, { expect: ["openSprites"] });
         const sprite = activeSpriteOf(site);
         const version = packageVersion();
@@ -63,6 +65,7 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
       inputSchema: {
         sprite: targetShape.sprite,
         includePalette: z.boolean().default(true).describe("Include the full palette as hex."),
+        ...notPortedShape(NOT_PORTED.sprite_info),
       },
       outputSchema: {
         id: z.number().int().describe("Stable id for this open document. Pass it back as '#<id>'."),
@@ -114,6 +117,7 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
     },
     async (args) => {
       try {
+        refuseNotPorted(args, NOT_PORTED.sprite_info);
         const data = await studio.call<Record<string, unknown>>("sprite.info", args, {
           expect: ["name", "width", "height", "colorMode", "frameCount", "layers"],
         });
@@ -141,7 +145,10 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
           "close",
           "resize_canvas",
           "set_properties",
-        ]),
+          "slice_create",
+          "slice_update",
+          "slice_delete",
+        ]).describe("The slice_* ops are refused: slices are not ported."),
         sprite: targetShape.sprite,
         path: z
           .string()
