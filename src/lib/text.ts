@@ -154,6 +154,18 @@ function gridBoundsOf(cells: ReadonlySet<string>): GridBounds | null {
   return { minX, minY, maxX, maxY };
 }
 
+/** Throws invalid_args naming every character of `lines` that `font` has no glyph for. */
+function refuseMissingGlyphs(font: Font, lines: readonly string[]): void {
+  const missing = [...new Set(lines.flatMap((line) => [...line]))].filter((ch) => !font.glyphs[ch]);
+  if (missing.length === 0) return;
+  const named = missing.map((ch) => `'${ch}' (U+${ch.codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0")})`);
+  throw new ToolError(
+    "invalid_args",
+    `Font '${font.name}' has no glyph for ${named.join(", ")}. Replace those characters with ones the font draws, or draw them as pixels.`,
+    { font: font.name, missing },
+  );
+}
+
 /**
  * Lay out `text` (multiline via "\n") against `font` and return every pixel
  * that should be written, plus the tight ink bounding box used for anchoring.
@@ -173,6 +185,7 @@ export function layoutText(opts: LayoutTextOptions): TextLayout {
   const shadowOffset = opts.shadowOffset ?? { x: 1, y: 1 };
 
   const lines = opts.text.split("\n");
+  refuseMissingGlyphs(font, lines);
 
   // ── 1. place glyph ink in grid units ──────────────────────────────────────
   const ink = new Set<string>();

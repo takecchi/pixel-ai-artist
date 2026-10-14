@@ -226,7 +226,7 @@ function spriteManage(studio: Studio, args: Record<string, unknown>) {
     if (!s.filename) {
       throw new ToolError("invalid_args", "This sprite has never been saved. Use op 'save_as' with a path.");
     }
-    const { files, adjustedDurations, adjustedBackgroundOpacity, alphaDropped, lostOnSave } = saveSprite(studio, s, s.filename);
+    const { files, adjustedDurations, adjustedBackgroundOpacity, alphaDropped, alphaRounded, lostOnSave } = saveSprite(studio, s, s.filename);
     return {
       sprite: displayName(s),
       id: s.id,
@@ -235,12 +235,13 @@ function spriteManage(studio: Studio, args: Record<string, unknown>) {
       ...(adjustedDurations.length > 0 ? { adjustedDurations } : {}),
       ...(adjustedBackgroundOpacity.length > 0 ? { adjustedBackgroundOpacity } : {}),
       ...(alphaDropped > 0 ? { alphaDropped } : {}),
+      ...(alphaRounded > 0 ? { alphaRounded } : {}),
       ...(Object.keys(lostOnSave).length > 0 ? { lostOnSave } : {}),
     };
   }
 
   if (op === "save_as") {
-    const { files, adjustedDurations, adjustedBackgroundOpacity, alphaDropped, lostOnSave } = saveSprite(studio, s, String(need(args.path, "path")));
+    const { files, adjustedDurations, adjustedBackgroundOpacity, alphaDropped, alphaRounded, lostOnSave } = saveSprite(studio, s, String(need(args.path, "path")));
     return {
       sprite: displayName(s),
       id: s.id,
@@ -249,6 +250,7 @@ function spriteManage(studio: Studio, args: Record<string, unknown>) {
       ...(adjustedDurations.length > 0 ? { adjustedDurations } : {}),
       ...(adjustedBackgroundOpacity.length > 0 ? { adjustedBackgroundOpacity } : {}),
       ...(alphaDropped > 0 ? { alphaDropped } : {}),
+      ...(alphaRounded > 0 ? { alphaRounded } : {}),
       ...(Object.keys(lostOnSave).length > 0 ? { lostOnSave } : {}),
     };
   }

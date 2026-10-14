@@ -252,6 +252,36 @@ test("antialiasing: semi-transparent pixels are counted in rgb and grayscale, ne
   assert.deepEqual(await run(indexed, { checks: ["antialiasing"] }), []);
 });
 
+test("antialiasing: opaque pixels on a cel or layer below 255 opacity are semi-transparent, faded as they show", async () => {
+  const studio = createStudio();
+  const { sprite, cel } = sketch(studio, 2, 1, [[0, 0, RED], [1, 0, RED]]);
+  cel.opacity = 142;
+  assert.deepEqual(await run(studio, { checks: ["antialiasing"] }), [
+    {
+      check: "antialiasing",
+      severity: "warning",
+      message:
+        "2 semi-transparent pixel(s) on 'Layer 1' frame 1: layer × cel opacity is 142/255, so they show partly transparent, and a GIF rounds them to opaque or clear. Fade with opaque palette colours, or set the opacity to 255.",
+      layer: "Layer 1",
+      frame: 1,
+      count: 2,
+    },
+  ]);
+  cel.opacity = 255;
+  sprite.layers[0]!.opacity = 200;
+  assert.equal((await run(studio, { checks: ["antialiasing"] }))[0]?.count, 2);
+});
+
+test("antialiasing: opaque pixels at full opacity, clear pixels at any opacity and a cel at opacity 0 are not semi-transparent", async () => {
+  const studio = createStudio();
+  const { sprite, cel } = sketch(studio, 2, 1, [[0, 0, RED]]);
+  assert.deepEqual(await run(studio, { checks: ["antialiasing"] }), []);
+  sprite.layers[0]!.opacity = 128;
+  assert.equal((await run(studio, { checks: ["antialiasing"] }))[0]?.count, 1, "the clear pixel stays clear");
+  cel.opacity = 0;
+  assert.deepEqual(await run(studio, { checks: ["antialiasing"] }), []);
+});
+
 test("layers: a layer with no cel is noted by name", async () => {
   const studio = createStudio();
   const { sprite } = sketch(studio, 2, 2, [[0, 0, RED]]);

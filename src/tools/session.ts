@@ -225,6 +225,11 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
           .int()
           .optional()
           .describe("Ops 'save'/'save_as' to .png or .gif: pixels written opaque with their colour kept, because a visible Background leaves PNG and GIF with no transparency (as Aseprite's PNG saver drops alpha). A Background below 255 opacity and holes in it come out solid."),
+        alphaRounded: z
+          .number()
+          .int()
+          .optional()
+          .describe("Ops 'save'/'save_as' to .gif: pixels of partial alpha (a soft edge, or a layer or cel below 255 opacity) written fully opaque or fully clear, because GIF transparency is on or off; counted once per frame."),
       },
       annotations: {
         readOnlyHint: false,
@@ -266,10 +271,11 @@ export function registerSessionTools(server: McpServer, studio: Studio): void {
         const misplaced = (data.misplacedBackground as string[] | undefined) ?? [];
         const misplacedNote = misplaced.length > 0 ? ` Moved these Background layers down to the bottom, where they are drawn: ${misplaced.map((n) => `'${n}'`).join(", ")}.` : "";
         const dropped = typeof data.alphaDropped === "number" ? ` ${data.alphaDropped} pixel(s) written opaque because a visible Background leaves the file no transparency (alphaDropped).` : "";
+        const rounded = typeof data.alphaRounded === "number" ? ` ${data.alphaRounded} pixel(s) of partial alpha written fully opaque or fully clear, because GIF transparency is on or off (alphaRounded).` : "";
         const adjusted = ((data.adjustedDurations as unknown[] | undefined) ?? []).length > 0 ? " Some frame durations were brought into 1..65535 ms (adjustedDurations)." : "";
         const background = (data.adjustedBackgroundOpacity as { layer: string; from: number }[] | undefined) ?? [];
         const backgrounds = background.length > 0 ? ` Background opacity was written as 255 (Aseprite ignores it): ${background.map((b) => `'${b.layer}' ${b.from}`).join(", ")} (adjustedBackgroundOpacity).` : "";
-        return ok(merged, `${args.op}: ${String(data.sprite ?? "ok")}.${hint}${renames}${lost}${skipped}${misplacedNote}${adjusted}${backgrounds}${dropped}`);
+        return ok(merged, `${args.op}: ${String(data.sprite ?? "ok")}.${hint}${renames}${lost}${skipped}${misplacedNote}${adjusted}${backgrounds}${dropped}${rounded}`);
       } catch (err) {
         return fail(err);
       }

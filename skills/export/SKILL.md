@@ -56,6 +56,11 @@ per-tag ranges.
 export op="gif" path="…/walk.gif"
 ```
 
+GIF transparency is on or off, so partial alpha — a soft edge, or a fade made
+with layer or cel opacity — comes out fully opaque or fully clear. The result
+counts those pixels in `alphaRounded`; if it is there, the GIF does not show
+what `look` showed. Fade with opaque colours from the palette instead.
+
 **Scaled PNG** — for a store page or a README:
 
 ```

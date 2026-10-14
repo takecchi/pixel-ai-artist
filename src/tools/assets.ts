@@ -3,6 +3,19 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Studio } from "../doc/index.js";
 import { fail, ok, targetShape } from "./kit.js";
 
+const SAMPLED_IN_TEXT = 8;
+
+/** The colours themselves, which the generic summary would fold into a count; the rest stay in `palette`. */
+function describeSampled(data: Record<string, unknown>): string {
+  const palette = (data.palette as { hex: string; share: number }[] | undefined) ?? [];
+  if (palette.length === 0) return `The ${String(data.width)}×${String(data.height)} source is fully transparent; no colours to sample.`;
+  const percent = (share: number) => (share > 0 && share < 0.005 ? "<1%" : `${Math.round(share * 100)}%`);
+  const shown = palette.slice(0, SAMPLED_IN_TEXT).map((c) => `${c.hex} ${percent(c.share)}`);
+  const rest = palette.length - shown.length;
+  const more = rest > 0 ? `, … and ${rest} more` : "";
+  return `Sampled ${palette.length} colour(s) from the ${String(data.width)}×${String(data.height)} source: ${shown.join(", ")}${more}.`;
+}
+
 export function registerAssetTools(server: McpServer, studio: Studio): void {
   server.registerTool(
     "reference",
@@ -68,7 +81,7 @@ export function registerAssetTools(server: McpServer, studio: Studio): void {
     async (args) => {
       try {
         const data = await studio.call<Record<string, unknown>>("reference.apply", args);
-        return ok(data);
+        return ok(data, args.op === "sample_palette" ? describeSampled(data) : undefined);
       } catch (err) {
         return fail(err);
       }
@@ -82,7 +95,8 @@ export function registerAssetTools(server: McpServer, studio: Studio): void {
       description:
         "Write game-ready files. Ops: 'png' (single frame), 'gif' (animation), 'spritesheet' (packed sheet plus a JSON atlas with per-frame and per-tag data), 'frames' (numbered PNGs), 'aseprite' (a copy of the document as an .aseprite file). " +
         "Spritesheet is what an engine actually consumes: pass `sheetType` and `byTag` to control layout. Exporting does not save the working document — use sprite_manage op 'save' for that. " +
-        "Reference layers are not left out: a visible one is drawn into the files like any other layer, so `reference op=\"remove\"` it or hide it first.",
+        "Reference layers are not left out: a visible one is drawn into the files like any other layer, so `reference op=\"remove\"` it or hide it first. " +
+        "An argument the op does not read is refused unless left at its default: `frame` is for 'png' only, `scale` for every op but 'aseprite', and `sheetType`, `byTag`, `padding`, `trim` and `includeJson` for 'spritesheet' only.",
       inputSchema: {
         op: z.enum(["png", "gif", "spritesheet", "frames", "aseprite"]),
         sprite: targetShape.sprite,
@@ -152,6 +166,11 @@ export function registerAssetTools(server: McpServer, studio: Studio): void {
           .int()
           .optional()
           .describe("Ops 'gif' and 'frames': pixels written opaque with their colour kept, because a visible Background leaves PNG and GIF with no transparency (as Aseprite's PNG saver drops alpha). A Background below 255 opacity and holes in it come out solid."),
+        alphaRounded: z
+          .number()
+          .int()
+          .optional()
+          .describe("Op 'gif', and 'png' or 'frames' to a .gif path: pixels of partial alpha (a soft edge, or a layer or cel below 255 opacity) written fully opaque or fully clear, because GIF transparency is on or off; counted once per frame."),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
     },
@@ -165,8 +184,9 @@ export function registerAssetTools(server: McpServer, studio: Studio): void {
         const background = (data.adjustedBackgroundOpacity as { layer: string; from: number }[] | undefined) ?? [];
         const backgrounds = background.length > 0 ? ` Background opacity was written as 255 (Aseprite ignores it): ${background.map((b) => `'${b.layer}' ${b.from}`).join(", ")} (adjustedBackgroundOpacity).` : "";
         const dropped = typeof data.alphaDropped === "number" ? ` ${data.alphaDropped} pixel(s) written opaque because a visible Background leaves the file no transparency (alphaDropped).` : "";
+        const rounded = typeof data.alphaRounded === "number" ? ` ${data.alphaRounded} pixel(s) of partial alpha written fully opaque or fully clear, because GIF transparency is on or off (alphaRounded).` : "";
         const size = typeof data.outputWidth === "number" ? ` Image ${data.outputWidth}×${String(data.outputHeight)} (scale ${String(data.scale)}).` : "";
-        return ok(data, `Wrote ${files.length} file(s): ${files.join(", ")}.${size}${durations}${backgrounds}${dropped}`);
+        return ok(data, `Wrote ${files.length} file(s): ${files.join(", ")}.${size}${durations}${backgrounds}${dropped}${rounded}`);
       } catch (err) {
         return fail(err);
       }

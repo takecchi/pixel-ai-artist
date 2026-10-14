@@ -118,7 +118,9 @@ first to get the ink bounds back without touching the sprite — that is how
 you centre a label or size a panel around it before committing to a position.
 Fonts are JSON files in the package's `knowledge/fonts/`; one ships,
 `pixel5x7` (ASCII 32–126), and its file shows the format: cell size, baseline
-and each glyph as rows of `#` and `.`.
+and each glyph as rows of `#` and `.`. Text with a character the font lacks —
+an accent, a tab, Japanese — is refused with the characters named; spell it
+with ones the font has, or draw those letters as pixels.
 
 ### 7. Verify precisely
 

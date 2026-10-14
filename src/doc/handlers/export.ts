@@ -5,12 +5,13 @@ import { encodePng } from "../../lib/png.js";
 import { buildSpriteSheet, type SheetTag, type SheetType } from "../../lib/spritesheet.js";
 import { packageVersion } from "../../lib/version.js";
 import { ToolError, need } from "../errors.js";
-import { isAsepritePath, opaqueFrames, writeAseprite, writeBytes, writeFrames, type Written } from "../files.js";
+import { alphaRounded, isAsepritePath, opaqueFrames, writeAseprite, writeBytes, writeFrames, type Written } from "../files.js";
 import { Image, channels, displayName, type Layer, type Rgba, type Sprite } from "../model.js";
 import type { HandlerTable, Studio } from "../studio.js";
 
 const ATLAS_APP = "https://github.com/takecchi/pixel-ai-artist";
 const SHEET_TYPES: readonly SheetType[] = ["horizontal", "vertical", "rows", "columns", "packed"];
+const EXPORT_OPS: readonly string[] = ["png", "gif", "frames", "spritesheet", "aseprite"];
 
 function names(value: unknown, arg: string): string[] | null {
   if (value === undefined || value === null) return null;
@@ -26,6 +27,33 @@ function intArg(value: unknown, name: string, min: number, max: number, fallback
     throw new ToolError("invalid_args", `${name} must be an integer in ${min}..${max}, got ${String(value)}.`);
   }
   return value;
+}
+
+/**
+ * Which ops read each layout argument, and the value that asks for nothing.
+ * The Lua handler ignored the rest, so a `scale` on 'aseprite' or a `padding`
+ * on 'png' was dropped without a word; here they are refused instead.
+ */
+const OP_ARGS: Record<string, { ops: readonly string[]; fallback?: unknown }> = {
+  frame: { ops: ["png"] },
+  scale: { ops: ["png", "gif", "frames", "spritesheet"], fallback: 1 },
+  sheetType: { ops: ["spritesheet"], fallback: "horizontal" },
+  byTag: { ops: ["spritesheet"], fallback: false },
+  padding: { ops: ["spritesheet"], fallback: 0 },
+  trim: { ops: ["spritesheet"], fallback: false },
+  includeJson: { ops: ["spritesheet"], fallback: true },
+};
+
+function refuseForeignArgs(op: string, args: Record<string, unknown>): void {
+  for (const [key, { ops, fallback }] of Object.entries(OP_ARGS)) {
+    const value = args[key];
+    if (value === undefined || value === null || value === fallback || ops.includes(op)) continue;
+    throw new ToolError(
+      "invalid_args",
+      `\`${key}\` applies to ${ops.map((o) => `'${o}'`).join(", ")}, not '${op}', which would ignore it. Leave it out, or use an op that reads it.`,
+      { argument: key, op },
+    );
+  }
 }
 
 /**
@@ -162,6 +190,7 @@ function exportRun(studio: Studio, args: Record<string, unknown>) {
   const s = studio.resolveSprite(args.sprite);
   const op = need(args.op, "op");
   const file = String(need(args.path, "path"));
+  if (EXPORT_OPS.includes(op as string)) refuseForeignArgs(op as string, args);
   const scale = intArg(args.scale, "scale", 1, 16, 1);
   const filtered = names(args.layers, "layers") !== null || names(args.tags, "tags") !== null;
   let files: string[];
@@ -170,6 +199,7 @@ function exportRun(studio: Studio, args: Record<string, unknown>) {
   let adjustedDurations: Written["adjustedDurations"] = [];
   let adjustedBackgroundOpacity: Written["adjustedBackgroundOpacity"] = [];
   let alphaDropped = 0;
+  let rounded = 0;
   let output = { width: s.width * scale, height: s.height * scale, scale };
 
   if (op === "png") {
@@ -178,7 +208,9 @@ function exportRun(studio: Studio, args: Record<string, unknown>) {
     }
     frame = studio.resolveFrame(s, args.frame);
     const view = exportView(studio, s, args, scale);
-    files = writeFrames([view.frames[frame - 1]!], ownPalette(s), file);
+    const still = [view.frames[frame - 1]!];
+    rounded = alphaRounded(still, file);
+    files = writeFrames(still, ownPalette(s), file);
   } else if (op === "aseprite") {
     if (filtered) {
       throw new ToolError("invalid_args", "'aseprite' saves the whole document; `layers` and `tags` apply to png, gif, frames and spritesheet.");
@@ -194,11 +226,13 @@ function exportRun(studio: Studio, args: Record<string, unknown>) {
   } else if (op === "gif") {
     const saved = savedFrames(exportView(studio, s, args, scale));
     alphaDropped = saved.alphaDropped;
+    rounded = alphaRounded(saved.frames, file);
     const opaque = s.palette.map((c) => (c | 255) >>> 0);
     files = writeFrames(s.palette.length > 0 ? inPalette(saved.frames, s.palette) : saved.frames, opaque, file);
   } else if (op === "frames") {
     const saved = savedFrames(exportView(studio, s, args, scale));
     alphaDropped = saved.alphaDropped;
+    rounded = alphaRounded(saved.frames, file);
     files = writeFrames(saved.frames, ownPalette(s), file);
   } else if (op === "spritesheet") {
     const sheet = writeSheet(exportView(studio, s, args, scale), s, file, args);
@@ -224,6 +258,7 @@ function exportRun(studio: Studio, args: Record<string, unknown>) {
     ...(adjustedDurations.length > 0 ? { adjustedDurations } : {}),
     ...(adjustedBackgroundOpacity.length > 0 ? { adjustedBackgroundOpacity } : {}),
     ...(alphaDropped > 0 ? { alphaDropped } : {}),
+    ...(rounded > 0 ? { alphaRounded: rounded } : {}),
   };
 }
 

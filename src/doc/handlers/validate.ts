@@ -114,17 +114,24 @@ function validateRun(studio: Studio, args: Record<string, unknown>) {
         // The alpha is the low byte in grayscale too. The extension read it
         // through the RGBA accessor, which finds nothing in a gray+alpha pixel,
         // so grayscale sprites never reported here.
+        // Faded by layer × cel opacity as the composite fades it: an opaque
+        // pixel on a cel at 142 shows half-transparent all the same.
+        const opacity = Math.round((layer.opacity * cel.opacity) / 255);
         let semi = 0;
         for (const v of img.pixels) {
-          const a = v & 255;
+          const a = ((v & 255) * opacity) / 255;
           if (a > 0 && a < 255) semi++;
         }
         if (semi > 0) {
+          const why =
+            opacity < 255
+              ? ` frame ${frame}: layer × cel opacity is ${opacity}/255, so they show partly transparent, and a GIF rounds them to opaque or clear. Fade with opaque palette colours, or set the opacity to 255.`
+              : ". Partial alpha usually comes from a soft brush or a resize and reads as blur.";
           finding(
             findings,
             "antialiasing",
             "warning",
-            `${semi} semi-transparent pixel(s) on '${layer.name}'. Partial alpha usually comes from a soft brush or a resize and reads as blur.`,
+            `${semi} semi-transparent pixel(s) on '${layer.name}'${why}`,
             { layer: layer.name, frame, count: semi },
           );
         }

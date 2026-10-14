@@ -189,11 +189,35 @@ test("a thick line stamps a square of 2·floor(t/2)+1 pixels, and its bounds gro
   assert.deepEqual(res.bounds, { x: 1, y: 1, width: 3, height: 3 });
 });
 
-test("a rect fills its box and outlines it on top, counting pixels written rather than pixels changed", async () => {
+test("a rect fills its box and outlines it on top, counting each pixel it changed once", async () => {
   const { studio, sprite, draw } = setup(6, 5);
   const res = await draw([{ kind: "rect", color: B, fill: G, rect: { x: 1, y: 1, width: 4, height: 3 } }]);
   assert.deepEqual(picture(studio, sprite), ["......", ".BBBB.", ".BGGB.", ".BBBB.", "......"]);
-  assert.equal(res.pixelsChanged, 12 + 4 + 4 + 3 + 3);
+  assert.equal(res.pixelsChanged, 12);
+});
+
+test("drawing the same rect again changes nothing and counts nothing", async () => {
+  const { draw } = setup(4, 4);
+  const rect = { kind: "rect", color: G, fill: G, rect: { x: 0, y: 0, width: 4, height: 4 } };
+  assert.equal((await draw([rect])).pixelsChanged, 16);
+  assert.equal((await draw([rect])).pixelsChanged, 0);
+});
+
+test("repainting pixels in another colour counts each of them, and an overlap counts only what it changed", async () => {
+  const { draw } = setup(4, 4);
+  await draw([{ kind: "rect", fill: R, rect: { x: 0, y: 0, width: 2, height: 2 } }]);
+  assert.equal((await draw([{ kind: "rect", fill: G, rect: { x: 0, y: 0, width: 2, height: 2 } }])).pixelsChanged, 4);
+  assert.equal((await draw([{ kind: "rect", fill: G, rect: { x: 0, y: 0, width: 3, height: 3 } }])).pixelsChanged, 5);
+});
+
+test("a batch counts a pixel by how it ends against how it began, once however many ops write it", async () => {
+  const { draw } = setup(3, 1);
+  const res = await draw([
+    { kind: "pixels", color: R, points: [{ x: 0, y: 0 }, { x: 1, y: 0 }] },
+    { kind: "pixels", color: G, points: [{ x: 1, y: 0 }] },
+    { kind: "clear", region: { x: 0, y: 0, width: 1, height: 1 } },
+  ]);
+  assert.equal(res.pixelsChanged, 1);
 });
 
 test("a rect with only a fill paints no outline, and one with only a colour paints no fill", async () => {
@@ -465,11 +489,11 @@ test("clear without a region on an empty cel changes nothing and bounds nothing"
   assert.equal(again.bounds, undefined);
 });
 
-test("clear with a region still counts every pixel it writes in that region, painted or not, as the extension did", async () => {
+test("clear with a region counts only the painted pixels it erased, as clear without one does, and bounds the region", async () => {
   const { draw } = setup(4, 1);
   await draw([{ kind: "pixels", color: R, points: [{ x: 1, y: 0 }] }]);
   const res = await draw([{ kind: "clear", region: { x: 0, y: 0, width: 3, height: 1 } }]);
-  assert.equal(res.pixelsChanged, 3);
+  assert.equal(res.pixelsChanged, 1);
   assert.deepEqual(res.bounds, { x: 0, y: 0, width: 3, height: 1 });
 });
 
@@ -995,6 +1019,43 @@ test("the draw tool expands text into pixels before the batch", async () => {
   assert.equal(data.opsApplied, 1);
   assert.ok(data.pixelsChanged > 0);
   assert.ok(picture(studio, sprite).some((row) => row.includes("R")));
+  await close();
+});
+
+test("the draw tool refuses text with a character the font has no glyph for, naming it, and paints nothing", async () => {
+  const { client, studio, close } = await connected();
+  const sprite = studio.addSprite({ width: 48, height: 12 });
+  const res = await client.callTool({
+    name: "draw",
+    arguments: { paletteLock: false, ops: [{ kind: "text", text: "héllo ✓", x: 0, y: 0, color: R }] },
+  });
+  assert.equal(res.isError, true);
+  assert.match(errorText(res), /^invalid_args: /);
+  assert.match(errorText(res), /'é' \(U\+00E9\), '✓' \(U\+2713\)/);
+  assert.equal(picture(studio, sprite).join("").replaceAll(".", ""), "");
+  await close();
+});
+
+test("measureOnly refuses text the font cannot draw rather than measuring it with gaps", async () => {
+  const { client, close } = await connected();
+  const res = await client.callTool({
+    name: "draw",
+    arguments: { measureOnly: true, ops: [{ kind: "text", text: "LV レベル", x: 0, y: 0, color: R }] },
+  });
+  assert.equal(res.isError, true);
+  assert.match(errorText(res), /^invalid_args: .*'レ' \(U\+30EC\), 'ベ' \(U\+30D9\), 'ル' \(U\+30EB\)/);
+  await close();
+});
+
+test("the draw tool draws and measures every printable ASCII character, spaces and line breaks included", async () => {
+  const { client, studio, close } = await connected();
+  studio.addSprite({ width: 600, height: 20 });
+  const ascii = Array.from({ length: 95 }, (_, i) => String.fromCharCode(32 + i)).join("");
+  const text = `${ascii}\n${ascii}`;
+  const drawn = await client.callTool({ name: "draw", arguments: { paletteLock: false, ops: [{ kind: "text", text, x: 0, y: 0, color: R }] } });
+  assert.ok(!drawn.isError, errorText(drawn));
+  const measured = await client.callTool({ name: "draw", arguments: { measureOnly: true, ops: [{ kind: "text", text, x: 0, y: 0, color: R }] } });
+  assert.ok(!measured.isError, errorText(measured));
   await close();
 });
 
