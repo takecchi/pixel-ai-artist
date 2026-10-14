@@ -549,4 +549,4 @@ g = gold-trim      #e2b94c
 - Solarski, *Drawing Basics and Video Game Art*, hair and shape language.
 - Saint11 (Fabric, Cuteness, Pipeline); Slynyrd Pixelblog PB29, PB33, PB52, PB55, PB57; Tsu pixel
   tutorials 7–9; art-pia, st0ven and Kandi Runner (Tuts+) character guides; Pixnote; Owlboy and
-  Spritefy notes (see `docs/kb-notes`).
+  Spritefy notes.
