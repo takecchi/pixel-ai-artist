@@ -170,24 +170,73 @@ test("strays reports positions in canvas coordinates when the cel is offset", as
   assert.deepEqual(f.at, { x: 5, y: 5 });
 });
 
-test("outline: a 75% black edge with one red pixel is a broken outline located at the odd pixel", async () => {
+/** A w x h rectangle at (x0, y0): a one-pixel ring of `ring` around a fill of `fill`. */
+function ringed(x0: number, y0: number, w: number, h: number, ring: number, fill: number): [number, number, number][] {
+  return block(x0, y0, w, h, fill).map(([x, y]) => {
+    const onRing = x === x0 || y === y0 || x === x0 + w - 1 || y === y0 + h - 1;
+    return [x, y, onRing ? ring : fill];
+  });
+}
+
+/** Replaces the colour at the listed positions. */
+function repaint(pixels: [number, number, number][], at: [number, number][], v: number): [number, number, number][] {
+  return pixels.map(([x, y, c]) => [x, y, at.some(([ax, ay]) => ax === x && ay === y) ? v : c]);
+}
+
+test("outline: where the fill runs out through the outline to the background, it is a broken outline located at the gap", async () => {
   const studio = createStudio();
-  sketch(studio, 4, 4, [[1, 1, BLACK], [2, 1, BLACK], [1, 2, BLACK], [2, 2, RED]]);
+  sketch(studio, 7, 7, repaint(ringed(1, 1, 5, 5, BLACK, RED), [[3, 1]], RED));
   assert.deepEqual(await run(studio, { checks: ["outline"] }), [
     {
       check: "outline",
       severity: "warning",
       message:
-        "Outline is 75% '#000000' but 1 edge pixel(s) use a different colour on 'Layer 1'. A broken outline reads as a hole in the silhouette.",
-      layer: "Layer 1",
+        "Outline is 94% '#000000' on frame 1, but the fill runs out through it at 1 edge pixel(s): (3,1). A broken outline reads as a hole in the silhouette.",
       frame: 1,
-      at: { x: 2, y: 2 },
+      at: { x: 3, y: 1 },
       count: 1,
     },
   ]);
 });
 
-test("outline: a silhouette no colour owns is only a note, and a clean outline says nothing", async () => {
+test("outline: a warning names the first five gaps and counts the rest", async () => {
+  const studio = createStudio();
+  const top: [number, number][] = [2, 3, 4, 5, 6, 7, 8].map((x) => [x, 1]);
+  sketch(studio, 11, 7, repaint(ringed(1, 1, 9, 5, BLACK, RED), top, RED));
+  const [f] = await run(studio, { checks: ["outline"] });
+  assert.match(f.message, /at 7 edge pixel\(s\): \(2,1\), \(3,1\), \(4,1\), \(5,1\), \(6,1\) and 2 more\./);
+  assert.equal(f.count, 7);
+});
+
+test("outline: a stretch of the edge in a colour of its own, as a selective or coloured outline has, is not a gap", async () => {
+  const studio = createStudio();
+  const top: [number, number][] = [1, 2, 3, 4, 5].map((x) => [x, 1]);
+  sketch(studio, 7, 7, repaint(ringed(1, 1, 5, 5, BLACK, RED), top, GREEN));
+  assert.deepEqual(await run(studio, { checks: ["outline"] }), []);
+});
+
+test("outline: a rigged body is judged as the layers composite, not by the edge its own layer leaves around the arm", async () => {
+  const studio = createStudio();
+  const body = repaint(ringed(1, 1, 6, 6, BLACK, RED), [], RED).filter(([x, y]) => !(x >= 3 && x <= 4 && y >= 3 && y <= 4));
+  const { sprite } = sketch(studio, 8, 8, body);
+  const arm = studio.addLayer(sprite, "arm");
+  const cel = studio.ensureCel(sprite, arm, 1);
+  for (const [x, y, v] of block(3, 3, 2, 2, BLUE)) cel.image.set(x, y, v);
+  assert.deepEqual(await run(studio, { checks: ["outline"] }), []);
+});
+
+test("outline: a reference layer is left out of the silhouette", async () => {
+  const studio = createStudio();
+  const { sprite } = sketch(studio, 7, 7, ringed(1, 1, 5, 5, BLACK, RED));
+  const ref = studio.addLayer(sprite, "reference");
+  ref.reference = true;
+  ref.opacity = 128;
+  const cel = studio.ensureCel(sprite, ref, 1);
+  for (let y = 0; y < 7; y++) for (let x = 0; x < 7; x++) cel.image.set(x, y, (x + y) % 2 ? BLUE : GREEN);
+  assert.deepEqual(await run(studio, { checks: ["outline"] }), []);
+});
+
+test("outline: a silhouette no colour owns is only a note for its frame, and a clean outline says nothing", async () => {
   const studio = createStudio();
   sketch(studio, 4, 4, [[1, 1, BLACK], [2, 1, RED], [1, 2, GREEN], [2, 2, BLUE]]);
   assert.deepEqual(await run(studio, { checks: ["outline"] }), [
@@ -195,8 +244,7 @@ test("outline: a silhouette no colour owns is only a note, and a clean outline s
       check: "outline",
       severity: "note",
       message:
-        "No single colour owns the silhouette edge on 'Layer 1', so this sprite is not outlined. That is a valid style — just keep it consistent.",
-      layer: "Layer 1",
+        "No single colour owns the silhouette edge on frame 1, so this sprite is not outlined. That is a valid style — just keep it consistent.",
       frame: 1,
     },
   ]);
