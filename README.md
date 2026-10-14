@@ -64,7 +64,9 @@ npx -y pixel-ai-artist@latest serve
 ```
 
 `npx pixel-ai-artist install codex` (or `gemini`, `cursor`, `opencode`,
-`--all`) writes that config for you.
+`--all`) writes that config for you, backing up a file it changes;
+`--dry-run` shows the entry first. Scopes and flags are in
+[docs/INSTALL.md](docs/INSTALL.md).
 
 Until the release is out, or to run an unreleased commit, start it straight
 from GitHub; npm clones and builds it on first use:
