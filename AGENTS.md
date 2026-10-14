@@ -28,7 +28,8 @@ same pull request.
 
 - No editor is involved. The documents live in the server's memory and the
   tools draw into them; results leave as files (PNG, GIF, sprite sheets, and
-  later `.ase` so Aseprite can open them).
+  `.aseprite` documents that Aseprite opens with their layers, frames and
+  tags; `open` reads `.aseprite` back too).
 - The Aseprite link — the Lua extension, the WebSocket bridge, the control
   client and headless `aseprite -b` — is gone. Tools call `Studio.call` with
   the extension's command names.
