@@ -190,6 +190,21 @@ export function writeFrames(frames: AnimationFrame[], palette: readonly Rgba[], 
 }
 
 /**
+ * Writes one file per frame, named as `writeFrames` names PNG frames, in the
+ * format the extension picks — a GIF per frame too. Aseprite expands
+ * `{frame}` only for formats saved as sequences, so the Lua handler's
+ * saveCopyAs wrote one animated GIF under the literal name, against the
+ * "one file per frame" the tool promised.
+ */
+export function writeFramesApart(frames: AnimationFrame[], palette: readonly Rgba[], file: string): string[] {
+  const full = path.resolve(file);
+  if (path.extname(full).toLowerCase() !== ".gif") return writeFrames(frames, palette, file);
+  const files = frameFileNames(full, frames.length);
+  files.forEach((f, i) => writeFrames([frames[i]!], palette, f));
+  return files;
+}
+
+/**
  * Writes the sprite as its visible layers look, and the sprite then belongs to
  * that file. Aseprite's GIF saver keeps an RGB or grayscale sprite's colours,
  * building the colour table from the frames, and only an indexed sprite is

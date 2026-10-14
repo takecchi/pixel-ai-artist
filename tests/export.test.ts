@@ -185,11 +185,33 @@ test("an argument the op does not read is refused as invalid_args naming it, and
       await assert.rejects(run(studio, { op, path: path.join(dir, name), ...extra }), (err: unknown) => {
         assert.ok(err instanceof ToolError, `${op} ${key}: expected a ToolError, got ${String(err)}`);
         assert.equal(err.code, "invalid_args", `${op} ${key}`);
-        assert.match(err.message, new RegExp(`^\`${key}\` applies to .*, not '${op}'`));
+        assert.match(err.message, new RegExp(`^'${op}' would ignore this argument: \`${key}\` applies to `));
         assert.equal(err.details.argument, key);
+        assert.deepEqual(err.details.arguments, [key]);
         return true;
       });
     }
+    assert.deepEqual(readdirSync(dir), []);
+  });
+});
+
+test("every argument the op would ignore is named in one refusal, so one retry can drop them all", async () => {
+  await inTempDir(async (dir) => {
+    const { studio } = await fixture();
+    await assert.rejects(
+      run(studio, { op: "aseprite", path: path.join(dir, "a.aseprite"), scale: 4, padding: 2, frame: 1, sheetType: "packed", trim: false }),
+      (err: unknown) => {
+        assert.ok(err instanceof ToolError);
+        assert.equal(err.code, "invalid_args");
+        assert.equal(
+          err.message,
+          "'aseprite' would ignore these arguments: `frame` applies to 'png'; `scale` applies to 'png', 'gif', 'frames', 'spritesheet'; `sheetType` applies to 'spritesheet'; `padding` applies to 'spritesheet'. Leave them out, or use an op that reads them.",
+        );
+        assert.equal(err.details.argument, "frame");
+        assert.deepEqual(err.details.arguments, ["frame", "scale", "sheetType", "padding"]);
+        return true;
+      },
+    );
     assert.deepEqual(readdirSync(dir), []);
   });
 });
@@ -424,9 +446,8 @@ test("frames and png written as .gif keep an RGB sprite's colours, as saveCopyAs
     const off = rgba(0xff, 0xf1, 0xe8);
     sprite.layers[0]!.cels.get(1)!.image = img(2, 1, [off, off]);
     sprite.layers[1]!.visible = false;
-    const framesFile = path.join(dir, "frames.gif");
-    await run(studio, { op: "frames", path: framesFile, tags: ["walk"] });
-    assert.deepEqual([...readGif(framesFile).frames[0]!.image.pixels], [off, off]);
+    await run(studio, { op: "frames", path: path.join(dir, "frames.gif"), tags: ["walk"] });
+    assert.deepEqual([...readGif(path.join(dir, "frames1.gif")).frames[0]!.image.pixels], [off, off]);
     const pngFile = path.join(dir, "still.gif");
     await run(studio, { op: "png", path: pngFile, frame: 1 });
     assert.deepEqual([...readGif(pngFile).frames[0]!.image.pixels], [off, off]);
@@ -518,6 +539,27 @@ test("frames writes one file per frame from {frame} counted from 0, and lists th
     assert.deepEqual(reply.files, expected);
     assert.deepEqual(readdirSync(dir).sort(), ["walk_0.png", "walk_1.png", "walk_2.png"]);
     assert.deepEqual(expected.map((f) => readPng(f).get(0, 0)), [RED, GREEN, BLUE]);
+  });
+});
+
+test("frames written as .gif writes one still GIF per frame from {frame}, and no file under the literal name", async () => {
+  await inTempDir(async (dir) => {
+    const { studio } = await fixture();
+    const reply = await run(studio, { op: "frames", path: path.join(dir, "walk_{frame}.gif") });
+    const expected = [0, 1, 2].map((n) => path.join(dir, `walk_${n}.gif`));
+    assert.deepEqual(reply.files, expected);
+    assert.deepEqual(readdirSync(dir).sort(), ["walk_0.gif", "walk_1.gif", "walk_2.gif"]);
+    assert.deepEqual(expected.map((f) => readGif(f).frames.length), [1, 1, 1]);
+    assert.deepEqual(expected.map((f) => readGif(f).frames[0]!.image.get(0, 0)), [RED, GREEN, BLUE]);
+  });
+});
+
+test("frames written as .gif without {frame} numbers the files as PNG frames are numbered", async () => {
+  await inTempDir(async (dir) => {
+    const { studio } = await fixture();
+    const reply = await run(studio, { op: "frames", path: path.join(dir, "walk.gif"), tags: ["late"] });
+    assert.deepEqual(reply.files, [path.join(dir, "walk1.gif"), path.join(dir, "walk2.gif")]);
+    assert.deepEqual(readdirSync(dir).sort(), ["walk1.gif", "walk2.gif"]);
   });
 });
 

@@ -90,6 +90,13 @@ not an outline dropped or lightened on the lit side. A sprite outlined all
 round its silhouette and nowhere inside already has one; do not ask for the
 lit side's outline to be taken out unless the brief asks for that style.
 
+A claim about movement or position — the body bobs, an arm sits lower —
+comes with numbers: `changedBounds` and `percentChanged` from `look op="diff"`
+between the frames, or the rows from `look op="ascii"`, never an estimate by
+eye. In comparison mode, with only the two files, name the pixel rows or
+columns you compared; what you cannot point to that way is an impression, so
+say so.
+
 ## Output
 
 A score out of 10, then the cold read, then findings, then the single
