@@ -69,6 +69,22 @@ test("opencode is a client, with an XDG-aware user path", () => {
   }
 });
 
+test("codex user scope follows CODEX_HOME, as Codex does, and falls back to ~/.codex when it is empty", () => {
+  const saved = process.env.CODEX_HOME;
+  try {
+    process.env.CODEX_HOME = "/codex-home";
+    assert.equal(configPath("codex", base(scratch(), { scope: "user" })), path.join("/codex-home", "config.toml"));
+    assert.equal(configPath("codex", base("/project")), path.join("/project", ".codex", "config.toml"));
+    process.env.CODEX_HOME = "";
+    assert.equal(configPath("codex", base(scratch(), { scope: "user" })), path.join(homedir(), ".codex", "config.toml"));
+    delete process.env.CODEX_HOME;
+    assert.equal(configPath("codex", base(scratch(), { scope: "user" })), path.join(homedir(), ".codex", "config.toml"));
+  } finally {
+    if (saved === undefined) delete process.env.CODEX_HOME;
+    else process.env.CODEX_HOME = saved;
+  }
+});
+
 test("project scope writes the mcp.servers entry the plugin expects", () => {
   const dir = scratch();
   const result = install("opencode", base(dir, { env: { PIXEL_AI_EXTRA: "1" } }));

@@ -43,7 +43,7 @@ export function configPath(client: ClientId, opts: InstallOptions): string {
         : path.join(project, ".mcp.json");
     case "codex":
       return opts.scope === "user"
-        ? path.join(home, ".codex", "config.toml")
+        ? path.join(process.env.CODEX_HOME || path.join(home, ".codex"), "config.toml")
         : path.join(project, ".codex", "config.toml");
     case "gemini":
       return opts.scope === "user"

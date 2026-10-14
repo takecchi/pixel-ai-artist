@@ -151,8 +151,8 @@ TOML — the JSON config from other clients will not work, which is a common
 source of "it silently does nothing". A reinstall replaces that table and its
 sub-tables (`[mcp_servers.pixel-ai-artist.env]`) and leaves every other table
 as it was, including ones whose names merely start the same way.
-`CODEX_HOME` is not read: with it set, write the entry by hand (`--dry-run`
-prints it).
+When `CODEX_HOME` is set and not empty, the file is `$CODEX_HOME/config.toml`
+instead, the same one Codex reads.
 
 Codex does not expose MCP **prompts**, so the skills do not appear as commands
 there. It does read MCP **resources**, which is where the same skill content
