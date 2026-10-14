@@ -89,13 +89,30 @@ export function notPortedShape(table: Record<string, NotPorted>): Record<string,
   return Object.fromEntries(Object.entries(table).map(([key, n]) => [key, notPortedArg(n)]));
 }
 
-/** Throws invalid_args for the first dropped argument `args` asks for; `where` prefixes the name, as in "batch[2].". */
-export function refuseNotPorted(args: Record<string, unknown>, table: Record<string, NotPorted>, where = ""): void {
-  for (const [key, n] of Object.entries(table)) {
-    const value = args[key];
-    if (value === undefined || (n.refuses && !n.refuses(value))) continue;
-    throw new ToolError("invalid_args", `\`${where}${key}\` is not ported in this version. ${n.why} ${n.instead}`, {
-      argument: `${where}${key}`,
-    });
-  }
+/**
+ * Throws invalid_args naming every dropped argument asked for, in `args` and
+ * in each item of `batch` (named as in "batch[2].parent"), so that one retry
+ * can leave them all out. Each reason is given once per argument.
+ */
+export function refuseNotPorted(
+  args: Record<string, unknown>,
+  table: Record<string, NotPorted>,
+  batch: readonly Record<string, unknown>[] = [],
+): void {
+  const sources: [string, Record<string, unknown>][] = [["", args], ...batch.map((op, i): [string, Record<string, unknown>] => [`batch[${i}].`, op])];
+  const asked = sources.flatMap(([where, source]) =>
+    Object.entries(table)
+      .filter(([key, n]) => source[key] !== undefined && (!n.refuses || n.refuses(source[key])))
+      .map(([key, n]) => ({ name: `${where}${key}`, key, n })),
+  );
+  if (asked.length === 0) return;
+  const names = asked.map((a) => `\`${a.name}\``);
+  const listed = names.length === 1 ? names[0]! : `${names.slice(0, -1).join(", ")} and ${names.at(-1)!}`;
+  const reasons = [...new Map(asked.map((a) => [a.key, a.n])).entries()].map(([key, n]) =>
+    asked.length === 1 ? `${n.why} ${n.instead}` : `\`${key}\`: ${n.why} ${n.instead}`,
+  );
+  throw new ToolError("invalid_args", `${listed} ${asked.length === 1 ? "is" : "are"} not ported in this version. ${reasons.join(" ")}`, {
+    argument: asked[0]!.name,
+    arguments: asked.map((a) => a.name),
+  });
 }

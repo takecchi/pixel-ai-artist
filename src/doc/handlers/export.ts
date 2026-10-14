@@ -5,7 +5,7 @@ import { encodePng } from "../../lib/png.js";
 import { buildSpriteSheet, type SheetTag, type SheetType } from "../../lib/spritesheet.js";
 import { packageVersion } from "../../lib/version.js";
 import { ToolError, need } from "../errors.js";
-import { alphaRounded, isAsepritePath, opaqueFrames, writeAseprite, writeBytes, writeFrames, type Written } from "../files.js";
+import { alphaRounded, isAsepritePath, opaqueFrames, writeAseprite, writeBytes, writeFrames, writeFramesApart, type Written } from "../files.js";
 import { Image, channels, displayName, type Layer, type Rgba, type Sprite } from "../model.js";
 import type { HandlerTable, Studio } from "../studio.js";
 
@@ -44,16 +44,19 @@ const OP_ARGS: Record<string, { ops: readonly string[]; fallback?: unknown }> = 
   includeJson: { ops: ["spritesheet"], fallback: true },
 };
 
+/** Names every argument `op` would ignore at once, so one retry can drop them all. */
 function refuseForeignArgs(op: string, args: Record<string, unknown>): void {
-  for (const [key, { ops, fallback }] of Object.entries(OP_ARGS)) {
+  const foreign = Object.entries(OP_ARGS).filter(([key, { ops, fallback }]) => {
     const value = args[key];
-    if (value === undefined || value === null || value === fallback || ops.includes(op)) continue;
-    throw new ToolError(
-      "invalid_args",
-      `\`${key}\` applies to ${ops.map((o) => `'${o}'`).join(", ")}, not '${op}', which would ignore it. Leave it out, or use an op that reads it.`,
-      { argument: key, op },
-    );
-  }
+    return !(value === undefined || value === null || value === fallback || ops.includes(op));
+  });
+  if (foreign.length === 0) return;
+  const each = foreign.map(([key, { ops }]) => `\`${key}\` applies to ${ops.map((o) => `'${o}'`).join(", ")}`).join("; ");
+  throw new ToolError(
+    "invalid_args",
+    `'${op}' would ignore ${foreign.length === 1 ? "this argument" : "these arguments"}: ${each}. Leave ${foreign.length === 1 ? "it" : "them"} out, or use an op that reads ${foreign.length === 1 ? "it" : "them"}.`,
+    { argument: foreign[0]![0], arguments: foreign.map(([key]) => key), op },
+  );
 }
 
 /**
@@ -233,7 +236,7 @@ function exportRun(studio: Studio, args: Record<string, unknown>) {
     const saved = savedFrames(exportView(studio, s, args, scale));
     alphaDropped = saved.alphaDropped;
     rounded = alphaRounded(saved.frames, file);
-    files = writeFrames(saved.frames, ownPalette(s), file);
+    files = writeFramesApart(saved.frames, ownPalette(s), file);
   } else if (op === "spritesheet") {
     const sheet = writeSheet(exportView(studio, s, args, scale), s, file, args);
     files = sheet.files;
