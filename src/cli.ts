@@ -153,13 +153,19 @@ async function runInstall(positional: string[], flags: Flags): Promise<void> {
   }
 
   let failed = false;
+  let wrote = false;
   for (const name of requested as ClientId[]) {
     try {
       const result = install(name, opts);
       if (dryRun) {
         process.stdout.write(`\n# ${name} → ${result.file}\n${result.note ?? ""}\n`);
       } else {
+        wrote ||= result.written;
         process.stdout.write(`✓ ${name.padEnd(9)} ${result.file}${result.written ? "" : " (already up to date)"}\n`);
+        if (result.replaced) {
+          const tables = result.replaced.map((t) => `[${t}]`).join(", ");
+          process.stdout.write(`  replaced ${tables}; the previous file is ${result.backup ?? "not kept"}\n`);
+        }
       }
     } catch (err) {
       process.stderr.write(`✗ ${name.padEnd(9)} ${(err as Error).message}\n`);
@@ -175,7 +181,7 @@ async function runInstall(positional: string[], flags: Flags): Promise<void> {
 
   if (failed) {
     process.exitCode = 1;
-  } else if (!dryRun) {
+  } else if (wrote) {
     process.stdout.write("\nRestart the agent so it picks up the new server.\n");
   }
 }
