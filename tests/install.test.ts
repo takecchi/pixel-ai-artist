@@ -246,6 +246,33 @@ test("a failed client is reported on stderr, and the restart advice is withheld"
   assert.doesNotMatch(r.stdout, /Restart/);
 });
 
+test("the restart advice follows a write, and not a reinstall that wrote nothing", () => {
+  const dir = scratch();
+  const first = cli(["install", "cursor", "--project"], dir);
+  assert.match(first.stdout, /Restart/);
+  const again = cli(["install", "cursor", "--project"], dir);
+  assert.equal(again.code, 0, again.stderr);
+  assert.match(again.stdout, /\(already up to date\)/);
+  assert.doesNotMatch(again.stdout, /Restart/);
+});
+
+test("replacing a codex sub-table says so and names the backup that keeps it", () => {
+  const dir = scratch();
+  const file = path.join(dir, ".codex", "config.toml");
+  mkdirSync(path.dirname(file), { recursive: true });
+  writeFileSync(file, '[mcp_servers.pixel-ai-artist]\ncommand = "npx"\n\n[mcp_servers.pixel-ai-artist.env]\nMY_KEY = "1"\n');
+  const r = cli(["install", "codex", "--project"], dir);
+  assert.equal(r.code, 0, r.stderr);
+  const line = /replaced \[mcp_servers\.pixel-ai-artist\.env\]; the previous file is (\S+)/.exec(r.stdout);
+  assert.ok(line, r.stdout);
+  assert.match(readFileSync(line[1]!, "utf8"), /MY_KEY = "1"/);
+
+  // Our own table alone, rewritten or not, is not worth a line.
+  writeFileSync(file, '[mcp_servers.pixel-ai-artist]\ncommand = "old"\n');
+  assert.doesNotMatch(cli(["install", "codex", "--project"], dir).stdout, /replaced/);
+  assert.doesNotMatch(cli(["install", "codex", "--project"], scratch()).stdout, /replaced/);
+});
+
 test("refuses to edit a config that is not JSON", () => {
   const dir = scratch();
   const file = path.join(dir, ".opencode", "opencode.json");

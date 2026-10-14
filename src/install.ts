@@ -30,6 +30,10 @@ export interface InstallResult {
   file: string;
   written: boolean;
   note?: string;
+  /** The copy of the file as it was before this write, when there was one. */
+  backup?: string;
+  /** Sub-tables of ours found in the file and replaced (Codex), such as `mcp_servers.pixel-ai-artist.env`. */
+  replaced?: string[];
 }
 
 export function configPath(client: ClientId, opts: InstallOptions): string {
@@ -110,7 +114,7 @@ function installOpenCode(file: string, opts: InstallOptions): InstallResult {
   if (opts.dryRun) {
     return { client: "opencode", file, written: false, note: JSON.stringify({ mcp: { servers: { [SERVER_KEY]: entry } } }, null, 2) };
   }
-  return { client: "opencode", file, written: writeIfChanged(file, JSON.stringify(next, null, 2) + "\n") };
+  return { client: "opencode", file, ...writeIfChanged(file, JSON.stringify(next, null, 2) + "\n") };
 }
 
 function installJson(client: ClientId, file: string, opts: InstallOptions): InstallResult {
@@ -134,7 +138,7 @@ function installJson(client: ClientId, file: string, opts: InstallOptions): Inst
     return { client, file, written: false, note: JSON.stringify({ [key]: { [SERVER_KEY]: entry } }, null, 2) };
   }
 
-  return { client, file, written: writeIfChanged(file, JSON.stringify(next, null, 2) + "\n") };
+  return { client, file, ...writeIfChanged(file, JSON.stringify(next, null, 2) + "\n") };
 }
 
 /**
@@ -159,8 +163,9 @@ function installToml(file: string, opts: InstallOptions): InstallResult {
 
   if (opts.dryRun) return { client: "codex", file, written: false, note: block };
 
-  const kept = withoutOurTables(existsSync(file) ? readFileSync(file, "utf8") : "").trimEnd();
-  return { client: "codex", file, written: writeIfChanged(file, kept ? `${kept}\n\n${block}` : block) };
+  const { kept, subTables } = withoutOurTables(existsSync(file) ? readFileSync(file, "utf8") : "");
+  const result = writeIfChanged(file, kept.trimEnd() ? `${kept.trimEnd()}\n\n${block}` : block);
+  return { client: "codex", file, ...result, ...(result.written && subTables.length > 0 ? { replaced: subTables } : {}) };
 }
 
 const OUR_TABLE = `mcp_servers.${SERVER_KEY}`;
@@ -170,16 +175,19 @@ const OUR_TABLE = `mcp_servers.${SERVER_KEY}`;
  * header that names someone else's table. Names are compared whole, so
  * `[mcp_servers.pixel-ai-artist-extra]` is not ours.
  */
-function withoutOurTables(toml: string): string {
+function withoutOurTables(toml: string): { kept: string; subTables: string[] } {
   const lines = toml.split("\n");
   const start = lines.findIndex((line) => tableName(line) === OUR_TABLE);
-  if (start === -1) return toml;
+  if (start === -1) return { kept: toml, subTables: [] };
+  const subTables: string[] = [];
   let end = start + 1;
   for (; end < lines.length; end++) {
     const name = tableName(lines[end]!);
-    if (name !== undefined && name !== OUR_TABLE && !name.startsWith(`${OUR_TABLE}.`)) break;
+    if (name === undefined || name === OUR_TABLE) continue;
+    if (!name.startsWith(`${OUR_TABLE}.`)) break;
+    subTables.push(name);
   }
-  return [...lines.slice(0, start), ...lines.slice(end)].join("\n");
+  return { kept: [...lines.slice(0, start), ...lines.slice(end)].join("\n"), subTables };
 }
 
 /** The name in a `[table]` or `[[array]]` header line, which may end in a comment. */
@@ -212,7 +220,7 @@ export function mergeAgentsFile(target: string, dryRun: boolean): { written: boo
   const next = content.trimEnd() + (content.trim() ? "\n\n" : "") + wrapped;
 
   if (dryRun) return { written: false, file: target };
-  return { written: writeIfChanged(target, next), file: target };
+  return { written: writeIfChanged(target, next).written, file: target };
 }
 
 function readJson(file: string): Record<string, unknown> {
@@ -257,19 +265,21 @@ function writeAtomic(file: string, contents: string): void {
   }
 }
 
-/** Back up and write, unless the file already holds exactly this. Returns whether it wrote. */
-function writeIfChanged(file: string, contents: string): boolean {
-  if (existsSync(file) && readFileSync(file, "utf8") === contents) return false;
-  backup(file);
+/** Back up and write, unless the file already holds exactly this. */
+function writeIfChanged(file: string, contents: string): { written: boolean; backup?: string } {
+  if (existsSync(file) && readFileSync(file, "utf8") === contents) return { written: false };
+  const copy = backup(file);
   writeAtomic(file, contents);
-  return true;
+  return { written: true, ...(copy ? { backup: copy } : {}) };
 }
 
-/** Never overwrite someone's config without leaving them a way back. */
-function backup(file: string): void {
-  if (!existsSync(file)) return;
+/** Never overwrite someone's config without leaving them a way back. Returns the copy's path. */
+function backup(file: string): string | undefined {
+  if (!existsSync(file)) return undefined;
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  copyFileSync(file, `${file}.bak-${stamp}`);
+  const copy = `${file}.bak-${stamp}`;
+  copyFileSync(file, copy);
+  return copy;
 }
 
 function tomlString(value: string): string {

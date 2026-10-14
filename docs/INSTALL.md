@@ -60,7 +60,9 @@ npx pixel-ai-artist install --all --agents
 Writes config for Claude Code, Codex, Gemini CLI, Cursor, OpenCode, VS Code
 and Windsurf, and adds an `AGENTS.md` section for the clients that read one.
 Existing config files are backed up first (`.bak-<timestamp>`); a file that
-already holds exactly the new content is left alone, with no backup. `--dry-run`
+already holds exactly the new content is left alone, with no backup, and is
+listed as `(already up to date)`. The advice to restart the agent is printed
+only when a config file was written. `--dry-run`
 prints, for each client, the file and the entry under the key it goes in
 (`mcpServers`, `servers`, `mcp.servers` or the TOML table), and writes nothing.
 
@@ -150,8 +152,9 @@ Writes `[mcp_servers.pixel-ai-artist]` into `~/.codex/config.toml`. Codex uses
 TOML — the JSON config from other clients will not work, which is a common
 source of "it silently does nothing". A reinstall replaces that table and its
 sub-tables (`[mcp_servers.pixel-ai-artist.env]`) and leaves every other table
-as it was, including ones whose names merely start the same way.
-When `CODEX_HOME` is set and not empty, the file is `$CODEX_HOME/config.toml`
+as it was, including ones whose names merely start the same way. When it
+replaces a sub-table, such as an `env` you added yourself, the output names it
+and the backup that still holds it. When `CODEX_HOME` is set and not empty, the file is `$CODEX_HOME/config.toml`
 instead, the same one Codex reads.
 
 Codex does not expose MCP **prompts**, so the skills do not appear as commands
