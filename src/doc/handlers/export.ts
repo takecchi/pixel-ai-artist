@@ -101,7 +101,12 @@ function inPalette(frames: AnimationFrame[], palette: readonly Rgba[]): Animatio
   });
 }
 
-function writeSheet(view: ExportView, s: Sprite, file: string, args: Record<string, unknown>): string[] {
+function writeSheet(
+  view: ExportView,
+  s: Sprite,
+  file: string,
+  args: Record<string, unknown>,
+): { files: string[]; width: number; height: number } {
   const full = path.resolve(file);
   if (path.extname(full).toLowerCase() !== ".png") {
     throw new ToolError("unsupported_command", "A sprite sheet texture is written as .png.", { path: full });
@@ -132,7 +137,7 @@ function writeSheet(view: ExportView, s: Sprite, file: string, args: Record<stri
   }
   writeBytes(full, encodePng(sheet.image));
   files.push(full);
-  return files;
+  return { files, width: sheet.image.width, height: sheet.image.height };
 }
 
 /**
@@ -165,6 +170,7 @@ function exportRun(studio: Studio, args: Record<string, unknown>) {
   let adjustedDurations: Written["adjustedDurations"] = [];
   let adjustedBackgroundOpacity: Written["adjustedBackgroundOpacity"] = [];
   let alphaDropped = 0;
+  let output = { width: s.width * scale, height: s.height * scale, scale };
 
   if (op === "png") {
     if (names(args.tags, "tags")) {
@@ -184,6 +190,7 @@ function exportRun(studio: Studio, args: Record<string, unknown>) {
     files = written.files;
     adjustedDurations = written.adjustedDurations;
     adjustedBackgroundOpacity = written.adjustedBackgroundOpacity;
+    output = { width: s.width, height: s.height, scale: 1 };
   } else if (op === "gif") {
     const saved = savedFrames(exportView(studio, s, args, scale));
     alphaDropped = saved.alphaDropped;
@@ -194,7 +201,9 @@ function exportRun(studio: Studio, args: Record<string, unknown>) {
     alphaDropped = saved.alphaDropped;
     files = writeFrames(saved.frames, ownPalette(s), file);
   } else if (op === "spritesheet") {
-    files = writeSheet(exportView(studio, s, args, scale), s, file, args);
+    const sheet = writeSheet(exportView(studio, s, args, scale), s, file, args);
+    files = sheet.files;
+    output = { width: sheet.width, height: sheet.height, scale };
     if (args.includeJson !== false) atlas = files[0];
   } else {
     throw new ToolError("unsupported_command", `export op '${String(op)}' is not supported.`);
@@ -206,6 +215,9 @@ function exportRun(studio: Studio, args: Record<string, unknown>) {
     files,
     width: s.width,
     height: s.height,
+    outputWidth: output.width,
+    outputHeight: output.height,
+    scale: output.scale,
     frameCount: s.frames.length,
     frame,
     atlas,

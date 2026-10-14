@@ -84,7 +84,8 @@ npx -y github:takecchi/pixel-ai-artist serve
 }
 ```
 
-The first start from GitHub takes about ten seconds (clone, install, build);
+The first start from GitHub takes ten to thirty seconds, depending on the
+machine and the network (clone, install, build);
 later starts reuse npm's cache and take two or three. Pin a branch, tag or
 commit with `github:takecchi/pixel-ai-artist#<ref>`. Working from a checkout
 instead? `npm ci`, then `node dist/cli.js install <client> --local` points the

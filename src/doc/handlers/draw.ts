@@ -246,8 +246,18 @@ function drawBatch(studio: Studio, args: Record<string, unknown>) {
               for (let x = r.x; x < r.x + r.width; x++) changed += Draw.pixel(surface, x, y, clearValue);
             }
           } else {
-            img.pixels.fill(transparentPixel(s));
-            changed += img.width * img.height;
+            const clearValue = transparentPixel(s);
+            let box: Rect | undefined;
+            img.pixels.forEach((value, i) => {
+              if (value === clearValue) return;
+              changed++;
+              const x = cel.x + (i % img.width);
+              const y = cel.y + Math.floor(i / img.width);
+              box = union(box, { x, y, width: 1, height: 1 });
+            });
+            img.pixels.fill(clearValue);
+            touched = union(touched, box);
+            continue;
           }
           break;
         }

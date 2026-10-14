@@ -90,6 +90,43 @@ test("export.run answers the sprite, op, files and the original size and frame c
   });
 });
 
+test("export.run answers the written image's size and the scale for every op, beside the sprite's own size", async () => {
+  await inTempDir(async (dir) => {
+    const { studio } = await fixture();
+    const sizeOf = (r: Reply) => [r.width, r.height, r.outputWidth, r.outputHeight, r.scale];
+    const png = await run(studio, { op: "png", path: path.join(dir, "p.png"), scale: 4 });
+    assert.deepEqual(sizeOf(png), [2, 1, 8, 4, 4]);
+    const gif = await run(studio, { op: "gif", path: path.join(dir, "g.gif"), scale: 3 });
+    assert.deepEqual(sizeOf(gif), [2, 1, 6, 3, 3]);
+    assert.deepEqual([readGif(path.join(dir, "g.gif")).width, readGif(path.join(dir, "g.gif")).height], [6, 3]);
+    const frames = await run(studio, { op: "frames", path: path.join(dir, "f_{frame}.png"), scale: 2 });
+    assert.deepEqual(sizeOf(frames), [2, 1, 4, 2, 2]);
+    const sheet = await run(studio, { op: "spritesheet", path: path.join(dir, "s.png"), scale: 2 });
+    const texture = readPng(path.join(dir, "s.png"));
+    assert.deepEqual(sizeOf(sheet), [2, 1, texture.width, texture.height, 2]);
+    assert.deepEqual([texture.width, texture.height], [12, 2], "three 4x2 frames side by side");
+    const ase = await run(studio, { op: "aseprite", path: path.join(dir, "a.aseprite"), scale: 4 });
+    assert.deepEqual(sizeOf(ase), [2, 1, 2, 1, 1], "the document is written unscaled");
+  });
+});
+
+test("the export tool's reply text names the size of the image it wrote", async () => {
+  await inTempDir(async (dir) => {
+    const { server, studio } = createServer();
+    await fixture(studio);
+    const [ct, st] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "test", version: "0" });
+    await Promise.all([client.connect(ct), server.connect(st)]);
+    try {
+      const res = await client.callTool({ name: "export", arguments: { op: "png", path: path.join(dir, "p.png"), scale: 4 } });
+      const text = (res.content as { text: string }[]).map((c) => c.text).join(" ");
+      assert.match(text, /Image 8×4 \(scale 4\)\./);
+    } finally {
+      await server.close();
+    }
+  });
+});
+
 test("export.run exports the sprite named by `sprite`, not the active one", async () => {
   await inTempDir(async (dir) => {
     const { studio, sprite } = await fixture();
