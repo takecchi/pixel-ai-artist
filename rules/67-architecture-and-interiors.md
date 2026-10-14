@@ -252,7 +252,7 @@ mmmmmmmmmmmmmmmm
 ## Procedure
 
 1. Fix the grid, light direction (upper-left) and a palette of 4–6 swatches per material (`palette` op `ramp` per material; stone cool, wood warm).
-2. Block the facade in flat colour with `draw` op `rect`: roof band, wall, base, openings. `look` op `preview` at 1× and squint: roof, wall and base must separate by value.
+2. Block the facade in flat colour with `draw` kind `rect`: roof band, wall, base, openings. `look` op `preview` at 1× and squint: roof, wall and base must separate by value.
 3. Tile materials first: brick or plaster tile via `draw` kind `grid` from the template, wrap-tested as in `rules://66-tiles-and-autotiling`.
 4. Openings: frame, then glass, then sill and shadow row; door planks before straps before handle.
 5. Eave shadow: 2 rows under the roof, then drop shadows under sills and lintels. One light direction.

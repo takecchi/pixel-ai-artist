@@ -208,7 +208,7 @@ LLLLLLLMML..
 ```
 
 **Explosion, 4 frames (13×13).** Frame 0 (not drawn here) is a dark disc of about
-7 px, `#222034`, via `draw` op `ellipse`. Then flash, sharp blast, fireball, fade.
+7 px, `#222034`, via `draw` kind `ellipse`. Then flash, sharp blast, fireball, fade.
 Hold flash and blast for 1 tick each (40–60 ms), fireball 80 ms, fade 100–120 ms (derived).
 
 ```grid vfx-explosion-1
@@ -358,7 +358,7 @@ C = bolt-halo  #5fcde4
 1. Fix the feeling and the ramp: `palette` op `set` with the 4–5 role colours, or `palette` op
    `ramp` from `#df7126` if the project palette lacks a fire ramp.
 2. Make a transparent `fx` layer (`layer` op `create`); `frame` op `add` to the frame count.
-3. Draw each frame with `draw` op `grid` from a template, same origin on every frame.
+3. Draw each frame with `draw` kind `grid` from a template, same origin on every frame.
 4. `look` op `filmstrip`, then `look` op `onion` on middle frames: the body keeps its
    volume and the tip travels, not teleports.
 5. `frame` op `set_duration` with uneven values; `tag` op `create` the loop (`fire-loop`) or

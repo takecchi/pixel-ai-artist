@@ -249,8 +249,8 @@ Head with warm key from the upper left and a cool fill on the right: the warm si
 2. Set the ramps with `palette` op `set` — one warm and one cool when two sources are used (rule 7); leave room for lit-by-both.
 3. Block planes by facing, not by outline: light / half / shadow masks at 60/40–70/30; `look` op `preview`.
 4. Place the terminator (sharp), the core 1–2 px in, the reflected row (rule 4). Round forms ramp with the curve; flat faces take one colour.
-5. Add the cast shadow with `draw` ops `polyline` + `fill` using the receiver's shadow entry; edge per By size. Add contact occlusion last (rule 17).
-6. Add extra sources: rim (1 px) on the lit contour, back-light contour, second ramp, halo via `draw` op `gradient` (`direction` `radial`, `steps` 3–4, `dither` true) in the light's colours. Ensure the background is darker behind rims.
+5. Add the cast shadow with `draw` kinds `polyline` + `fill` using the receiver's shadow entry; edge per By size. Add contact occlusion last (rule 17).
+6. Add extra sources: rim (1 px) on the lit contour, back-light contour, second ramp, halo via `draw` kind `gradient` (`direction` `radial`, `steps` 3–4, `dither` true) in the light's colours. Ensure the background is darker behind rims.
 7. Check: `recolor` op `desaturate` on a copy — lit/shadow split must still read and not be 50/50; for animated light use `look` op `filmstrip` (flicker = 2–3 frames); for flipped sprites compare the mirror.
 8. `validate`.
 

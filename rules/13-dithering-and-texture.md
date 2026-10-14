@@ -14,7 +14,7 @@ an agent reaches for noise dither or a smooth gradient tool and produces grain, 
 3. **Keep the two shades close.** Adjacent ramp steps with low value difference give a soft transition; high
    contrast gives a loud checkerboard. With a rich palette dither only between neighbouring ramp colours.
 4. **Use ordered levels.** A 4×4 Bayer tile gives levels of 16 (table below). No two dither pixels touch
-   orthogonally up to 50%; above 50% invert the roles so no two *holes* touch. `draw` op `dither`
+   orthogonally up to 50%; above 50% invert the roles so no two *holes* touch. `draw` kind `dither`
    (`pattern` `checker` / `bayer2` / `bayer4` / `bayer8` / `noise`, `ratio` 0 = all `colorA`, 1 = all `colorB`) does
    this; `noise` is random, avoid it.
 5. **Never a wide pixel.** Two touching dither pixels (2×1) read as a mistake. The usual cause is a **phase
@@ -37,7 +37,7 @@ an agent reaches for noise dither or a smooth gradient tool and produces grain, 
     mortar, shadow or light one brick; do not outline every brick.
 12. **Never on faces or near a mouth, never on a sprite that moves.** Dither beside the face reads as stray pixels;
     on an animated part it flickers. Put dithered texture on a static background layer (`rules://06-layers-and-rigging`).
-13. **Screens no longer blur dither into a blend**; the pattern is seen as a pattern. `draw` op `gradient` with
+13. **Screens no longer blur dither into a blend**; the pattern is seen as a pattern. `draw` kind `gradient` with
     few `steps` and `dither: true` bands and dithers the seams; clean them by hand.
 
 ### Bayer 4×4 levels (derived)
@@ -286,7 +286,7 @@ WWWWWWSSWWWWWWWW
 
 1. Ask: can one more palette colour or a bridge do this? If yes, stop.
 2. Pick two adjacent ramp shades (`palette` op `analyze` shows ramp structure and near-duplicates).
-3. Confine the area with `select` (`rect` / `ellipse` / `color`), then `draw` op `dither` with `selectionOnly`, `pattern`
+3. Confine the area with `select` (`rect` / `ellipse` / `color`), then `draw` kind `dither` with `selectionOnly`, `pattern`
    `bayer4` or `checker`, and a `ratio` from the table — or draw a 3–5 band transition with `grid` from a template.
 4. `look` op `ascii` over the seams: find touching dither pixels or phase breaks (rule 5); slide a block or add/remove
    one pixel.

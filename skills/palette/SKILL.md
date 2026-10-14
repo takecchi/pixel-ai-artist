@@ -24,8 +24,9 @@ Match the request, in this order of preference:
 About 2000 presets are bundled. `palette op="preset"` with a name that is not a
 key searches them instead and answers up to 20 `matches` (key, name, author,
 size) and the `total` — call it again with one of those keys. Search by a word
-of the name or author (`endesga`, `gameboy`, `nes`); anything else can be
-loaded from a file with `op="load"`.
+of the name or author (`endesga`, `gameboy`, `nintendo`) — a word matches
+inside longer ones, so a short one like `nes` also finds `japanese-woodblock`;
+anything else can be loaded from a file with `op="load"`.
 
 ## Building ramps
 

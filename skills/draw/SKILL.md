@@ -27,7 +27,7 @@ Then read the subject rules for what you are drawing — the table in
 `skill://studio` under *Subject rules* names them. A hand, a face, a horse,
 an isometric crate or a waterfall each has its own file with size budgets
 and ` ```grid ` templates. A template is a starting point you transcribe with
-`draw` op `grid`, mapping each legend role onto the sprite's palette; adapt
+`draw` kind `grid`, mapping each legend role onto the sprite's palette; adapt
 it to the pose rather than inventing the shape from nothing.
 
 ### 2. Block in the silhouette
@@ -112,11 +112,13 @@ Hand-place where you want it broken.
 
 ### 6b. Text, if the art has words
 
-`draw` op kind `text` lays out a string from a bitmap font and draws it in the
+`draw` kind `text` lays out a string from a bitmap font and draws it in the
 same batch as everything else. Pass `measureOnly: true` with only `text` ops
 first to get the ink bounds back without touching the sprite — that is how
 you centre a label or size a panel around it before committing to a position.
-See [TOOLS.md](../../docs/TOOLS.md#font-format) for the font format.
+Fonts are JSON files in the package's `knowledge/fonts/`; one ships,
+`pixel5x7` (ASCII 32–126), and its file shows the format: cell size, baseline
+and each glyph as rows of `#` and `.`.
 
 ### 7. Verify precisely
 

@@ -50,7 +50,7 @@ At 8 px a platform is mostly its palette and hue choice; at 16 px the policies (
 
 ## Templates
 
-`platform-nes-hero-16`, `platform-snes-hero-16` and `platform-gb-mage-16` show the same discipline at three budgets. Transcribe with `draw` op `grid`, then map roles onto your loaded palette.
+`platform-nes-hero-16`, `platform-snes-hero-16` and `platform-gb-mage-16` show the same discipline at three budgets. Transcribe with `draw` kind `grid`, then map roles onto your loaded palette.
 
 NES sprite: three colours + transparent, no outline. Dark is hair, boots and eye; cloth is the tunic; skin is face and hands.
 
@@ -226,7 +226,7 @@ ORWRRRRO
 1. Read the request for platform words ("NES", "Game Boy", "16-bit", "retro"). Pick a platform and a contract (rule 1); write the seven numbers back to the user in one line.
 2. `sprite_manage` op `new` at a multiple-of-8 canvas. Strict contracts: an indexed sprite makes the palette limit physical.
 3. `palette` op `preset` or `set` (rule 4). `palette` op `get` and confirm the visible colour count matches the budget.
-4. Block in the silhouette with `draw` op `grid`, adapting the nearest template. `look` op `preview` with `scale: 1` is the real-size read; the default ~1024 px preview is for checking clusters.
+4. Block in the silhouette with `draw` kind `grid`, adapting the nearest template. `look` op `preview` with `scale: 1` is the real-size read; the default ~1024 px preview is for checking clusters.
 5. Shade with the platform's ramp length (3 colours NES/GB, 2–3 tones per material SNES/Genesis). Light from the upper left. `recolor` op `shade` for steps, never a hand-picked darker hex.
 6. Strict background: for each 16×16 cell run `read_pixels` with `region` `{x,y,width:16,height:16}` and count distinct colours; ≤4 including the shared backdrop.
 7. `validate` with `checks: ["palette","strays","antialiasing"]` and `strict: true`. Expect 0 off-palette, 0 semi-transparent pixels, ≤1 stray per object.

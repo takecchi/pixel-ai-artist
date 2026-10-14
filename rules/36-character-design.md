@@ -265,7 +265,7 @@ k = boot-mid           #5a3a22
 ## Procedure
 
 1. Write the brief (rule 1) and the shape (rule 2). `sprite_manage` new at the cast canvas.
-2. Thumbnail round: 6–10 silhouettes at ≈ 16×16 on a scratch sprite with `draw` op grid or `rect` / `ellipse` in one flat colour; `look` op preview each; pick 1–2.
+2. Thumbnail round: 6–10 silhouettes at ≈ 16×16 on a scratch sprite with `draw` kind `grid` or `rect` / `ellipse` in one flat colour; `look` op preview each; pick 1–2.
 3. Blow up the winner to its canvas size, still flat; apply rules 4–6 (masses, straight vs curve, negative space).
 4. Silhouette test on a duplicate layer: `recolor` op replace to one flat colour, `look` op preview; for a cast put all sprites on one frame.
 5. Add the strong element and the anchor feature (rules 11, 14), then 2–3 colours via `palette` op ramp, one saturated accent.

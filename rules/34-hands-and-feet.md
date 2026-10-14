@@ -124,7 +124,7 @@ highlight on a hand that is not on the fingertips or the knuckle row is noise
 All hand sheets show a hand with a forearm stub in `sleeve` colours. **Front** =
 the character faces the viewer, or the palm/back of the hand does. **Side** = the
 character faces right, near hand. Cells are separated by one blank column; to draw
-one cell, copy its columns `[i × stride, i × stride + width)` into `draw` op `grid`
+one cell, copy its columns `[i × stride, i × stride + width)` into `draw` kind `grid`
 and map the roles onto the sprite's own palette. Light is from the upper left.
 
 **8 px.** Four 5-px cells (stride 6): arm hanging, sword grip (blade above, grip
@@ -527,7 +527,7 @@ OOOOOOOOO.OOOOOOOOO.
    top-down). Pick the template whose size row matches; at an in-between height
    take the smaller one and add a pixel to the thumb or toe cap, not to the palm.
 3. Draw the limb first (sleeve, trouser), then stamp the hand or boot with `draw`
-   op `grid` at the limb's end, using `transparent: "skip"` so the limb underneath
+   kind `grid` at the limb's end, using `transparent: "skip"` so the limb underneath
    survives. Map roles onto the sprite's palette with `palette` op `get`; the
    example hexes only make the template renderable.
 4. Hands that grip: draw the object first on its own layer, then the fist on top,

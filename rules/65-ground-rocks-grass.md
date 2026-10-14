@@ -209,7 +209,7 @@ mmmmmmmmkmmmmmmsssk.
 1. Fix tile size and palette first. `palette` op `ramp` once per material, 3 steps, small `spread`; darks lean toward blue-teal, lights toward yellow (`rules://20-color-for-pixel-art`).
 2. Layers: `ground` (base tile), `overlay` (tufts, flowers, rocks), `shadow` (contact and cast shadows).
 3. Transcribe the nearest template with `draw` kind `grid`, mapping each legend role to your palette. Re-place clusters by editing the rows, not by redrawing: `look` op `ascii` with `rulers=false`, edit, resend at the same x/y.
-4. Wrap check: `draw` op `blit` the tile into its eight neighbours on a scratch 48×48 layer (`fromLayer`, offsets ±16), then `look` op `preview`. Hunt for rows or columns of aligned pixels, a cluster that touches only one side, a repeated bright pixel.
+4. Wrap check: `draw` kind `blit` the tile into its eight neighbours on a scratch 48×48 layer (`fromLayer`, offsets ±16), then `look` op `preview`. Hunt for rows or columns of aligned pixels, a cluster that touches only one side, a repeated bright pixel.
 5. Move the seam: blit the four quadrants swapped (there is no wrapping `transform` op `translate`), fix what sits in the middle now, swap back. Repeat the wrap check.
 6. Make the quiet tile from a copy: delete two thirds of the clusters, keep one of each kind.
 7. Rocks on `overlay`: silhouette → three planes → crack → contact row on `shadow`. `look` op `preview` at 1× next to a character.

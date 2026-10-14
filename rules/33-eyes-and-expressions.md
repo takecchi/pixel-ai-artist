@@ -402,10 +402,10 @@ OSSSSSSSMmmmMSSSSSSSO.OSSSSSMTTTTTTTMSSSSSO.OSSSSSSSMMMMMSSSSSSSO
 1. Draw the base head with no eyes, brows or mouth (`rules://32-heads-and-faces`).
 2. Put the face on its own layer (`layer` op `create` "face", `rules://06-layers-and-rigging`)
    so an expression is a swap, not a repaint.
-3. Pick the eye size from the ladder; `draw` op `grid` the entry at the eye line — once per
+3. Pick the eye size from the ladder; `draw` kind `grid` the entry at the eye line — once per
    eye, the second at the mirrored x, catch-light on the same side in both.
 4. One expression per frame: `frame` op `duplicate`, clear the face cel region
-   (`draw` op `clear`), stamp brows, eyes, mouth from the recipe table; `tag` op `create` per
+   (`draw` kind `clear`), stamp brows, eyes, mouth from the recipe table; `tag` op `create` per
    expression name.
 5. `look` op `filmstrip`: each expression must be told apart by brows plus mouth alone. Cover
    the eyes with a thumb — if two faces become identical, fix the mouth; cover the mouth —

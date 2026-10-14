@@ -141,6 +141,20 @@ your agent ──stdio/MCP──▶ server: tools ──▶ Studio ──▶ doc
   server only reads and writes the files the agent names.
   [Architecture](docs/ARCHITECTURE.md) · [security](SECURITY.md).
 
+## Files it reads and writes
+
+| Tool and op | Formats |
+|---|---|
+| `sprite_manage` `open` | `.aseprite` / `.ase`, PNG, GIF, JPEG — told apart by their content, not their name |
+| `sprite_manage` `save` / `save_as` | `.aseprite` / `.ase` (layers, frames, durations and tags), `.png` (one file per frame when there are several), `.gif` |
+| `export` `png` / `gif` / `frames` | `.png` or `.gif`, by the path's extension |
+| `export` `spritesheet` | a `.png` texture and a `.json` atlas beside it |
+| `export` `aseprite` | `.aseprite` / `.ase` |
+| `palette` `load` | `.gpl`, `.hex`, `.pal`, `.act`, `.col`, `.aseprite` / `.ase`, and the colours of a `.png`, `.gif` or `.jpg` |
+| `reference` `import` / `sample_palette` | PNG, GIF (its first frame), JPEG |
+
+JPEG is read, never written. BMP, WebP and TGA are not handled at all.
+
 ## Development
 
 ```bash

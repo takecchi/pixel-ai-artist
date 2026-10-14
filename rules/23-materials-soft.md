@@ -240,7 +240,7 @@ Slime: hard 2-px specular upper-left, reflected patch lower-right, coloured dark
 1. Choose the material row from the table and set its ramp with `palette` op `set`; decide the light (`rules://24-lighting-scenarios`).
 2. Draw the silhouette with the material's edge signature (rule 3); `look` op `preview`.
 3. Fill the base tone; add *one* shadow step in the shadow side; for skin make that step the terminator (rule 7).
-4. Add the material's structure: folds (cloth), highlight band (hair), tuft notches (fur), stitch row (leather), scale cells (scales), spec + reflected patch (slime). Draw with `draw` ops `polyline`/`pixels`, or transcribe a template with op `grid`.
+4. Add the material's structure: folds (cloth), highlight band (hair), tuft notches (fur), stitch row (leather), scale cells (scales), spec + reflected patch (slime). Draw with `draw` kinds `polyline`/`pixels`, or transcribe a template with kind `grid`.
 5. Add the deep core step and bounce only if the size allows (see By size); no highlight on cloth, fur, scales.
 6. For skin add the warm accent pixels and the eye-white check (lightest skin tone, not white).
 7. `look` op `ascii`: no orphan pixels, no 2×1 dither pairs, folds not parallel everywhere. `validate`.

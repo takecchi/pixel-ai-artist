@@ -306,8 +306,8 @@ ONNNNNNNNO
 
 1. `sprite_info`, then rig on layers: head, torso+arms, legs (`rules://06-layers-and-rigging`). Legs hold feet static.
 2. Draw frame A and run the silhouette test (`rules://03-silhouette-and-form`).
-3. `frame` op `duplicate` (`linkCels` off) twice. On frame 2 `cel` op `move` the torso layer `dy: 1`; on frame 3 also
-   the head layer. Redraw the legs 1 row shorter with `draw` op `grid`; paint the neck row on frame 2.
+3. `frame` op `duplicate` twice. On frame 2 `cel` op `move` the torso layer `dy: 1`; on frame 3 also
+   the head layer. Redraw the legs 1 row shorter with `draw` kind `grid`; paint the neck row on frame 2.
 4. `look` op `diff` frame 1 → 2 and 2 → 3: only edge rows and the moved chunk should change. If more than ~50 % of
    the pixels differ you moved too much.
 5. `look` op `onion` with `layer` set to torso: the ghosts must sit 1 row apart, never 2.

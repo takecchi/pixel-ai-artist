@@ -80,7 +80,7 @@ Panels: 12×12 (3 px corners) to 16×16 (4 px corners); bars 5 px tall at 16 px 
 ## Templates
 
 **9-slice panel (12×12).** Slice at columns 3 and 9, rows 3 and 9: nine regions, corners
-3×3. Use `draw` op `blit` to build any size: corners once, edge strips repeated, middle
+3×3. Use `draw` kind `blit` to build any size: corners once, edge strips repeated, middle
 filled.
 
 ```grid ui-9slice-panel
@@ -289,7 +289,7 @@ kLMMDk
 
 1. Fix the kit first: outline colour, 3–4 frame values, one accent, light direction. Put them
    in the palette (`palette` op `set`) before drawing any element.
-2. Draw the 9-slice panel at its smallest size with `draw` op `grid`; check by assembling
+2. Draw the 9-slice panel at its smallest size with `draw` kind `grid`; check by assembling
    a 40×24 test panel with `blit`; judge with `look` op `preview`.
 3. Build bar, button and slot from the same corner and edge pieces (3-slice for bars).
 4. Draw icons on a canvas with the margin from rule 9; fill flat first and apply the

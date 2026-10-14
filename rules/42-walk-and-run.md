@@ -347,7 +347,7 @@ H = hair           #7a4a2a
 2. `rig` the body onto layers: head, torso, near arm, far arm, near leg, far leg
    (`rules://06-layers-and-rigging`). Far limbs one shade darker so they read
    behind. Feet on one fixed ground row.
-3. Frame 1 (contact) and frame 3 (pass) with `draw` op `grid`, from a template
+3. Frame 1 (contact) and frame 3 (pass) with `draw` kind `grid`, from a template
    above or by hand. Look at both before continuing.
 4. `frame` op `duplicate` for 2 and 4; move limbs per layer with `cel` op `set`
    or `transform` op `translate`. Re-measure limb length after each move.

@@ -248,11 +248,11 @@ SSSSSSSSSSSSSSSS.SSSSSSSSSSSSSSSS.SSSSSSSSSSSSSSSS.SSSSSSSSSSSSSSSS.SSSSSSSSSSSS
    `palette` op `ramp` for skin (5 steps), hair (4), cloth (3) (`rules://01-palette-and-color`).
 2. Layers (`layer` op `create`): backdrop, body, head, hair, face (eyes, brows, mouth), accents
    (`rules://06-layers-and-rigging`). Expressions will swap the face layer only.
-3. Block in: `draw` op `grid` or `ellipse` for the face-neck-shoulders shape, then the hair
+3. Block in: `draw` kind `grid` or `ellipse` for the face-neck-shoulders shape, then the hair
    masses, in flat colour (`portrait-48-blockin`). `look` op `preview` at 1×; fix the head shape now.
-4. Guide layer: `draw` op `line` rows for hairline, brow, eye line, nose base, mouth, chin from
+4. Guide layer: `draw` kind `line` rows for hairline, brow, eye line, nose base, mouth, chin from
    rule 5; delete it at the end.
-5. Planes: fill the light patches and the far-side shadow with `draw` op `fill`; add the 1-px
+5. Planes: fill the light patches and the far-side shadow with `draw` kind `fill`; add the 1-px
    shadow under the hair edge and the chin. `look` op `preview`.
 6. Hair: flow lines from the part, highlight band, 2-px strands; no outline on the hairline.
 7. Eyes, brows, nose, mouth, in that order; `look` op `ascii` with a `region` to check gaps and

@@ -211,7 +211,7 @@ KTTTK.KTTRTTK.KTRRRRRTK
 
 1. Choose the type, projection and size; note the wheel diameter D and compute the proportions
    from rule 4.
-2. `draw` op `grid` the wheel stamps at their centres; box the body above them with `rect`.
+2. `draw` kind `grid` the wheel stamps at their centres; box the body above them with `rect`.
 3. Cut the silhouette (hood, cabin, nose) with row spans; check `look` op `preview` for the
    three-block read.
 4. Add arches by painting the one-pixel-larger ring, then the tyre.

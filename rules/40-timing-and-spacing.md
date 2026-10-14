@@ -215,7 +215,7 @@ x = contact      #3b82e8
 ## Procedure
 
 1. Choose the tick and budget from the tables above; write the beat ("windup 2, strike 1, hold 2, recover 3").
-2. Block the keys only: `frame` op `add` `count`, `draw` op `grid` per key. `look` op `filmstrip`: the story must read from
+2. Block the keys only: `frame` op `add` `count`, `draw` kind `grid` per key. `look` op `filmstrip`: the story must read from
    the keys alone, and each pose must pass the flat-fill test.
 3. Place offsets from a spacing ladder: `cel` op `move` `dx`/`dy` per frame. Use `cel` op `tween` with `ease_in_out` /
    `ease_out` only for secondary parts; whole-pixel rounding stutters a small primary move.

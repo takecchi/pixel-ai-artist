@@ -268,11 +268,11 @@ WLWLW
 1. Decide the layers (far/mid/near) and the tile `H` × `F`; write the shift per layer from
    rule 4 before drawing a single drop.
 2. New sprite or layer at tile size (`sprite_manage` op `new`); draw frame 0 with `draw`
-   op `grid` from a template, hand-moving offsets so no lanes align.
+   kind `grid` from a template, hand-moving offsets so no lanes align.
 3. `frame` op `duplicate` to `F` frames. For each frame and layer, move the layer's pixels
    with `transform` op `translate` (`dy` = shift). Pixels that leave the bottom must
-   re-enter at the top: `draw` op `blit` the bottom strip to the top before translating.
-4. Add splashes: `draw` op `grid` at each streak's landing point, 3 frames.
+   re-enter at the top: `draw` kind `blit` the bottom strip to the top before translating.
+4. Add splashes: `draw` kind `grid` at each streak's landing point, 3 frames.
 5. `look` op `filmstrip`, then check the loop: frame `F` must lead into frame 1, and frame
    0 shifted by `H` must equal frame 0.
 6. `frame` op `set_duration` (rain 50–60 ms), `tag` op `create` the loop.

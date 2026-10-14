@@ -503,7 +503,7 @@ g = gold-trim      #e2b94c
    its base colour. Shape bangs, hairline and the outer contour before shading.
 3. Hair: `palette` op `ramp` from the base colour for 3–4 tones (hue-shifted). Place the
    highlight band first, then the shadow under bangs and at the ends, then 1 px cluster
-   lines. Stamp a template with `draw` op `grid`, `transparent: "skip"`.
+   lines. Stamp a template with `draw` kind `grid`, `transparent: "skip"`.
 4. Cloth: mark support points, draw the folds from them, count against the budget.
    Armour: draw each piece on its own layer, shade in chunks, assemble.
 5. Cape: its own layer under the body. Draw the still shape first; draw run and jump as

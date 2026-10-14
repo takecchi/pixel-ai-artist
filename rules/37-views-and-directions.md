@@ -149,10 +149,10 @@ OSOlTTTtOsO..OSOlTTtOsO...OlSTTtO.....OlTTTTtO..OlOTTTTTOtO
 ## Procedure
 
 1. State the set and canvas (rule 1, 11). `sprite_manage` new with canvas wide enough for all frames in a row; `layer` op create one layer per direction or per part.
-2. Draw the row guides first: one `draw` op line per landmark row (head top, chin, shoulder, belt, crotch, knee, sole) on a locked "guides" layer (`layer` op set editable:false).
-3. Draw E (profile) with `draw` op grid, then the hero view (S or SE) at the same rows. `look` op ascii to verify rows match the guides.
-4. Derive N from S: copy with `draw` op blit, remove face, extend hair, keep collar and shoulders. Derive diagonals by shifting the face block (rule 6) and the torso centre line (rule 5).
-5. Mirror E to W with `draw` op blit `flipHorizontal:true` or `transform` op flip on a copy; then repair asymmetric items and re-shade for the light direction.
+2. Draw the row guides first: one `draw` kind `line` per landmark row (head top, chin, shoulder, belt, crotch, knee, sole) on a locked "guides" layer (`layer` op set editable:false).
+3. Draw E (profile) with `draw` kind `grid`, then the hero view (S or SE) at the same rows. `look` op ascii to verify rows match the guides.
+4. Derive N from S: copy with `draw` kind `blit`, remove face, extend hair, keep collar and shoulders. Derive diagonals by shifting the face block (rule 6) and the torso centre line (rule 5).
+5. Mirror E to W with `draw` kind `blit` `flipHorizontal:true` or `transform` op flip on a copy; then repair asymmetric items and re-shade for the light direction.
 6. `look` op preview of all directions side by side at 1×, then `look` op filmstrip if frames exist. Silhouette test each (`rules://03-silhouette-and-form`).
 7. `validate`; check the same number of body rows and the same feet row in every view.
 

@@ -289,7 +289,7 @@ ONNNNNO
 ## Procedure
 
 1. `sprite_info`; decide gameplay or timed strip. Keep the foot pixel on one x,y. Draw rest, crouch, launch, apex, fall,
-   land with `draw` op `grid`, one frame each. `look` op `preview`: all silhouettes must differ filled solid (`rules://03-silhouette-and-form`).
+   land with `draw` kind `grid`, one frame each. `look` op `preview`: all silhouettes must differ filled solid (`rules://03-silhouette-and-form`).
 2. Timed strip: lay out heights with the rule 2 fractions; `cel` op `move` `dy` per frame. Keep `tween` for secondary
    parts only: whole-pixel rounding stutters a small arc.
 3. Squash/stretch: edit the drawing; `look` op `diff` against rest for pixel counts. `look` op `onion` on the body

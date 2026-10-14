@@ -214,11 +214,11 @@ OJJJJJO.....OJJJJJJO.......OJJJJJO........OJJJJJJO...................OJJJJJJJJJO
 
 ## Procedure
 
-1. `layer` op create "line-of-action"; draw the curve with `draw` op polyline or paste a guide template. Decide the weight foot and mark its column.
-2. `layer` op create "dummy"; block head, chest and pelvis as three flat shapes on the curve with `draw` op grid or `draw` op ellipse / rect. Tilt shoulders against hips (rule 3).
-3. Add limbs as 3→2 px tapered strokes (`draw` op line with `thickness`, or `grid`). Hands and feet as clusters.
+1. `layer` op create "line-of-action"; draw the curve with `draw` kind `polyline` or paste a guide template. Decide the weight foot and mark its column.
+2. `layer` op create "dummy"; block head, chest and pelvis as three flat shapes on the curve with `draw` kind `grid` or `draw` kind `ellipse` / rect. Tilt shoulders against hips (rule 3).
+3. Add limbs as 3→2 px tapered strokes (`draw` kind `line` with `thickness`, or `grid`). Hands and feet as clusters.
 4. `look` op preview; then the silhouette test: `layer` op duplicate, `recolor` op replace every colour with one dark flat colour, `look` op preview, then delete the copy. If the action is unclear change the pose, not the shading.
-5. Shift a mass by `draw` op blit to the new x/y plus `clear` of the old one, rather than redrawing; compare variants on separate frames with `look` op onion.
+5. Shift a mass by `draw` kind `blit` to the new x/y plus `clear` of the old one, rather than redrawing; compare variants on separate frames with `look` op onion.
 6. Only then outline and shade (`rules://02-shading-and-light`). For animation keep the same masses across frames (`rules://06-layers-and-rigging`, `rules://42-walk-and-run`).
 
 ## Mistakes

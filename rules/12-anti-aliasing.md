@@ -216,7 +216,7 @@ DDDDDDDDDDDDDDDDDD..DDDDDDDDDDDDDDDDDD..DDDDDDDDDDDDDDDDDD
 
 1. Draw and clean the line **aliased**; fix every jaggy first.
 2. `look` op `ascii`; list every step of 3+ px on the long contours. Leave 1:1 diagonals alone.
-3. For each, place the strip in the inner corner with `draw` op `pixels`: darker shade at the corner, lighter beyond.
+3. For each, place the strip in the inner corner with `draw` kind `pixels`: darker shade at the corner, lighter beyond.
    Strip length by rule 4. Pick shades with `palette` op `ramp` or reuse existing colours (`paletteLock` on).
 4. `look` op `preview` at `scale: 1` and 2. Blur your eyes: the curve should look rounder, the line not thicker.
 5. If it looks softer but not rounder, delete the strips and keep the aliased version.

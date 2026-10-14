@@ -35,9 +35,9 @@ across per 1 up; `1:N` means 1 across per N up.
    read; fix by moving **one** end pixel of a run to its neighbour — the pixel count stays the same.
 7. **No lone wolves.** A pixel that sticks out of the imagined smooth curve, or falls short of it, is the error.
    The cure is usually deleting 1–2 pixels, not re-stroking the curve. A re-stroke brings new jaggies.
-8. **Circles and ellipses.** `draw` op `ellipse` draws the canonical row widths for
+8. **Circles and ellipses.** `draw` kind `ellipse` draws the canonical row widths for
    D=4–16 (`rules://72-3d-forms` has the table; D=3 comes out a square, so stamp it).
-   For a hand-drawn curve, draw one quadrant and mirror it with `draw` op `blit`
+   For a hand-drawn curve, draw one quadrant and mirror it with `draw` kind `blit`
    (`flipHorizontal` / `flipVertical`) — symmetry is then exact. Odd diameters share one
    centre row and column between the halves; copy the half, not a second centre.
 9. **Colour edges are lines.** The boundary between two fills obeys rules 3–7 exactly. Cel-shading edges are where
@@ -49,7 +49,7 @@ across per 1 up; `1:N` means 1 across per N up.
     arcs read calm. Pick one dominant family per asset. Front and back contours of a body step in opposite
     directions (chest out, back straight; knee forward, calf back); a 1 px straight column head to feet is a failure.
     For converging lines, fix the vanishing point so the main edges land on clean ratios; round run lengths, never endpoints.
-13. **Use the line op, then check the ends.** `draw` op `line` is even for clean ratios; for other angles verify
+13. **Use the line op, then check the ends.** `draw` kind `line` is even for clean ratios; for other angles verify
     the period, and trim or lengthen a half-length first or last run by 1 px. Hand-placed `pixels` is where runs go wrong.
 
 ### Circle row widths (derived: one choice per diameter that keeps the edge runs monotone)
@@ -291,12 +291,12 @@ FFFFFFFFFFFFFFF..FFFFFFFFF..FFFFF..FFFFF
 ## Procedure
 
 1. Decide the dominant line family and the clean ratios you will use before the first pixel.
-2. Block the shape with `draw` ops `line` / `ellipse` / `polyline` as a draft, or transcribe a template with op `grid`.
+2. Block the shape with `draw` kinds `line` / `ellipse` / `polyline` as a draft, or transcribe a template with kind `grid`.
 3. `look` op `ascii` with a `region` crop and `rulers=false`; write the run list of every curve and slope.
 4. Fix in this order: elbows (rule 2), then jaggies (rule 6), then lone wolves (7). Removing elbows creates new
-   jaggies, so this is two passes. Delete one pixel with `draw` op `clear` on a 1×1 `region`; move one with
+   jaggies, so this is two passes. Delete one pixel with `draw` kind `clear` on a 1×1 `region`; move one with
    `pixels`; re-lay a whole straight segment with `line`.
-5. Mirror symmetric shapes with `draw` op `blit` flips instead of drawing both halves.
+5. Mirror symmetric shapes with `draw` kind `blit` flips instead of drawing both halves.
 6. `look` op `preview` at `scale: 1` and again at the default scale — flaws visible at one are invisible at the other.
 7. `validate`: it has no jaggy or elbow check. `strays` only reports pixels with no opaque 4-neighbour, `outline`
    only gaps in the edge colour. Run lengths are by-eye work.

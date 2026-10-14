@@ -13,6 +13,7 @@ tools:
   - mcp__plugin_pixel-ai-artist_pixel-ai-artist__look
   - mcp__plugin_pixel-ai-artist_pixel-ai-artist__read_pixels
   - mcp__plugin_pixel-ai-artist_pixel-ai-artist__validate
+  - mcp__plugin_pixel-ai-artist_pixel-ai-artist__palette
   - mcp__plugin_pixel-ai-artist_pixel-ai-artist__reference
 disallowedTools:
   - Write
@@ -38,7 +39,9 @@ critiques written to be easy to fix rather than true.
    missed a part the brief makes central (the face, the boombox, the bridge),
    that is a **BLOCKING read failure**, whatever `validate` says.
 4. `sprite_info` — size, palette, layers, frames, tags. Then `validate` — the
-   mechanical findings.
+   mechanical findings — and `palette op="analyze"` for near-duplicate colours
+   and brightness-only ramps, which `validate` cannot see. `get` and `analyze`
+   are the only `palette` ops you call; the others change the palette.
 5. `look` op `ascii` on anything that felt wrong but you could not name.
 6. `look` op `filmstrip` if there is more than one frame, then `look` op `onion`
    on any in-between that looked like it jumped — ghosted neighbours show a limb

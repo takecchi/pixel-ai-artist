@@ -357,10 +357,10 @@ OHHHHHHSeOOeSSSSWwESSO.....OHHHHHHHHHHHHSSSSSSSkkkkkkkSSO...
 ## Procedure
 
 1. `sprite_info`; fix H from the heads-tall plan and pick odd/even width (rule 6).
-2. `layer` op `create` "guide"; `draw` op `line` the centre axis and one row per landmark from
+2. `layer` op `create` "guide"; `draw` kind `line` the centre axis and one row per landmark from
    the table. At ≤12 px skip the guide and read rows off the table.
-3. On a "head" layer block the silhouette in one flat skin colour (`draw` op `grid` from the
-   nearest template, or `draw` op `ellipse` and trim). `look` op `preview` at 1×: it must read
+3. On a "head" layer block the silhouette in one flat skin colour (`draw` kind `grid` from the
+   nearest template, or `draw` kind `ellipse` and trim). `look` op `preview` at 1×: it must read
    as a head already (`rules://03-silhouette-and-form`).
 4. Eyes on the eye line, then mouth, brows, nose, ears (rule 17). `look` op `ascii` with a
    `region` to check rows, gaps, parity.

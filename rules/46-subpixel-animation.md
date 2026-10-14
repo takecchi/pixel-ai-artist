@@ -158,7 +158,7 @@ mFFFO.OFFFO.OFFFm
 
 ## Procedure
 
-1. Name the boundary that moves and its direction (rule 6). Draw keys A and B a full pixel apart with `draw` op `grid`.
+1. Name the boundary that moves and its direction (rule 6). Draw keys A and B a full pixel apart with `draw` kind `grid`.
 2. `frame` op `duplicate` A to make the half-step M. `look` op `ascii` on the region, then edit only the boundary
    pixels: A's trailing pixel → the ramp neighbour, B's leading pixel → its neighbour. Runs ≥ 2–3 px.
 3. `look` op `diff` A → M and M → B: only boundary pixels may differ; a large diff means you moved a shape.

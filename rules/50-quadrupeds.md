@@ -449,7 +449,7 @@ OPPPOOSSBBBBBBBBBBBBBBBBBBSSMO.
    `body`, `head`, `leg-near-hind`, `leg-near-front` (`rules://06-layers-and-rigging`).
 3. On `sketch`, `draw` the spine as a 1 px `line` and the three masses as `ellipse` ops.
    Mark the six anchors from the table with `pixels`.
-4. Transcribe the nearest template with `draw` op `grid` onto `body`, or build the legs as
+4. Transcribe the nearest template with `draw` kind `grid` onto `body`, or build the legs as
    `polyline` segments between the anchors. Do the far legs a ramp step darker.
 5. Silhouette test: `look` op `preview`, then squint. Species must read in one flat colour.
    If it does not, change a ratio (oversize feature), not the shading.

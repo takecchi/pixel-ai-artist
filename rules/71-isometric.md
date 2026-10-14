@@ -11,7 +11,7 @@ or a roof. For the choice between projections see `rules://70-perspective`.
    edge directions: vertical, 2:1 (both ways), 1:1, 1:2 steep (windscreens, tapers),
    horizontal only for the rare flat rim. Every receding edge in the scene is the same
    2:1 line, runs of exactly 2,2,2. A 4,4,4 run is worse than 2,2,2; 2,3,2 is a bug.
-2. **Draw lines with `draw` op `line`** from a point to a point with dx = 2·dy, then
+2. **Draw lines with `draw` kind `line`** from a point to a point with dx = 2·dy, then
    `look` op `ascii` and confirm every row has the same run. Keep a ruler: one spare
    layer with one long 2:1 line you can slide against edges.
 3. **A tile is a diamond twice as wide as tall, even sizes only:** 16×8, 24×12,
@@ -35,7 +35,7 @@ or a roof. For the choice between projections see `rules://70-perspective`.
    along +y by (−W/2, +W/4), one cube up by (0, −W/2). Nearer tiles overlap the ones behind,
    so draw back to front: ascending x+y, then ascending height.
 9. **Floor circles are 2:1 ellipses** (16×8, 24×12, 32×16 …): table and templates in
-   `rules://72-3d-forms`. `draw` op `ellipse` with that box draws the table exactly.
+   `rules://72-3d-forms`. `draw` kind `ellipse` with that box draws the table exactly.
 10. **Circles on a wall are skewed circles.** Draw the flat circle, shear it by 1 px
     per 2 px across (left wall: slope down to the right, right wall: mirror) and repair
     the first and last rows by hand. Bounding box ≈ d wide by 1.12·d tall. Even tricky shapes
@@ -259,7 +259,7 @@ CCCCCCCCCCC.
 ## Procedure
 
 1. Choose tile size and light direction; create a `ruler` layer with one long 2:1 line.
-2. Stamp a cube/tile template with `draw` op `grid` (`transparent: "skip"` to overlay
+2. Stamp a cube/tile template with `draw` kind `grid` (`transparent: "skip"` to overlay
    existing art), or compute the silhouette from rule 4 for other sizes.
 3. Block the mass from cuboids on one layer per part (`layer` op `create`); carve last.
 4. Colour faces top/left/right from one ramp (`palette` op `ramp`, `rules://02-shading-and-light`).
@@ -271,7 +271,7 @@ CCCCCCCCCCC.
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| Jagged, uneven edges | Free-hand or 30° lines | Redraw with `draw` op `line` at dx = 2·dy |
+| Jagged, uneven edges | Free-hand or 30° lines | Redraw with `draw` kind `line` at dx = 2·dy |
 | Object looks pasted on | No ground shadow | Add a flat 2:1 shadow |
 | Faces read as one blob | Same value on left and right | Left −15%, right −25% |
 | Light flips between blocks | Per-object lighting | One light for the scene |
