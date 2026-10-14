@@ -121,6 +121,18 @@ test("isPixelMutation matches OpenCode tool ids, not Claude's", () => {
   }
 });
 
+test("isPixelMutation also matches the short pixel_ form of the tool ids", () => {
+  for (const name of ["pixel_draw", "pixel_recolor", "pixel_transform"]) {
+    assert.equal(isPixelMutation(name), true, name);
+  }
+  for (const name of [
+    "pixel-ai_draw", "pixel_look", "pixel_draw_extra", "pixel__draw", "xpixel_draw",
+    "mcp__pixel-ai-artist__draw", "pixel-ai-artist-draw", null,
+  ]) {
+    assert.equal(isPixelMutation(name), false, String(name));
+  }
+});
+
 test("resolveSkillsDir finds the checkout skills and fails softly elsewhere", () => {
   const here = path.dirname(fileURLToPath(new URL("../opencode/index.mjs", import.meta.url)));
   assert.equal(resolveSkillsDir(here), path.resolve(here, "..", "skills"));

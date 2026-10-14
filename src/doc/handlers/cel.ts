@@ -135,6 +135,12 @@ function celApply(studio: Studio, args: Record<string, unknown>) {
   const sprite = studio.resolveSprite(args.sprite);
   const op = String(need(args.op, "op"));
   if (op === "list") return list(studio, sprite, args);
+  if (op === "link" || op === "unlink") {
+    throw new ToolError(
+      "unsupported_command",
+      `cel op '${op}' is not ported in this version. Linked cels are not ported: every cel owns its image. Copy the cel to each frame with op 'copy'.`,
+    );
+  }
 
   const layer = studio.resolveLayer(sprite, args.layer);
   const frame = studio.resolveFrame(sprite, args.frame);
