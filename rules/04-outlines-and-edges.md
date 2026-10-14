@@ -34,7 +34,7 @@ computed one.
 - A shallow line is a run of N, then N, then N. Keep N the same.
 - Never place a single pixel that breaks an otherwise even run.
 
-`draw` op `line` uses Bresenham, which is even by construction. Hand-placed
+`draw` kind `line` uses Bresenham, which is even by construction. Hand-placed
 `pixels` ops are where runs go wrong — check them with `look` op `ascii`.
 
 ## Doubles and corners

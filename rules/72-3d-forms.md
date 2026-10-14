@@ -48,7 +48,7 @@ and ellipses, and how each primitive is lit. Isometric placement is in
     core, two widest rows. Edge runs shorten at a steady rate to the 45° point, then the
     pattern turns; no run of 1 beside a run of 3, no doubled corner. The table below is
     that rule, symmetric, corners empty.
-12. **`draw` op `ellipse` draws exactly this table** for D=4–16 and the 2:1 ellipses
+12. **`draw` kind `ellipse` draws exactly this table** for D=4–16 and the 2:1 ellipses
     below, so a plain circle or floor ellipse can be one op. D=3 comes out a 3×3 square:
     stamp the plus from the template instead. Shaded forms still go through the grid
     templates, which carry the bands. Above these sizes, check the result with `look`
@@ -258,8 +258,8 @@ FFFFFFFFFF.....
 
 ## Procedure
 
-1. Pick the form and its diameter/size; stamp the circle/ellipse template (`draw` op `grid`)
-   or paint the row widths from the table; `draw` op `ellipse` gives the same outline.
+1. Pick the form and its diameter/size; stamp the circle/ellipse template (`draw` kind `grid`)
+   or paint the row widths from the table; `draw` kind `ellipse` gives the same outline.
 2. Build the ramp first: `palette` op `ramp` from the base colour, 4–6 steps, hue-shifted.
 3. Fill by band: map template glyphs to ramp colours in the grid legend; for a new size
    scale the template band by band, keeping the terminator hard.

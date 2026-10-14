@@ -5,10 +5,10 @@ Machine-made pixel art is a picture *of* pixel art, not pixels on a grid. Image 
 ## Rules
 
 1. **Audit before "done" and before handing over anything derived from an image.** Order: `sprite_info` (size, mode), `validate` with `checks` naming all of `palette`, `strays`, `outline`, `banding`, `antialiasing`, `animation` and `strict: true`, `palette` op `analyze`, `look` op `preview` with `scale: 1`, then the by-eye items in Review. `validate` alone is never the verdict (see "What validate cannot see").
-2. **Know your own entry points.** Drawing at 1× with `draw` cannot create mixels. Tells reach your canvas through: (a) imported references, (b) a widened palette (`paletteLock: false`, `palette` op `extract` without a cap), (c) `draw` ops `gradient` with many steps or `dither` pattern `noise`, (d) hand AA that overshoots, (e) orphan pixels from coordinate slips, (f) soft alpha from layer opacity, (g) skipped decisions on light and hierarchy. Treat each as a controlled operation.
+2. **Know your own entry points.** Drawing at 1× with `draw` cannot create mixels. Tells reach your canvas through: (a) imported references, (b) a widened palette (`paletteLock: false`, `palette` op `extract` without a cap), (c) `draw` kinds `gradient` with many steps or `dither` pattern `noise`, (d) hand AA that overshoots, (e) orphan pixels from coordinate slips, (f) soft alpha from layer opacity, (g) skipped decisions on light and hierarchy. Treat each as a controlled operation.
 3. **Triage an incoming image with the run test.** Read one row with `read_pixels` (`region` height 1) and list the same-colour run lengths. All runs multiples of one k>1 = a clean pre-scaled file: recoverable (rule 5). Runs spread across, say, 8–14 with no common divisor = mixels: not recoverable by snapping; redraw (rule 4).
 4. **Generated or messy input is a concept, not an asset.** Import it with `reference`, draw over it at the target size, and use `look` op `compare` to name the few biggest mismatches. Upscalers, blurs, "pixelate" filters and smoothing only enlarge the problem. Resolved conflict: one source automates unscaling (find the grid, vote a colour per cell); another tested it on real generated images and found none that could be trusted, with detectors disagreeing by 2× on the same file. Decision: auto-unscale only after the run test passes; otherwise redraw.
-5. **Exact recovery of a pre-scaled file.** `transform` op `scale` only enlarges. To go down, `sprite_manage` a new canvas of W/k × H/k, `reference` op `import` with `fit: "stretch"` (nearest-neighbour), then copy the reference into the art with `draw` op `blit` (`fromLayer: "reference"`). Re-quantise afterwards: averaging and resampling create colours that were never in the art.
+5. **Exact recovery of a pre-scaled file.** `transform` op `scale` only enlarges. To go down, `sprite_manage` a new canvas of W/k × H/k, `reference` op `import` with `fit: "stretch"` (nearest-neighbour), then copy the reference into the art with `draw` kind `blit` (`fromLayer: "reference"`). Re-quantise afterwards: averaging and resampling create colours that were never in the art.
 6. **One tell proves nothing.** Beginners make mixels, strays and bloated palettes; some artists use them on purpose. Three independent tells together mean machine-made or auto-resized. Report findings neutrally ("this has 9 isolated pixels and 214 colours") and offer fixes; do not accuse, and ask for layers or a time-lapse when provenance matters.
 7. **Fix in this order:** pitch and scale → palette → silhouette and light → clusters and banding → edges → details. Fixing edges before the palette repeats work.
 8. **Fix at native scale.** Never smooth, blur, upscale or filter to hide a tell. Integer nearest-neighbour is the only legal resize (`transform` op `scale` factor). Leave `paletteLock` on; `transform` already refuses non-90° rotation.
@@ -40,8 +40,8 @@ Detect = what to run. Fix = the smallest repair. Row ids are used in Review.
 | C1 | Colour bloat: hundreds to tens of thousands of colours; a "16 colour" prompt gave 528 | `palette` op `get` usage; `validate` palette (off-palette count, note above 64 entries) | `palette` op `extract` with `maxColors` 12–16 (RGB only), `recolor` op `snap`, rebuild ramps |
 | C2 | Near-duplicate shades (ΔE<3 = the same colour to a viewer) | `palette` op `analyze` | Merge with `recolor` op `replace` |
 | C3 | Brightness-only ramps: shadow = same hue, darker | `palette` op `analyze` ramp structure; ramp steps share one hue | `palette` op `ramp` (shadows toward blue/violet, highlights toward orange), `recolor` op `shade` |
-| C4 | Colour noise inside flat regions (JPEG-like) | `read_pixels` on a 4×4 flat patch: more than one colour | `draw` op `fill` with `tolerance` 20–40, contiguous, then `recolor` op `snap` |
-| C5 | Confetti: single pixels of unrelated hue near the subject | `validate` strays only finds specks floating in transparency; specks inside a fill need `look` op `ascii` (a glyph with no same-glyph 4-neighbour) | Repaint with the surrounding colour (`draw` op `pixels`); keep one specular dot or eye |
+| C4 | Colour noise inside flat regions (JPEG-like) | `read_pixels` on a 4×4 flat patch: more than one colour | `draw` kind `fill` with `tolerance` 20–40, contiguous, then `recolor` op `snap` |
+| C5 | Confetti: single pixels of unrelated hue near the subject | `validate` strays only finds specks floating in transparency; specks inside a fill need `look` op `ascii` (a glyph with no same-glyph 4-neighbour) | Repaint with the surrounding colour (`draw` kind `pixels`); keep one specular dot or eye |
 | C6 | Conflicting light: highlights on both sides | Preview; `ascii`: lightest glyph clusters on opposite sides | One direction (`rules://02-shading-and-light`), reshade |
 | C7 | Pillow shading: value falls off from the centre in rings, uniform dark rim | `ascii` of one form shows concentric rings | Offset highlight toward the light, crescent shadow on the far side (template) |
 | C8 | Local colour only: every material one hue, one saturation, no accent | Preview; `recolor` op `desaturate` on a copy shows no focal value | `rules://20-color-for-pixel-art`: temperature and one accent |
@@ -51,18 +51,18 @@ Detect = what to run. Fix = the smallest repair. Row ids are used in Review.
 | Id | Tell | Detect | Fix |
 |----|------|--------|-----|
 | X1 | Speckle as texture: random 1–2 px clusters | `ascii`: many clusters under 3 px | Clusters of ≥3 px that follow the form; fewer |
-| X2 | Dither as a field or noise | `draw` op `dither` pattern `noise` anywhere; dither over about half an object | Add a colour; `checker` / `bayer` only in a 1–3 px transition |
+| X2 | Dither as a field or noise | `draw` kind `dither` pattern `noise` anywhere; dither over about half an object | Add a colour; `checker` / `bayer4` only in a 1–3 px transition |
 | X3 | Banding and hugging: parallel bands with aligned ends | `validate` banding (horizontal run ≥ max(8, width/3), reported as a note); vertical, diagonal and hugging need `ascii` | Stagger the ends, let boundaries wander, dither one short section (template) |
 | X4 | Equal detail everywhere: no resting area | Preview at `scale: 1` fails the 1× test; `read_pixels` regions show similar colour counts everywhere | Delete detail until 1× passes; quiet zones (`rules://91-composition-and-scenes`) |
-| X5 | Smooth gradients on rock, pipe, cloth | `draw` op `gradient` with many `steps` | 3–5 steps; wander the edges; dither only large skies |
+| X5 | Smooth gradients on rock, pipe, cloth | `draw` kind `gradient` with many `steps` | 3–5 steps; wander the edges; dither only large skies |
 | X6 | Software circles: even but lumpy runs | `ascii` run lengths | Hand-edit to monotone runs |
-| X7 | Repeating tile grid | Blit the tile 3×3 with `draw` op `blit`, `look` | Variants; break the lattice |
+| X7 | Repeating tile grid | Blit the tile 3×3 with `draw` kind `blit`, `look` | Variants; break the lattice |
 
 **Edges, alpha and outline**
 
 | Id | Tell | Detect | Fix |
 |----|------|--------|-----|
-| E1 | Semi-transparent pixels and halos | `validate` antialiasing (RGB sprites) | Repaint those pixels opaque with `draw` op `pixels` |
+| E1 | Semi-transparent pixels and halos | `validate` antialiasing (RGB sprites) | Repaint those pixels opaque with `draw` kind `pixels` |
 | E2 | Soft AA: opaque in-between tones, two or more steps from outline to background | `ascii` on an edge; `palette` op `analyze` near-duplicates | Hard 1 px edge; selective AA at most half the step length (`rules://12-anti-aliasing`) |
 | E3 | Colour fringe from an old background | Add a temporary flat contrasting layer below, `look` op `preview` | Recolour the fringe to the outline colour (`transform` op `outline`, `side: "inside"`) |
 | E4 | Broken or doubled outline | `validate` outline: 60–99% one colour = gaps; doubles need `ascii` | Regenerate with `transform` op `outline` |
@@ -326,7 +326,7 @@ Fix: boundaries step every few pixels, one transition crossed by a checker, the 
 1. `reference` op `sample_palette` (`colors: 16`) to see how many distinct colours it wants; `sprite_info` for its size.
 2. Run test (rule 3): `read_pixels` of a 1-row region at a busy y, and one more at another y.
 3. Clean multiples: unscale (rule 5), `palette` op `extract` (`maxColors` 16) then `recolor` op `snap`, clean by hand. Drifting runs: skip to 4.
-4. Redraw at the target size: `reference` op `import` with `fit: "contain"` at low `opacity`, `draw` op `grid` for the silhouette, `look` op `compare` to name the largest mismatches. Fix only those.
+4. Redraw at the target size: `reference` op `import` with `fit: "contain"` at low `opacity`, `draw` kind `grid` for the silhouette, `look` op `compare` to name the largest mismatches. Fix only those.
 5. Finish with the audit above.
 
 ## Mistakes

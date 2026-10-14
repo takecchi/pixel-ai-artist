@@ -231,7 +231,7 @@ W = smear-head  #ffffff
    layer(s) so the body art stays untouched.
 2. **Contrast frame:** `cel` op `copy` the impact frame, `recolor` op `replace` to flat
    white (or dark). Keep the silhouette; this is 1 frame at the front of the hit.
-3. **Smear:** stamp the right `impact-smear-*` with `draw` op `grid` (`transparent: skip`)
+3. **Smear:** stamp the right `impact-smear-*` with `draw` kind `grid` (`transparent: skip`)
    on the strike frame; recolour its three roles to the weapon's two brightest ramp
    colours (`palette` op `get` for indices). Keep the body silhouette stable.
 4. **Spark:** stamp `impact-spark-1/2/3` on three consecutive frames at the contact

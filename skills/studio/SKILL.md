@@ -137,7 +137,7 @@ If a request fits no row, it is usually a direct tool call ("rename the layer",
 Before a stage draws or animates something, read the rule files for its
 subject — every stage, and every agent you hand a stage to. Two or three files
 is normal; reading all of them is not. Each one has size budgets, mistakes, a
-review list and ` ```grid ` templates to transcribe with `draw` op `grid`.
+review list and ` ```grid ` templates to transcribe with `draw` kind `grid`.
 
 | Drawing | Read |
 |---------|------|

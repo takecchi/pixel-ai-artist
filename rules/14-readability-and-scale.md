@@ -263,10 +263,10 @@ M..LD..LMD.
 
 1. Write down the smallest feature that must be visible (a face expression? a gem?) and choose the canvas from that.
 2. Block in the silhouette; run test (2) on a copy: duplicate the layer (`layer` op `duplicate`), collapse every colour to
-   one value (`recolor` op `replace`, or `draw` op `replace`), `look` op `preview`, delete the copy.
+   one value (`recolor` op `replace`, or `draw` kind `replace`), `look` op `preview`, delete the copy.
 3. Fix shape first: separate fused parts with a 1 px gap, break symmetry, exaggerate angles, enlarge the key feature.
 4. Shade; then run test (3): duplicate, `recolor` op `desaturate` with `strength: 1`, `look` op `preview`.
-5. Test (4): a temporary layer under the sprite filled dark, light, then mid-grey (`layer` op, `draw` op `rect`);
+5. Test (4): a temporary layer under the sprite filled dark, light, then mid-grey (`layer` op, `draw` kind `rect`);
    `look` each. Adjust the outline or the background values, not the whole sprite.
 6. Spend the detail budget on the focal point only; delete any interior line that the value steps already say.
 7. `look` op `preview` at `scale: 1`; for animation, `look` op `filmstrip` and the motion test.

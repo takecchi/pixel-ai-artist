@@ -35,7 +35,7 @@ Reusing a part from another open sprite (the same sword for two characters):
 
 ## Splitting baked art
 
-`draw` op `blit` per part, drawing on the part's layer with `fromLayer` naming
+`draw` kind `blit` per part, drawing on the part's layer with `fromLayer` naming
 the baked layer. Without `fromLayer`, `blit` copies from the layer it draws on
 and nothing moves.
 

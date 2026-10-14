@@ -6,7 +6,7 @@ A scene is a decision about where the eye goes. Without it an agent renders ever
 
 1. **One sentence of purpose first.** "This image makes the viewer feel X / learn Y." Any cluster that does not serve it gets deleted. Then classify: a *gameplay* scene (platformer, shmup) wants a muted, simple background so sprites read; an *RPG / adventure* scene can afford rich scenery.
 2. **Canvas from the platform.** Pick a base that integer-scales (`rules://90-platform-styles`): 192×144 (4:3, fits inside 256×224 with a UI border, divides cleanly for pixel-perfect parallax), 256×224, 320×180. Do not resize later.
-3. **Thumbnail before colour.** At 1⁄6–1⁄10 scale (32×24 for 192×144, 32×18 for 320×180) block three value masses with `draw` op `grid`. Look with `look` op `preview`. Fix the layout here; recolouring a bad layout is repainting.
+3. **Thumbnail before colour.** At 1⁄6–1⁄10 scale (32×24 for 192×144, 32×18 for 320×180) block three value masses with `draw` kind `grid`. Look with `look` op `preview`. Fix the layout here; recolouring a bad layout is repainting.
 4. **Horizon at 33–45% from the top** for open land, **55–65%** when the sky is the drama. Never exactly 50%. (Three finished landscapes in the sources sit at 35–44%.)
 5. **Subject on the centre line or a third line**, with at least one subject-width of calm around it. Subject height: 27–49% of canvas in a scenic piece; 10–16% of screen height for a platformer hero (`rules://30-proportions-by-size`).
 6. **One focal point.** It gets the strongest value contrast, the sharpest detail and the one accent hue, usually the complement of its surroundings (warm red mane on cool blue-green; cool blue beetle on warm orange sand). Everything else is subordinate.
@@ -49,7 +49,7 @@ Parallax layers all use the same canvas size aligned at (0,0), nearest-neighbour
 
 ## Templates
 
-Thumbnails are layout, not finished art: transcribe with `draw` op `grid` onto a 32-wide sprite, judge the masses with `look` op `preview`, then scale the plan up by an integer factor.
+Thumbnails are layout, not finished art: transcribe with `draw` kind `grid` onto a 32-wide sprite, judge the masses with `look` op `preview`, then scale the plan up by an integer factor.
 
 Three-plane landscape (horizon row 9 of 20 = 45%, subject on the centre line, about 30% tall). Value ladder: sky → haze → mountains darker → mid grass → near grass darkest. The near plane is the most saturated.
 
@@ -203,9 +203,9 @@ uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu
 ## Procedure
 
 1. Write the purpose sentence and the scene class (gameplay / scenery). `sprite_manage` op `new` at the canvas from rule 2, one layer per plane: sky, far, middle, near, subject, effects. Separate layers let you fix one plane without touching the others (`rules://06-layers-and-rigging`).
-2. Thumbnail: a 32-wide scratch sprite, `draw` op `grid` with the nearest template above. `look` op `preview`; judge the masses before anything else.
+2. Thumbnail: a 32-wide scratch sprite, `draw` kind `grid` with the nearest template above. `look` op `preview`; judge the masses before anything else.
 3. Palette: `palette` op `preset` or `set`, ≤16 entries for 192×144, ramps from `palette` op `ramp`. Assign plane colours by rule 8 (blend toward the haze), reusing entries across planes.
-4. Bands: fill sky and ground bands with `draw` ops `rect` / `gradient` (steps only, `dither` only at band edges). Mountains and clouds as flat silhouettes.
+4. Bands: fill sky and ground bands with `draw` kinds `rect` / `gradient` (steps only, `dither` only at band edges). Mountains and clouds as flat silhouettes.
 5. Subject block-in on its own layer; ground-contact y by rule 22; accent hue by rule 6.
 6. Texture per plane (rule 9), then dither at transitions, then small accents.
 7. Checks: `look` op `preview` with `scale: 1` (1× read, look away, look back); `recolor` op `desaturate` on a **copy** layer for the grey test (focal object must remain the highest-contrast thing against its surroundings); a dark-field and light-field check of the subject; HUD zones clear.

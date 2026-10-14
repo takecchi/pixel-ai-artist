@@ -308,13 +308,13 @@ s = star-arm       #8fa3e0
    canvas height of the sky. `sprite_info` first.
 2. Build the sky ramp with `palette` op `set` (4–5 entries: zenith → horizon), plus a separate
    distance ramp for layers. Load them before drawing, because `paletteLock` snaps to them.
-3. On a `Sky` layer: `draw` op `gradient` (direction vertical, `steps` = band count, `dither` true) or
+3. On a `Sky` layer: `draw` kind `gradient` (direction vertical, `steps` = band count, `dither` true) or
    hand-set each band with `rect`, then `dither` (pattern `checker`) on the 2–4 boundary rows. Vary
    band heights.
-4. On a `Clouds` layer stamp a template with `draw` op `grid` (`transparent: "skip"`), then map its
+4. On a `Clouds` layer stamp a template with `draw` kind `grid` (`transparent: "skip"`), then map its
    roles onto sky-ramp tints. Add far banks first and near clouds last.
 5. Sun / moon / stars on their own layer so they can stay fixed when the clouds scroll.
-6. Distance layers: apply the distance ramp with `draw` op `replace` per layer, or `recolor` op `shade`
+6. Distance layers: apply the distance ramp with `draw` kind `replace` per layer, or `recolor` op `shade`
    and `desaturate` on that layer's region, then `recolor` op `snap`.
 7. Time-of-day variants: duplicate the file, `palette` op `set` on the sky, cloud and distance entries
    only, `recolor` op `hue_shift` for quick previews. Do not repaint.

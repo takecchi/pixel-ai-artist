@@ -14,10 +14,10 @@ in `rules://83-ui-and-icons`, lettering as an effect in `rules://81-impacts-and-
    8×8 and up for titles and headings. At 3 px wide `M`, `N`, `W`, `K`, `X`, `Y` are
    compromises, which is why 3×5 stays caps-only and numeric.
 2. **Use what ships.** `knowledge/fonts/pixel5x7.json` (CC0) is the only bundled font;
-   `draw` op `text` takes `font`, `anchor`, `letterSpacing`, `lineSpacing`, `bold`,
+   `draw` kind `text` takes `font`, `anchor`, `letterSpacing`, `lineSpacing`, `bold`,
    `outlineColor`, `shadowColor`/`shadowOffset`, `scale` and `measureOnly`. Use the font
    instead of drawing letters by hand. For 3×5, stamp glyphs from the sheets below
-   (`draw` op `grid` or `blit`); never improvise a glyph.
+   (`draw` kind `grid` or `blit`); never improvise a glyph.
 3. **Strokes: 1 px, uniform, no anti-aliasing, no italics, no hairlines.** Round shapes get
    no intermediate colour. Bigger fonts use 2 px stems (IBM-style 8×8).
 4. **One baseline, one height.** Caps and digits share a top row and a bottom row;
@@ -75,7 +75,7 @@ A 128 px-wide screen holds 32 chars of 3×5 per line (PICO-8) or about 21 of pro
 
 ## Templates
 
-**5×7 HUD line (58×6).** `draw` op `text` `SCORE 0420`, `pixel5x7`, defaults. Digits are
+**5×7 HUD line (58×6).** `draw` kind `text` `SCORE 0420`, `pixel5x7`, defaults. Digits are
 tabular, so the score never jitters while it counts.
 
 ```grid font-5x7-hud
@@ -124,7 +124,7 @@ oottttootttootos
 ```
 
 **3×5 sheets.** Each glyph 3 px wide (punctuation 1–3), 1 px gap. Copy one glyph out with
-`draw` op `blit` (`from` = its 3×5 box); never retype it.
+`draw` kind `blit` (`from` = its 3×5 box); never retype it.
 
 ```grid font-3x5-a-m
 t = text-fill #2b1d2e
@@ -182,7 +182,7 @@ tt...tt..t..t.t.ttt....ttt...t.ttt.ttt
 ## Procedure
 
 1. Choose the font from rule 1 and the contrast pair from rule 11 (`palette` op `get`).
-2. `draw` op `text` with `measureOnly: true` to get ink bounds; compute the anchor so the
+2. `draw` kind `text` with `measureOnly: true` to get ink bounds; compute the anchor so the
    label is centred or right-aligned, then draw it for real in the same batch.
 3. Add `outlineColor` or `shadowColor` only after reading rule 12; on 3×5, put a
    panel or a 1 px box behind the text instead.

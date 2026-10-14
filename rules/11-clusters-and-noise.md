@@ -261,7 +261,7 @@ OFFFFFFFFFFFDDDDDO
 3. `look` op `ascii` over the shaded area: count the clusters of each tone. More than ~3 per tone per part at 32 px
    means noise; merge.
 4. Hunt orphans: any glyph with no same-glyph orthogonal neighbour. Keep only the allowed kinds (rule 3).
-5. Hunt bands: scan for two edges that share a start and end column or row; shift one by 1 px (`draw` ops
+5. Hunt bands: scan for two edges that share a start and end column or row; shift one by 1 px (`draw` kinds
    `pixels` + `clear` on a 1×1 `region`).
 6. `look` op `preview` at `scale: 1`; squint. Run `validate` (`strays`, `banding`).
 7. For animation, `look` op `filmstrip`: cluster layout of cloth and hair must not re-form between frames.

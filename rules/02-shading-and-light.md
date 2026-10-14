@@ -44,7 +44,7 @@ adds texture. It is not free: at small sizes it reads as noise.
 - Keep the two dithered colours adjacent in a ramp. Dithering between distant
   colours produces visible speckle.
 
-`draw` op `dither` handles the pattern; you choose the two colours and the ratio.
+`draw` kind `dither` handles the pattern; you choose the two colours and the ratio.
 
 ## Anti-aliasing
 

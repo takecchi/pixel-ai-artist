@@ -292,7 +292,7 @@ KhhhhhhhhhhhhhhK
 ## Procedure
 
 1. Pick size from the world's tile; choose projection and light; write the colour budget.
-2. `draw` op `grid` the silhouette in one colour; `look` op `preview` at 1×. Fix shape now.
+2. `draw` kind `grid` the silhouette in one colour; `look` op `preview` at 1×. Fix shape now.
 3. Split into volumes/materials (blade vs hilt, lid vs body, glass vs liquid) with flat roles.
 4. Build one ramp per material with `palette` op `ramp`; add 2–3 steps per material in light
    order; add the one specular/glint pixel last.

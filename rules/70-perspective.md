@@ -239,8 +239,8 @@ KKKK................................
 1. Write one line: projection, light direction, tile or scale. Everything else
    follows from it.
 2. `layer` op `create` a `guide` layer. Draw the horizon row, vanishing point and a
-   long ruler line with `draw` op `line`; hide it before export.
-3. Block each object as a box in flat colour (`draw` ops `rect`, `grid`), tops and
+   long ruler line with `draw` kind `line`; hide it before export.
+3. Block each object as a box in flat colour (`draw` kinds `rect`, `grid`), tops and
    fronts only as the projection allows.
 4. Place receding repeats by writing their gap sequence on the guide first.
 5. Put two sibling sprites side by side and `look` op `preview` at 1×; fix the

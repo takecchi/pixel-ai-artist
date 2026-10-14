@@ -289,13 +289,13 @@ xxxxxxxx
 
 1. `sprite_info`. Decide the water type (tile, side-view, fall, reflection), frame count and loop. Build a water ramp of
    4–5 entries with `palette` op `ramp` or `set`, with hue travel from cyan-teal (light) to indigo (deep).
-2. Base on its own layer: `draw` op `rect` fill, flecks with `pixels`, bands with `rect` and `dither` (pattern
+2. Base on its own layer: `draw` kind `rect` fill, flecks with `pixels`, bands with `rect` and `dither` (pattern
    `checker`) on the joins.
-3. Overlay on a second layer, `draw` op `grid` for ripples. Add frames with `frame` op `duplicate`; move each ripple chunk by
+3. Overlay on a second layer, `draw` kind `grid` for ripples. Add frames with `frame` op `duplicate`; move each ripple chunk by
    re-drawing (≤1 px) or with `cel` op `move` for a whole overlay. Tag the loop with `tag` op `create`.
 4. Waterfall: draw the period pattern once, then each frame is the pattern shifted down by the step with wrap:
-   `draw` op `blit` two pieces (rows 0…H−s to y = s, rows H−s…H to y = 0). The splash is drawn per frame.
-5. Reflection: `draw` op `blit` with `flipVertical` from the object (above its contact line) to below it; `recolor` op
+   `draw` kind `blit` two pieces (rows 0…H−s to y = s, rows H−s…H to y = 0). The splash is drawn per frame.
+5. Reflection: `draw` kind `blit` with `flipVertical` from the object (above its contact line) to below it; `recolor` op
    `shade` (−1 step) and `desaturate` on that region; then one `blit` per 2-row strip with `x ± 1` in one `draw` call, last third
    dithered with `dither` (pattern `checker`) against the water colour.
 6. `look` op `filmstrip` for the loop and `onion` to check ≤1 px moves; `validate` checks `animation` timing and strays.

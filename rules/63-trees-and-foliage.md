@@ -362,9 +362,9 @@ g = ground-shadow  #1f4e3a
 1. `sprite_info`; pick the projection (side, top-down, iso), size and light side. Palette: a 4–5 step leaf ramp with
    hue travel (`palette` op `ramp`), a trunk ramp of 3, and a ground-shadow entry.
 2. Layers: `shadow`, `trunk`, `crown`. Crown goes above the trunk so branches read as inside it.
-3. Silhouette: draw a bundle or the crown with `draw` op `ellipse`/`polyline` in the mid green. Check the black-fill
+3. Silhouette: draw a bundle or the crown with `draw` kind `ellipse`/`polyline` in the mid green. Check the black-fill
    read with `look` op `preview`.
-4. Light: add the upper-left rim and highlight patches (rule 4) with `draw` op `pixels`, then the shade band, then the
+4. Light: add the upper-left rim and highlight patches (rule 4) with `draw` kind `pixels`, then the shade band, then the
    darkest entry on the bottom edge only. Use `recolor` op `shade` for the second and third bundle copies.
 5. Notches along the edge, sky gaps, one leaf pattern on the borders (rules 6, 8). Trunk: stripes, cracks, flare.
 6. Conifers and palms: follow rules 12 and 13, draw tiers and fronds top to bottom.

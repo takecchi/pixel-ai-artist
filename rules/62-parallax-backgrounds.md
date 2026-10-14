@@ -223,9 +223,9 @@ oooooooooooooooooooooooooooooooo
    pick rates from the divisor table, then width = `rate × frames`.
 2. `sprite_manage` op `new` with the layer width × height. One layer per plane (`layer` op `create`, names
    `sky`, `far`, `mid`, `near`, `fg`). Palette: sky ramp, distance ramp, plane ramps via `palette` op `ramp`.
-3. Draw far to near. Each plane: silhouette with `draw` op `grid` or `polyline`, a fill to the bottom, then shading,
+3. Draw far to near. Each plane: silhouette with `draw` kind `grid` or `polyline`, a fill to the bottom, then shading,
    then texture sized by distance. Compute the silhouette so the first and last column match.
-4. Seam check on a scratch copy (`sprite_manage` op `save_as`): `resize_canvas` to 3× width, `draw` op `blit` the
+4. Seam check on a scratch copy (`sprite_manage` op `save_as`): `resize_canvas` to 3× width, `draw` kind `blit` the
    strip to x = width and x = 2 × width, `look` op `preview`. Close without saving over the original.
 5. Motion check: one frame per camera step, `cel` op `set` the layer's `x` to `−rate × frame` (layer pre-tiled twice),
    `look` op `filmstrip` or `onion`. Rates must be whole pixels.

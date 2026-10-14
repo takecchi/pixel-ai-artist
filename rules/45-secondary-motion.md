@@ -241,7 +241,7 @@ O.............O.............O.............O.............O.............O.........
 3. Per frame, mark the anchor (pixel on the body) and 2–3 nodes for the free
    part. Place each node on the previous node's path, one frame late. Write the
    offsets down as in the tables.
-4. Draw the part along those nodes with `draw` op `polyline` or `grid`: 3 px wide
+4. Draw the part along those nodes with `draw` kind `polyline` or `grid`: 3 px wide
    at the root, 2 px at the tip; cast the lower edge in the shade colour.
 5. On a stop or direction change, add the overshoot and settle frames
    (amplitude 3 → 2 → 1 → 0) even if the body has no more frames.

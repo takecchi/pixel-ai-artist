@@ -1,6 +1,6 @@
 # Tiles and autotiling
 
-A tile is drawn once and shown a thousand times, so every flaw is multiplied: a lone rock becomes wallpaper, a seam becomes a grid, an edge set without inner corners breaks on the first L-shaped patch. And an autotile set authored in the wrong order exports a wangset that picks the wrong tile everywhere. This file is the method for seamless tiles, terrain transitions and the standard autotile layouts, and what each means for the `tileset` tool. Ground textures: `rules://65-ground-rocks-grass`; brick, doors, windows: `rules://67-architecture-and-interiors`.
+A tile is drawn once and shown a thousand times, so every flaw is multiplied: a lone rock becomes wallpaper, a seam becomes a grid, an edge set without inner corners breaks on the first L-shaped patch. And an autotile set authored in the wrong order hands the engine a terrain setup that picks the wrong tile everywhere. This file is the method for seamless tiles, terrain transitions and the standard autotile layouts, and how to hand each to an engine as a sheet of cells. Ground textures: `rules://65-ground-rocks-grass`; brick, doors, windows: `rules://67-architecture-and-interiors`.
 
 ## Rules
 
@@ -250,17 +250,17 @@ Edge contract: draw edges per minitile, not per tile. The right edge of every to
 
 There are no tilemap layers or tileset export here. Draw the tiles as cells of one sprite — 8 per row, left to right, in canonical order — and `export` op `png` the sheet. The engine's own terrain setup (a Tiled wangset, Godot peering bits, RPG Maker's A2) takes the bits from the index → mask table above; state your index convention to the user.
 
-To build blob47 from A2 pieces: for each of the 47 masks, take each quarter's state from the table and `draw` op `blit` the four minitiles into its cell.
+To build blob47 from A2 pieces: for each of the 47 masks, take each quarter's state from the table and `draw` kind `blit` the four minitiles into its cell.
 
 ## Procedure
 
 1. Fix the tile size and palette (`rules://21-limited-and-platform-palettes` for platform sets). Make the canvas a whole number of tiles.
 2. Master tile: draw it, blit the four quadrants swapped to move the seam to the middle (`transform` op `translate` does not wrap), rework, swap back.
-3. Wrap test: `draw` op `blit` the tile into its eight neighbours on a scratch layer, `look` op `preview`, then `look` op `ascii` the first and last columns and rows and check they continue each other.
+3. Wrap test: `draw` kind `blit` the tile into its eight neighbours on a scratch layer, `look` op `preview`, then `look` op `ascii` the first and last columns and rows and check they continue each other.
 4. Transitions: composite A and B through the mask, then the boundary pass (rule 12). One edge, one outer corner, one inner corner cover all four sides once flipped and re-lit.
 5. Autotile set: paint the mockup cells in canonical order, body tile (mask 255, index 47) first. For every pair of tiles that show terrain on touching sides, `read_pixels` the border column or row and check it is identical.
 6. No two tiles may be identical: `look` op `ascii` any pair that looks alike, and redraw one if they match.
-7. Test patches on a scratch layer: `draw` op `blit` tiles into a single cell, 3×3, L, ring and plus, then `look` op `preview`.
+7. Test patches on a scratch layer: `draw` kind `blit` tiles into a single cell, 3×3, L, ring and plus, then `look` op `preview`.
 8. `export` op `png` the sheet, and give the user the index → mask table with it.
 9. `validate` `layers`, `strays`.
 
@@ -272,8 +272,8 @@ To build blob47 from A2 pieces: for each of the 47 masks, take each quarter's st
 | Thin vertical line between tiles | Edge column differs between neighbours | Compare border columns with `look` op `ascii`, copy one |
 | Edges have a notch at the junction | Boundary offsets differ between edge and corner | Same offset, both profile ends equal |
 | Light rim on the south side | Flipped a lit edge | Re-run the boundary pass |
-| Export rejected: needs 48 tiles | Set incomplete, or `pack` merged two identical tiles | Draw all 47, make them distinct |
-| Wrong tile chosen everywhere | Tiles not in ascending mask order | Reorder the mockup by the diagram, pack again |
+| Engine's blob47 setup finds fewer than 47 distinct tiles | Set incomplete, or two tiles drawn identical | Draw all 47, make them distinct (`look` op `ascii` any pair that looks alike) |
+| Wrong tile chosen everywhere | Tiles not in ascending mask order | Reorder the cells by the diagram and `export` the sheet again |
 | Inner corners missing | 4-bit set used for blob terrain | Use blob47 or dual-grid |
 | Shadows run across tiles | Real-length cast shadow | One tile max, same length for all heights |
 
@@ -283,7 +283,7 @@ To build blob47 from A2 pieces: for each of the 47 masks, take each quarter's st
 - Variants differ in the centre only; borders are identical.
 - Transition tiles join both full tiles without a visible step; boundary offsets agree on every side.
 - Light direction is the same on all edges; no rim on a south or east edge.
-- Set order is canonical; `tileCount` is 47 (blob47) and the patch tests (single, 3×3, L, ring, plus) look correct.
+- Set order is canonical; the sheet holds 47 distinct cells (blob47) and the patch tests (single, 3×3, L, ring, plus) look correct.
 - Tiles are less saturated than the sprites that walk on them.
 
 ## Sources

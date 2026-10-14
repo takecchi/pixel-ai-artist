@@ -260,10 +260,10 @@ zzzzzzzzzzzzzzzzzzzz
 1. `sprite_info`; write down canvas, horizon row, light side, palette. Set the horizon with a guide line on its own layer.
 2. Palette: sky ramp (4–5), a distance ramp for ranges, and per-plane greens or rock ramps. `palette` op `ramp` for each;
    reuse entries between planes.
-3. Block in four flat masses with `draw` op `rect`/`polyline` (closed, `fill`): sky, far range, mid hills, near ground.
+3. Block in four flat masses with `draw` kind `rect`/`polyline` (closed, `fill`): sky, far range, mid hills, near ground.
    `look` op `preview`, then `recolor` op `desaturate` on a copy: the planes must separate by value alone.
 4. Far to near, each on its own layer (`layer` op `create`): range silhouettes → shading planes → snow → haze → hills → ground.
-   Stamp templates with `draw` op `grid`; adjust the profile by editing rows from `look` op `ascii` (`rulers=false`).
+   Stamp templates with `draw` kind `grid`; adjust the profile by editing rows from `look` op `ascii` (`rulers=false`).
 5. Ground texture last, sized by distance (rule 5). Add the dark frame and a few accents near the focal point.
 6. `look` op `preview` at 1×. Check the player strip is calm, planes are ≥8 px apart, ridge steps are even,
    and the horizon is not at 50 %. `validate` for strays and banding.

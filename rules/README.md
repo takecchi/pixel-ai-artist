@@ -11,13 +11,15 @@ ways:
   word of this still cannot casually break the palette.
 
 Read `rules://index` for the list, or start at `00-core-principles.md`.
-Files are numbered in bands ([ADR-0011](../docs/adr/0011-pixel-art-knowledge-base.md)):
+Files are numbered in bands:
 `0x` core discipline, `1x` technique, `2x` colour and materials, `3x`
 characters, `4x` animation, `5x` creatures, `6x` environments, `7x` objects and
-3D, `8x` effects and UI, `9x` style. Subject files carry ` ```grid ` templates;
-`node --experimental-strip-types scripts/rule-templates.ts [outDir] [code]`
-renders them to PNG, and `tests/rules.test.ts` holds them to the format `draw`
-op `grid` accepts.
+3D, `8x` effects and UI, `9x` style. Subject files carry ` ```grid ` templates
+in the format `draw` kind `grid` accepts.
+
+Where a rule says `draw` kind `grid` (or `blit`, `line`, `dither`…), it means
+one entry of the `draw` tool's `ops` array: `draw ops:[{kind:"grid", x, y,
+legend, rows}]`. `kind` picks the shape; there is no `op` inside `ops`.
 
 Changing a rule here changes behaviour everywhere. Skills reference rules by
 name rather than restating them, so a rule has exactly one place to be wrong.

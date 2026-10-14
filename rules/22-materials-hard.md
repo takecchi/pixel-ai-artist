@@ -236,9 +236,9 @@ Femur: two-lobed knobs, a shaft lit from above (light / mid / shadow rows), warm
 
 1. Pick the gloss class (rule 2) and the ramp from the table; load or write it with `palette` op `set`.
 2. Block in the silhouette with the mid entry; `look` op `preview` — the shape must read before any band is drawn.
-3. Draw base light and base shadow as planes or crescents (`draw` ops `ellipse`, `polyline`, `fill`, or `grid` from a template above).
+3. Draw base light and base shadow as planes or crescents (`draw` kinds `ellipse`, `polyline`, `fill`, or `grid` from a template above).
 4. Add the material layer: bands for metal/gold, border + highlights for glass, facet values for gems, plane entries for stone, grain and bevels for wood.
-5. Place the specular last (1–2 px) with `draw` op `pixels`; skip it on matte materials.
+5. Place the specular last (1–2 px) with `draw` kind `pixels`; skip it on matte materials.
 6. Add one story detail only: scratch, crack, knot, chip. `look` op `ascii` to confirm no orphan pixels and no 2×1 doubles.
 7. For shine or sparkle animation: duplicate frames with `frame` op `duplicate`, move only the spec/facet highlight, set `frame` op `set_duration` (3–4 frames, eased), check with `look` op `filmstrip`.
 8. `validate`.

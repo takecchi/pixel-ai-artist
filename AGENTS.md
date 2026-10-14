@@ -35,6 +35,8 @@ same pull request.
 - Tilesets, slices, linked cels, blend modes, layer groups and `run_lua` are
   not ported and not on the tool surface: no schema field or op names them.
   A command still being ported answers `unsupported_command`.
+- The `submit` skill (a pull request to aseprite-ai-artist's gallery) is not
+  ported; there is no gallery here.
 - No undo. A batch (`draw`, `layer`) lands whole or not at all instead.
 
 ## The rules that are not negotiable

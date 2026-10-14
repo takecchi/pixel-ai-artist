@@ -63,7 +63,7 @@ content, and text whose first line is `<code>: <message>` (`invalid_args`,
 | `transform` | `translate` `flip` `rotate` `scale` `outline` `crop_to_content` | Acts on ONE cel; there is no scope parameter. Rotation is by 90° steps only; other angles are refused. `outline`'s `side` (`outside` default, `inside`) picks which pixels get painted; `diagonals` (default `false`) switches 4- to 8-neighbour. |
 | `recolor` | `shade` `snap` `replace` `hue_shift` `desaturate` | Operates on distinct colours, not pixels, in one pass. |
 
-`draw` op kind `text` lays out a string from a bitmap font and expands it to
+`draw` kind `text` lays out a string from a bitmap font and expands it to
 plain pixels before it is drawn: `text`, `x`, `y`, `color`, `font`
 (name in `knowledge/fonts/`, default `pixel5x7`), `anchor` (one of
 `top_left` `top` `top_right` `left` `center` `right` `bottom_left` `bottom`
@@ -77,7 +77,7 @@ the glyph ink box — outline and shadow never shift it), `letterSpacing`,
 panel or centre a label first. See
 [ADR-0005](adr/0005-bitmap-text.md) and the font format below.
 
-`draw` op kind `grid` is a picture written as text — the writable form of
+`draw` kind `grid` is a picture written as text — the writable form of
 `look op="ascii"`: `x`, `y` (top-left, default 0), `legend` (one character →
 `#rrggbb` or `#rrggbbaa`, or `null` for transparent; `.` is transparent unless redefined),
 `rows` (top to bottom, one character per pixel, every row the same width, at

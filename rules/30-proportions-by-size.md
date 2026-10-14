@@ -199,9 +199,9 @@ J.TTTTT.J......LLL.LLL...........LLLL.LLLL.....
 ## Procedure
 
 1. Write the tone in one line, map it to a head count (rule 2), compute head px (Table A). Under 4 px: lower the count.
-2. `sprite_manage` to confirm the canvas; `layer` op create "dummy". Draw the matching mannequin with `draw` op grid (feet on the bottom row), or lay a guide line with `draw` op line at every head unit.
+2. `sprite_manage` to confirm the canvas; `layer` op create "dummy". Draw the matching mannequin with `draw` kind `grid` (feet on the bottom row), or lay a guide line with `draw` kind `line` at every head unit.
 3. `look` op preview at 1× next to the ladder for the read; `look` op ascii to verify landmark rows against Table B.
-4. Adjust one segment at a time: `draw` op blit the region to its new x/y, then `draw` op clear the old one, comparing against the other segments (`transform` op translate moves a whole cel only). Fix proportions before any colour.
+4. Adjust one segment at a time: `draw` kind `blit` the region to its new x/y, then `draw` kind `clear` the old one, comparing against the other segments (`transform` op translate moves a whole cel only). Fix proportions before any colour.
 5. Dress the dummy (`rules://35-hair-and-clothing`); keep tight clothing first so anatomy is not hidden.
 6. Hide the dummy, run `validate`, then `look` op preview again. Check silhouette against `rules://03-silhouette-and-form`.
 
