@@ -43,7 +43,7 @@ export function configPath(client: ClientId, opts: InstallOptions): string {
         : path.join(project, ".mcp.json");
     case "codex":
       return opts.scope === "user"
-        ? path.join(home, ".codex", "config.toml")
+        ? path.join(process.env.CODEX_HOME || path.join(home, ".codex"), "config.toml")
         : path.join(project, ".codex", "config.toml");
     case "gemini":
       return opts.scope === "user"
@@ -107,10 +107,10 @@ function installOpenCode(file: string, opts: InstallOptions): InstallResult {
     environment: { ...opts.env, PIXEL_AI_PROMPTS: "0" },
   };
   const next = { ...existing, mcp: { ...mcp, servers: { ...servers, [SERVER_KEY]: entry } } };
-  if (opts.dryRun) return { client: "opencode", file, written: false, note: JSON.stringify({ [SERVER_KEY]: entry }, null, 2) };
-  backup(file);
-  writeAtomic(file, JSON.stringify(next, null, 2) + "\n");
-  return { client: "opencode", file, written: true };
+  if (opts.dryRun) {
+    return { client: "opencode", file, written: false, note: JSON.stringify({ mcp: { servers: { [SERVER_KEY]: entry } } }, null, 2) };
+  }
+  return { client: "opencode", file, written: writeIfChanged(file, JSON.stringify(next, null, 2) + "\n") };
 }
 
 function installJson(client: ClientId, file: string, opts: InstallOptions): InstallResult {
@@ -131,12 +131,10 @@ function installJson(client: ClientId, file: string, opts: InstallOptions): Inst
   const next = { ...existing, [key]: { ...servers, [SERVER_KEY]: entry } };
 
   if (opts.dryRun) {
-    return { client, file, written: false, note: JSON.stringify(next[key], null, 2) };
+    return { client, file, written: false, note: JSON.stringify({ [key]: { [SERVER_KEY]: entry } }, null, 2) };
   }
 
-  backup(file);
-  writeAtomic(file, JSON.stringify(next, null, 2) + "\n");
-  return { client, file, written: true };
+  return { client, file, written: writeIfChanged(file, JSON.stringify(next, null, 2) + "\n") };
 }
 
 /**
@@ -161,23 +159,32 @@ function installToml(file: string, opts: InstallOptions): InstallResult {
 
   if (opts.dryRun) return { client: "codex", file, written: false, note: block };
 
-  let existing = existsSync(file) ? readFileSync(file, "utf8") : "";
-  // Anchored to the start of a line: a bare indexOf would also match the header
-  // text inside a comment or a string value and splice around the wrong offset.
-  const headerAt = new RegExp(`^\\s*${header.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`, "m").exec(existing);
-  const start = headerAt?.index ?? -1;
-  if (start !== -1) {
-    // Replace from our header up to the next top-level table that is not ours.
-    const rest = existing.slice(start + header.length);
-    const nextTable = rest.search(/\n\[(?!mcp_servers\.pixel-ai-artist)/);
-    const end = nextTable === -1 ? existing.length : start + header.length + nextTable + 1;
-    existing = existing.slice(0, start) + existing.slice(end);
-  }
+  const kept = withoutOurTables(existsSync(file) ? readFileSync(file, "utf8") : "").trimEnd();
+  return { client: "codex", file, written: writeIfChanged(file, kept ? `${kept}\n\n${block}` : block) };
+}
 
-  backup(file);
-  const separator = existing.length > 0 && !existing.endsWith("\n\n") ? "\n" : "";
-  writeAtomic(file, existing.trimEnd() + "\n" + separator + block);
-  return { client: "codex", file, written: true };
+const OUR_TABLE = `mcp_servers.${SERVER_KEY}`;
+
+/**
+ * Drop our table and its sub-tables (`.env`), from our header up to the next
+ * header that names someone else's table. Names are compared whole, so
+ * `[mcp_servers.pixel-ai-artist-extra]` is not ours.
+ */
+function withoutOurTables(toml: string): string {
+  const lines = toml.split("\n");
+  const start = lines.findIndex((line) => tableName(line) === OUR_TABLE);
+  if (start === -1) return toml;
+  let end = start + 1;
+  for (; end < lines.length; end++) {
+    const name = tableName(lines[end]!);
+    if (name !== undefined && name !== OUR_TABLE && !name.startsWith(`${OUR_TABLE}.`)) break;
+  }
+  return [...lines.slice(0, start), ...lines.slice(end)].join("\n");
+}
+
+/** The name in a `[table]` or `[[array]]` header line, which may end in a comment. */
+function tableName(line: string): string | undefined {
+  return /^\s*\[\[?([^[\]]+)\]\]?\s*(?:#.*)?$/.exec(line)?.[1]!.trim();
 }
 
 /**
@@ -205,9 +212,7 @@ export function mergeAgentsFile(target: string, dryRun: boolean): { written: boo
   const next = content.trimEnd() + (content.trim() ? "\n\n" : "") + wrapped;
 
   if (dryRun) return { written: false, file: target };
-  backup(target);
-  writeAtomic(target, next);
-  return { written: true, file: target };
+  return { written: writeIfChanged(target, next), file: target };
 }
 
 function readJson(file: string): Record<string, unknown> {
@@ -250,6 +255,14 @@ function writeAtomic(file: string, contents: string): void {
     }
     throw err;
   }
+}
+
+/** Back up and write, unless the file already holds exactly this. Returns whether it wrote. */
+function writeIfChanged(file: string, contents: string): boolean {
+  if (existsSync(file) && readFileSync(file, "utf8") === contents) return false;
+  backup(file);
+  writeAtomic(file, contents);
+  return true;
 }
 
 /** Never overwrite someone's config without leaving them a way back. */

@@ -59,8 +59,17 @@ npx pixel-ai-artist install --all --agents
 
 Writes config for Claude Code, Codex, Gemini CLI, Cursor, OpenCode, VS Code
 and Windsurf, and adds an `AGENTS.md` section for the clients that read one.
-Existing config files are backed up first (`.bak-<timestamp>`), and `--dry-run`
-prints the change without making it.
+Existing config files are backed up first (`.bak-<timestamp>`); a file that
+already holds exactly the new content is left alone, with no backup. `--dry-run`
+prints, for each client, the file and the entry under the key it goes in
+(`mcpServers`, `servers`, `mcp.servers` or the TOML table), and writes nothing.
+
+`--agents` takes an optional path, and `--dir` a required one; neither takes a
+client name as its value, so `install --agents codex` installs Codex with the
+default `AGENTS.md`. To pass a path that is also a client name, write
+`--agents=<path>` or `--dir=<path>`. An unknown option is refused rather than
+ignored. A client that fails is reported on stderr, the command exits 1, and
+the others are still written.
 
 ### Workflow names
 
@@ -139,7 +148,11 @@ npx pixel-ai-artist install codex
 
 Writes `[mcp_servers.pixel-ai-artist]` into `~/.codex/config.toml`. Codex uses
 TOML — the JSON config from other clients will not work, which is a common
-source of "it silently does nothing".
+source of "it silently does nothing". A reinstall replaces that table and its
+sub-tables (`[mcp_servers.pixel-ai-artist.env]`) and leaves every other table
+as it was, including ones whose names merely start the same way.
+When `CODEX_HOME` is set and not empty, the file is `$CODEX_HOME/config.toml`
+instead, the same one Codex reads.
 
 Codex does not expose MCP **prompts**, so the skills do not appear as commands
 there. It does read MCP **resources**, which is where the same skill content
@@ -193,7 +206,11 @@ npx pixel-ai-artist install codex cursor --project
 ```
 
 Writes into the current directory (`.codex/config.toml`, `.cursor/mcp.json`) so
-the setup travels with the repository.
+the setup travels with the repository; `--dir <path>` names another one.
+
+Two clients ignore the scope. VS Code is always written to the project
+(`.vscode/mcp.json`), and Windsurf always to the user file
+(`~/.codeium/windsurf/mcp_config.json`), with or without `--project`.
 
 ## 3. Check it
 
