@@ -68,9 +68,25 @@ where *Differences from the original* below says otherwise:
   `background: true`.
 - `export` returns `outputWidth`, `outputHeight` and `scale`: the size of the
   image written, next to `width` and `height`, which stay the sprite's.
-- `draw` kind `clear` with no `rect` counts in `pixelsChanged` only the pixels
-  it cleared, and its `bounds` cover those; the original counted the whole
-  cel. With a `rect` or a selection the count is the original's.
+- `draw` counts in `pixelsChanged` each pixel whose value differs after the
+  batch, once; the original counted writes. A filled rect with an outline is
+  not counted twice, drawing the same thing again counts 0, and `clear`
+  counts only the pixels it cleared. A `clear` with no `rect` has `bounds`
+  around those pixels, where the original counted the whole cel.
+- `draw` kind `text` refuses a character the font has no glyph for
+  (`invalid_args`, naming it and its U+ code), `measureOnly` too; the
+  original skipped it and reported success. Newlines are accepted.
+- `export` refuses an argument its op does not read, when it is not the
+  default (`invalid_args`, naming the ops that read it): `scale` for
+  `aseprite`; `sheetType`, `byTag`, `padding`, `trim` and `includeJson`
+  outside `spritesheet`; `frame` outside `png`.
+- Writing a GIF still rounds partial alpha to opaque or clear, and now says
+  how many pixels it rounded (`alphaRounded`, counted per frame), from
+  `export` `gif`, `png` or `frames` to a `.gif`, and `sprite_manage` `save` /
+  `save_as`. `validate`'s antialiasing check takes layer and cel opacity
+  into account, as the picture does.
+- `reference` `sample_palette` lists the top eight colours with their share
+  (`#rrggbb 12%`) in its reply text, and how many more there are.
 - The text of `validate`, `sprite_manage` `list`, `tag` and `cel` `move` /
   `set` replies says what to do next (a warning is no longer called clean;
   findings past the fifteenth are counted). Their structured results are the
