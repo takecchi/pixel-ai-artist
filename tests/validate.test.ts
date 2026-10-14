@@ -236,6 +236,26 @@ test("outline: a reference layer is left out of the silhouette", async () => {
   assert.deepEqual(await run(studio, { checks: ["outline"] }), []);
 });
 
+test("outline: a separate shape with none of the outline colour — a spark, a glow — is left out, not counted as gaps", async () => {
+  const studio = createStudio();
+  sketch(studio, 14, 7, [...ringed(1, 1, 5, 5, BLACK, RED), ...block(9, 2, 3, 3, GREEN)]);
+  assert.deepEqual(await run(studio, { checks: ["outline"] }), []);
+});
+
+test("outline: beside a spark, a gap in an outlined shape is still a gap, and only that one is named", async () => {
+  const studio = createStudio();
+  sketch(studio, 14, 7, [...repaint(ringed(1, 1, 5, 5, BLACK, RED), [[3, 1]], RED), ...block(9, 2, 3, 3, GREEN)]);
+  const found = await run(studio, { checks: ["outline"] });
+  assert.deepEqual(found.map((f: Reply) => [f.severity, f.count, f.at]), [["warning", 1, { x: 3, y: 1 }]]);
+});
+
+test("outline: a blob touching an outlined shape only at a corner is part of that shape, so its fill running out is a gap", async () => {
+  const studio = createStudio();
+  sketch(studio, 10, 10, [...ringed(1, 1, 5, 5, BLACK, RED), ...block(6, 6, 3, 3, RED)]);
+  const found = await run(studio, { checks: ["outline"] });
+  assert.deepEqual(found.map((f: Reply) => [f.severity, f.count, f.at]), [["warning", 4, { x: 7, y: 6 }]]);
+});
+
 test("outline: a silhouette no colour owns is only a note for its frame, and a clean outline says nothing", async () => {
   const studio = createStudio();
   sketch(studio, 4, 4, [[1, 1, BLACK], [2, 1, RED], [1, 2, GREEN], [2, 2, BLUE]]);

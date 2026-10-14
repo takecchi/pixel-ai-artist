@@ -99,8 +99,7 @@ export function registerStructureTools(server: McpServer, studio: Studio): void 
     },
     async (args) => {
       try {
-        refuseNotPorted(args, NOT_PORTED.layer);
-        (args.batch ?? []).forEach((op, i) => refuseNotPorted(op, NOT_PORTED.layer, `batch[${i}].`));
+        refuseNotPorted(args, NOT_PORTED.layer, args.batch ?? []);
         const data = await studio.call<Record<string, unknown>>("layer.apply", args);
         const faint = (data.faintBackground as { layer: string; opacity: number }[] | undefined) ?? [];
         const note = faint.length > 0 ? ` Background opacity below 255 (${faint.map((b) => `'${b.layer}' ${b.opacity}`).join(", ")}) draws faint here, but saved PNG and GIF come out solid and .aseprite stores 255 (faintBackground).` : "";

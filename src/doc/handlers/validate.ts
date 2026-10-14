@@ -16,6 +16,7 @@ interface Finding {
 
 const ALL_CHECKS = ["palette", "strays", "outline", "banding", "antialiasing", "layers", "animation", "export_readiness"];
 const FOUR: readonly (readonly [number, number])[] = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+const EIGHT: readonly (readonly [number, number])[] = [...FOUR, [1, 1], [1, -1], [-1, 1], [-1, -1]];
 
 /** Fields the Lua left nil are absent, not undefined, so a result compares equal to the plain object it is. */
 function finding(
@@ -42,7 +43,9 @@ const GAPS_NAMED = 5;
  * gap, which flagged selective and coloured outlines too. A gap here is an
  * edge pixel whose colour carries on inward — the fill reaching the
  * background through the outline. An edge pixel in a colour of its own is a
- * different stretch of outline, not a hole.
+ * different stretch of outline, not a hole. Shapes are judged apart: one with
+ * none of the outline colour on its edge — a spark, a glow, a particle — is
+ * meant to have no outline (rules://80-vfx-fire-smoke-magic), so it is left out.
  */
 function outlineFindings(studio: Studio, sprite: Sprite, frame: number, findings: Finding[]): void {
   const img = studio.composite(sprite, frame, { layers: sprite.layers.filter((l) => !l.reference) });
@@ -53,23 +56,45 @@ function outlineFindings(studio: Studio, sprite: Sprite, frame: number, findings
   };
   const isEdge = (x: number, y: number) => FOUR.some(([dx, dy]) => hexAt(x + dx, y + dy) === null);
 
-  const edge: { x: number; y: number; hex: string }[] = [];
+  // Shapes join on diagonals too, so an outline stepped one pixel at a time stays one shape.
+  const shapeOf = new Int32Array(img.width * img.height).fill(-1);
+  let shapes = 0;
+  for (let i = 0; i < shapeOf.length; i++) {
+    if (shapeOf[i] !== -1 || hexAt(i % img.width, Math.floor(i / img.width)) === null) continue;
+    const stack = [i];
+    shapeOf[i] = shapes;
+    while (stack.length > 0) {
+      const at = stack.pop()!;
+      const [x, y] = [at % img.width, Math.floor(at / img.width)];
+      for (const [dx, dy] of EIGHT) {
+        const j = (y + dy) * img.width + x + dx;
+        if (hexAt(x + dx, y + dy) === null || shapeOf[j] !== -1) continue;
+        shapeOf[j] = shapes;
+        stack.push(j);
+      }
+    }
+    shapes++;
+  }
+
+  const all: { x: number; y: number; hex: string; shape: number }[] = [];
   const counts = new Map<string, number>();
   for (let y = 0; y < img.height; y++) {
     for (let x = 0; x < img.width; x++) {
       const hex = hexAt(x, y);
       if (hex === null || !isEdge(x, y)) continue;
       counts.set(hex, (counts.get(hex) ?? 0) + 1);
-      edge.push({ x, y, hex });
+      all.push({ x, y, hex, shape: shapeOf[y * img.width + x]! });
     }
   }
-  if (edge.length === 0) return;
+  if (all.length === 0) return;
 
   let best = "";
   let bestN = 0;
   for (const [hex, n] of counts) {
     if (n > bestN) [best, bestN] = [hex, n];
   }
+  const outlined = new Set(all.filter((e) => e.hex === best).map((e) => e.shape));
+  const edge = all.filter((e) => outlined.has(e.shape));
   const share = bestN / edge.length;
   if (share < 0.6) {
     finding(

@@ -93,7 +93,7 @@ export function registerAssetTools(server: McpServer, studio: Studio): void {
     {
       title: "Export",
       description:
-        "Write game-ready files. Ops: 'png' (single frame), 'gif' (animation), 'spritesheet' (packed sheet plus a JSON atlas with per-frame and per-tag data), 'frames' (numbered PNGs), 'aseprite' (a copy of the document as an .aseprite file). " +
+        "Write game-ready files. Ops: 'png' (single frame), 'gif' (animation), 'spritesheet' (packed sheet plus a JSON atlas with per-frame and per-tag data), 'frames' (one numbered PNG or GIF per frame), 'aseprite' (a copy of the document as an .aseprite file). " +
         "Spritesheet is what an engine actually consumes: pass `sheetType` and `byTag` to control layout. Exporting does not save the working document — use sprite_manage op 'save' for that. " +
         "Reference layers are not left out: a visible one is drawn into the files like any other layer, so `reference op=\"remove\"` it or hide it first. " +
         "An argument the op does not read is refused unless left at its default: `frame` is for 'png' only, `scale` for every op but 'aseprite', and `sheetType`, `byTag`, `padding`, `trim` and `includeJson` for 'spritesheet' only.",

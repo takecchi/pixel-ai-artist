@@ -3,6 +3,8 @@ import { test } from "node:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createServer } from "../dist/server.js";
+import { ToolError } from "../dist/doc/index.js";
+import { NOT_PORTED, refuseNotPorted } from "../dist/tools/not-ported.js";
 
 type Args = Record<string, unknown>;
 
@@ -104,6 +106,48 @@ test("a layer batch item carrying a refused value is refused by its position, fo
       await close();
     }
   }
+});
+
+test("every refused value, top level and batch items together, is named in one refusal with each reason once", async () => {
+  const { raw, text, close } = await connected();
+  try {
+    const result = await raw("layer", {
+      names: ["x"],
+      batch: [
+        { op: "create", name: "a", parent: "group" },
+        { op: "create", name: "b", blendMode: "screen", names: ["c"] },
+        { op: "create", name: "c", parent: "other" },
+      ],
+    });
+    assert.equal(result.isError, true, text(result));
+    const message = text(result);
+    assert.ok(
+      message.startsWith(
+        "invalid_args: `names`, `batch[0].parent`, `batch[1].blendMode`, `batch[1].names` and `batch[2].parent` are not ported in this version. `names`: ",
+      ),
+      message,
+    );
+    assert.equal(message.split("Layer groups are not ported").length - 1, 1, message);
+    assert.equal(message.split("Blend modes are not ported").length - 1, 1, message);
+  } finally {
+    await close();
+  }
+});
+
+test("a refusal keeps the first name in `argument` and lists every one in `arguments`", () => {
+  const refusal = (args: Args, batch: Args[] = []) => {
+    try {
+      refuseNotPorted(args, NOT_PORTED.layer, batch);
+    } catch (err) {
+      return err as ToolError;
+    }
+    assert.fail("expected a refusal");
+  };
+  const one = refusal({ parent: "group" });
+  assert.deepEqual([one.code, one.details.argument, one.details.arguments], ["invalid_args", "parent", ["parent"]]);
+  assert.ok(one.message.startsWith("`parent` is not ported in this version. Layer groups"), one.message);
+  const many = refusal({ blendMode: "multiply" }, [{ parent: "" }, { names: ["a"] }]);
+  assert.deepEqual([many.details.argument, many.details.arguments], ["blendMode", ["blendMode", "batch[1].names"]]);
 });
 
 test("a refused batch item leaves the items before it unapplied", async () => {
